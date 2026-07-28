@@ -1436,6 +1436,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         Math.max(0, pathEnd - start),
       );
       const finish = start + hops;
+      const showLandingNumber = q.mathVisualShowLandingNumber !== false;
+      const showPathSentence = q.mathVisualShowPathSentence !== false;
       const cellWidth = 46;
       const svgWidth = Math.max(460, pathEnd * cellWidth);
       const center = number =>
@@ -1495,7 +1497,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 justify-content:center;
               "
             >
-              ${number}
+${showLandingNumber && number === finish ? "" : number}
             </div>
           `;
         },
@@ -1568,7 +1570,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               ${cells}
             </div>
 
-            <p
+            ${showPathSentence ? `<p
               style="
                 color:#596b7d;
                 font-weight:800;
@@ -1577,7 +1579,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               "
             >
               Start at ${start}. Count on ${hops} to reach ${finish}.
-            </p>
+            </p>` : ""}
           </div>
         </div>
       `;

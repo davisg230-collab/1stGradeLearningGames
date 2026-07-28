@@ -139,6 +139,8 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualCount?: number;
   mathVisualEnd?: number;
   mathVisualHopCount?: number;
+  mathVisualShowLandingNumber?: boolean;
+  mathVisualShowPathSentence?: boolean;
   mathVisualObject?: string;
   mathVisualObjects?: string;
   mathVisualPartOne?: number;
@@ -916,6 +918,8 @@ function MathVisualPreview({
       Math.max(0, pathEnd - start),
     );
     const finish = start + hops;
+    const showLandingNumber = question.mathVisualShowLandingNumber !== false;
+    const showPathSentence = question.mathVisualShowPathSentence !== false;
     const cellWidth = 46;
     const svgWidth = Math.max(460, pathEnd * cellWidth);
     const numberCenter = (number: number) =>
@@ -1036,23 +1040,25 @@ function MathVisualPreview({
                           : undefined,
                     }}
                   >
-                    {number}
+                    {showLandingNumber && isFinish ? null : number}
                   </div>
                 );
               },
             )}
           </div>
 
-          <p
-            style={{
-              color: "#596b7d",
-              fontWeight: 800,
-              margin: "12px 0 0",
-              textAlign: "center",
-            }}
-          >
-            Start at {start}. Count on {hops} to reach {finish}.
-          </p>
+          {showPathSentence ? (
+            <p
+              style={{
+                color: "#596b7d",
+                fontWeight: 800,
+                margin: "12px 0 0",
+                textAlign: "center",
+              }}
+            >
+              Start at {start}. Count on {hops} to reach {finish}.
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -4561,6 +4567,28 @@ export function GameEditorPanel({
                                     }
                                   />
                                 </label>
+                              ) : null}
+
+                              {selectedQuestion.mathVisualType
+                                === "number-path" ? (
+                                <>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualShowLandingNumber !== false}
+                                      onChange={(event) => updateQuestion("mathVisualShowLandingNumber", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show landing number
+                                  </label>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualShowPathSentence !== false}
+                                      onChange={(event) => updateQuestion("mathVisualShowPathSentence", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show sentence underneath
+                                  </label>
+                                </>
                               ) : null}
 
                               {selectedQuestion.mathVisualType
