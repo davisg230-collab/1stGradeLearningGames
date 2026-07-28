@@ -140,6 +140,7 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualEnd?: number;
   mathVisualHopCount?: number;
   mathVisualObject?: string;
+  mathVisualObjects?: string;
   mathVisualPartOne?: number;
   mathVisualPartTwo?: number;
   mathVisualSecondCount?: number;
@@ -168,6 +169,7 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualGroupSize?: number;
   mathVisualShowNumbers?: boolean;
   mathVisualShowTotals?: boolean;
+  mathVisualGraphShowNumbers?: boolean;
   mathVisualType?: string;
   questionImageAlt?: string;
   questionImageStoragePath?: string;
@@ -857,6 +859,20 @@ function MathVisualPreview({
     question.mathVisualObject === "cubes"
       ? "cubes"
       : "circles";
+  const visualObjectSymbols: Record<string, string> = {
+    apples: "\uD83C\uDF4E",
+    bears: "\uD83D\uDC3B",
+    circles: "\u25CF",
+    cubes: "\u25A0",
+    diamonds: "\u25C6",
+    hearts: "\u2665",
+    hexagons: "\u2B22",
+    squares: "\u25A0",
+    stars: "\u2605",
+    triangles: "\u25B2",
+  };
+  const visualObjectSymbol =
+    visualObjectSymbols[question.mathVisualObject ?? ""];
 
   const shellStyle = {
     background: "#fffdf8",
@@ -1063,6 +1079,7 @@ function MathVisualPreview({
       question.mathVisualColorThree || "#ffc857",
     ];
     const showTotals = question.mathVisualShowTotals !== false;
+    const showNumbers = question.mathVisualGraphShowNumbers !== false;
     const categoryHeader = question.mathVisualGraphCategoryHeader?.trim() || "Category";
     const totalLabel = question.mathVisualGraphTotalLabel?.trim() || "Total";
     const gridTemplateColumns = `minmax(110px, 1fr) repeat(${maximum}, 30px)${showTotals ? " 54px" : ""}`;
@@ -1109,7 +1126,7 @@ function MathVisualPreview({
                 textAlign: "center",
               }}
             >
-              {index + 1}
+              {showNumbers ? index + 1 : null}
             </strong>
           ))}
           {showTotals ? (
@@ -1355,6 +1372,11 @@ function MathVisualPreview({
         ? question.mathVisualObject
         : "circles";
     const symbols: Record<string, string> = {
+      diamonds: "\u25C6",
+      hearts: "\u2665",
+      hexagons: "\u2B22",
+      squares: "\u25A0",
+      triangles: "\u25B2",
       apples: "🍎",
       bears: "🧸",
       stars: "★",
@@ -1623,7 +1645,20 @@ function MathVisualPreview({
       (_, index) => rawValues[index] ?? 0,
     );
     const maximum = Math.max(1, ...values);
+    const categoryObjects = (
+      typeof question.mathVisualObjects === "string"
+        ? question.mathVisualObjects
+        : ""
+    )
+      .split(",")
+      .map((object) => object.trim())
+      .filter(Boolean);
     const symbols: Record<string, string> = {
+      diamonds: "\u25C6",
+      hearts: "\u2665",
+      hexagons: "\u2B22",
+      squares: "\u25A0",
+      triangles: "\u25B2",
       apples: "🍎",
       bears: "🧸",
       circles: "●",
@@ -1671,7 +1706,11 @@ function MathVisualPreview({
                           fontSize: "32px",
                         }}
                       >
-                        {symbol}
+                        {symbols[
+                          categoryObjects[index]
+                            || question.mathVisualObject
+                            || "stars"
+                        ] ?? symbol}
                       </span>
                     ),
                   )}
@@ -1947,6 +1986,10 @@ function MathVisualPreview({
   );
   const showNumbers =
     question.mathVisualShowNumbers === true;
+  const usesObjectSymbol = Boolean(visualObjectSymbol)
+    && visualType !== "ten-frame"
+    && visualType !== "linking-cubes"
+    && question.mathVisualObject !== "cubes";
 
   return (
     <div
@@ -1984,24 +2027,34 @@ function MathVisualPreview({
                 alignItems: "center",
                 background: shaded
                   ? "#ffe59a"
-                  : filled
-                    ? cube
-                      ? "#70b7ff"
-                      : "#ff8396"
-                    : "#ffffff",
-                border: "3px solid #354b63",
-                borderRadius: cube ? "9px" : "50%",
+                  : usesObjectSymbol
+                    ? "transparent"
+                    : filled
+                      ? cube
+                        ? "#70b7ff"
+                        : "#ff8396"
+                      : "#ffffff",
+                border: usesObjectSymbol
+                  ? "none"
+                  : "3px solid #354b63",
+                borderRadius: usesObjectSymbol
+                  ? "0"
+                  : cube
+                    ? "9px"
+                    : "50%",
                 boxShadow: [
-                  filled && cube
+                  filled && cube && !usesObjectSymbol
                     ? "inset -6px -6px 0 rgba(0,0,0,.12)"
                     : "",
                   circled
                     ? "0 0 0 5px #7a4cc2"
                     : "",
                 ].filter(Boolean).join(", "),
-                color: "#25384c",
+                color: usesObjectSymbol
+                  ? (shaded ? "#e9b949" : "#ff6f91")
+                  : "#25384c",
                 display: "flex",
-                fontSize: "20px",
+                fontSize: usesObjectSymbol ? "42px" : "20px",
                 fontWeight: 900,
                 height: "54px",
                 justifyContent: "center",
@@ -2011,7 +2064,11 @@ function MathVisualPreview({
                 width: "54px",
               }}
             >
-              {showNumbers ? index + 1 : null}
+              {usesObjectSymbol && filled
+                ? visualObjectSymbol
+                : showNumbers
+                  ? index + 1
+                  : null}
               {crossed ? (
                 <span
                   aria-hidden="true"
@@ -3950,6 +4007,14 @@ export function GameEditorPanel({
                                     />
                                     Show totals column
                                   </label>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualGraphShowNumbers !== false}
+                                      onChange={(event) => updateQuestion("mathVisualGraphShowNumbers", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show number labels (1 to maximum)
+                                  </label>
                                   <div style={{display: "grid", gap: "12px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))"}}>
                                     {([
                                       ["Category 1 color", "mathVisualColorOne", "#70b7ff"],
@@ -4260,6 +4325,62 @@ export function GameEditorPanel({
                                 </>
                               ) : null}
                               {selectedQuestion.mathVisualType
+                                === "picture-graph" ? (
+                                <section className="game-editor-subsection">
+                                  <h4>Picture for each category</h4>
+                                  <span className="field-help">
+                                    Choose a different object for each category row.
+                                  </span>
+                                  {(selectedQuestion.mathVisualLabels
+                                    ?? "Bears,Stars,Apples")
+                                    .split(",")
+                                    .map((label) => label.trim())
+                                    .filter(Boolean)
+                                    .slice(0, 6)
+                                    .map((label, index, labels) => {
+                                      const currentObjects = (selectedQuestion.mathVisualObjects
+                                        ?? "")
+                                        .split(",")
+                                        .map((value) => value.trim());
+                                      const currentObject = currentObjects[index]
+                                        || selectedQuestion.mathVisualObject
+                                        || "stars";
+
+                                      return (
+                                        <label key={`${label}-${index}`}>
+                                          {label} object
+                                          <select
+                                            value={currentObject}
+                                            onChange={(event) => {
+                                              const nextObjects = labels.map((_, objectIndex) =>
+                                                currentObjects[objectIndex]
+                                                || selectedQuestion.mathVisualObject
+                                                || "stars",
+                                              );
+                                              nextObjects[index] = event.target.value;
+                                              updateQuestion(
+                                                "mathVisualObjects",
+                                                nextObjects.join(","),
+                                              );
+                                            }}
+                                          >
+                                            <option value="circles">Circles</option>
+                                            <option value="cubes">Cubes</option>
+                                            <option value="bears">Bears</option>
+                                            <option value="stars">Stars</option>
+                                            <option value="apples">Apples</option>
+                                            <option value="triangles">Triangles</option>
+                                            <option value="squares">Squares</option>
+                                            <option value="diamonds">Diamonds</option>
+                                            <option value="hearts">Hearts</option>
+                                            <option value="hexagons">Hexagons</option>
+                                          </select>
+                                        </label>
+                                      );
+                                    })}
+                                </section>
+                              ) : null}
+                              {selectedQuestion.mathVisualType
                                 === "number-bond" ? (
                                 <div
                                   style={{
@@ -4402,6 +4523,21 @@ export function GameEditorPanel({
                                     </option>
                                     <option value="apples">
                                       Apples
+                                    </option>
+                                    <option value="triangles">
+                                      Triangles
+                                    </option>
+                                    <option value="squares">
+                                      Squares
+                                    </option>
+                                    <option value="diamonds">
+                                      Diamonds
+                                    </option>
+                                    <option value="hearts">
+                                      Hearts
+                                    </option>
+                                    <option value="hexagons">
+                                      Hexagons
                                     </option>
                                   </select>
                                 </label>

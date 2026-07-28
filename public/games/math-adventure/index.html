@@ -1389,6 +1389,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       q.mathVisualObject === "cubes"
         ? "cubes"
         : "circles";
+    const visualObjectSymbols = {
+      apples: "\uD83C\uDF4E",
+      bears: "\uD83D\uDC3B",
+      circles: "\u25CF",
+      cubes: "\u25A0",
+      diamonds: "\u25C6",
+      hearts: "\u2665",
+      hexagons: "\u2B22",
+      squares: "\u25A0",
+      stars: "\u2605",
+      triangles: "\u25B2",
+    };
+    const visualObjectSymbol = visualObjectSymbols[q.mathVisualObject] || "";
 
     if (type === "number-path") {
       const pathEnd = Math.max(
@@ -1582,6 +1595,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         typeof q.mathVisualColorThree === "string" ? q.mathVisualColorThree : "#ffc857",
       ];
       const showTotals = q.mathVisualShowTotals !== false;
+      const showNumbers = q.mathVisualGraphShowNumbers !== false;
       const categoryHeader = typeof q.mathVisualGraphCategoryHeader === "string" && q.mathVisualGraphCategoryHeader.trim()
         ? q.mathVisualGraphCategoryHeader.trim()
         : "Category";
@@ -1592,7 +1606,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <strong style="background:#e9f4ff;padding:8px">${escapeHtml(categoryHeader)}</strong>
         ${Array.from(
           {length: maximum},
-          (_, index) => `<strong style="background:#e9f4ff;padding:8px 2px;text-align:center">${index + 1}</strong>`,
+          (_, index) => `<strong style="background:#e9f4ff;padding:8px 2px;text-align:center">${showNumbers ? index + 1 : ""}</strong>`,
         ).join("")}
         ${showTotals ? `<strong style="background:#e9f4ff;padding:8px">${escapeHtml(totalLabel)}</strong>` : ""}
       `;
@@ -1728,6 +1742,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? q.mathVisualObject
           : "circles";
       const symbols = {
+        diamonds: "\u25C6",
+        hearts: "\u2665",
+        hexagons: "\u2B22",
+        squares: "\u25A0",
+        triangles: "\u25B2",
         apples: "🍎",
         bears: "🧸",
         stars: "★",
@@ -1943,7 +1962,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         (_, index) => rawValues[index] || 0,
       );
       const maximum = Math.max(1, ...values);
+      const categoryObjects = typeof q.mathVisualObjects === "string"
+        ? q.mathVisualObjects.split(",").map(value => value.trim())
+        : [];
+      const symbolForCategory = index =>
+        symbols[categoryObjects[index] || q.mathVisualObject] || symbol;
       const symbols = {
+        diamonds: "\u25C6",
+        hearts: "\u2665",
+        hexagons: "\u2B22",
+        squares: "\u25A0",
+        triangles: "\u25B2",
         apples: "🍎",
         bears: "🧸",
         circles: "●",
@@ -1960,7 +1989,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div style="display:flex;flex-wrap:wrap;gap:6px">
                 ${Array.from(
                   {length: values[index]},
-                  () => `<span style="color:${index % 2 ? "#ff8396" : "#70b7ff"};font-size:32px">${symbol}</span>`,
+                  () => `<span style="color:${index % 2 ? "#ff8396" : "#70b7ff"};font-size:32px">${symbolForCategory(index)}</span>`,
                 ).join("")}
               </div>
               <strong>${values[index]}</strong>
@@ -2157,6 +2186,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       cellCount,
     );
     const showNumbers = q.mathVisualShowNumbers === true;
+    const usesObjectSymbol = Boolean(visualObjectSymbol)
+      && type !== "ten-frame"
+      && type !== "linking-cubes"
+      && q.mathVisualObject !== "cubes";
 
     const cells = Array.from(
       {length: cellCount},
@@ -2173,11 +2206,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const grouped = index < groupSize;
         const background = shaded
           ? "#ffe59a"
-          : filled
-            ? cube
-              ? "#70b7ff"
-              : "#ff8396"
-            : "#ffffff";
+          : usesObjectSymbol
+            ? "transparent"
+            : filled
+              ? cube
+                ? "#70b7ff"
+                : "#ff8396"
+              : "#ffffff";
 
         return `
           <span
@@ -2185,16 +2220,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             style="
               align-items:center;
               background:${background};
-              border:3px solid #354b63;
-              border-radius:${cube ? "9px" : "50%"};
+              border:${usesObjectSymbol ? "none" : "3px solid #354b63"};
+              border-radius:${usesObjectSymbol ? "0" : cube ? "9px" : "50%"};
               box-shadow:${circled
                 ? "0 0 0 5px #7a4cc2"
-                : filled && cube
+                : filled && cube && !usesObjectSymbol
                   ? "inset -6px -6px 0 rgba(0,0,0,.12)"
                   : "none"};
-              color:#25384c;
+              color:${usesObjectSymbol ? "#ff6f91" : "#25384c"};
               display:flex;
-              font-size:20px;
+              font-size:${usesObjectSymbol ? "42px" : "20px"};
               font-weight:900;
               height:54px;
               justify-content:center;
@@ -2205,7 +2240,9 @@ document.addEventListener("DOMContentLoaded", async () => {
               width:54px;
             "
           >
-            ${showNumbers ? index + 1 : ""}
+            ${usesObjectSymbol && filled
+              ? visualObjectSymbol
+              : showNumbers ? index + 1 : ""}
             ${crossed
               ? '<b style="color:#d53c4e;font-size:54px;font-weight:400;left:5px;line-height:1;position:absolute;top:-2px">×</b>'
               : ""}
