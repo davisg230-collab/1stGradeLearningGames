@@ -1,0 +1,817 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isTeacherEditor() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'davisg230@gmail.com',
+          'lvest1@crossroadsschoolskc.org'
+        ];
+    }
+
+    function isOwnedBySignedInTeacher() {
+      return isTeacherEditor()
+        && resource.data.teacherEmail == request.auth.token.email;
+    }
+
+    function isValidCardId(cardId) {
+      return cardId.matches('^(CKLA Skills:unit-[0-9]+|Eureka Math:module-[0-9]+)$');
+    }
+
+    function isValidName(value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 40;
+    }
+
+    function isValidNameKey(value) {
+      return value is string
+        && value.matches('^[a-z]{1,30}$');
+    }
+
+    function isValidChoice(value) {
+      return value is string
+        && value.matches('^[A-Za-z0-9 _./-]{1,50}$');
+    }
+
+    function isValidWord(value) {
+      return value is string
+        && value.matches('^[A-Z0-9]{1,30}$');
+    }
+
+    function isValidPublicGameId(value) {
+      return value in [
+        'ckla-unit-1-word-builder-blast',
+        'ckla-unit-2-long-vowel-quest',
+        'unit1-zone1-sound-safari'
+      ];
+    }
+
+    function isValidEditableGameId(gameId) {
+      return gameId is string
+        && gameId.matches('^[a-z0-9-]{3,80}$');
+    }
+
+    function isValidEditableGameDefinition(gameId) {
+      return request.resource.data.keys().hasOnly([
+          'createdAt',
+          'draftVersion',
+          'gameId',
+          'publishedVersion',
+          'schemaVersion',
+          'subject',
+          'title',
+          'unitSlug',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && request.resource.data.keys().hasAll([
+          'gameId',
+          'publishedVersion',
+          'schemaVersion',
+          'subject',
+          'title',
+          'unitSlug',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && request.resource.data.gameId == gameId
+        && isValidEditableGameId(request.resource.data.gameId)
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.subject in [
+          'ckla',
+          'math'
+        ]
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.unitSlug is string
+        && request.resource.data.unitSlug.matches('^[a-z0-9-]{3,80}$')
+        && request.resource.data.publishedVersion is string
+        && request.resource.data.publishedVersion.size() <= 80
+        && (
+          !request.resource.data.keys().hasAny(['draftVersion'])
+          || request.resource.data.draftVersion == null
+          || (
+            request.resource.data.draftVersion is string
+            && request.resource.data.draftVersion.size() <= 80
+          )
+        )
+        && (
+          !request.resource.data.keys().hasAny(['createdAt'])
+          || request.resource.data.createdAt is timestamp
+        )
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.token.email;
+    }
+
+    function isValidEditableGameContent() {
+      return request.resource.data.content is map
+        && request.resource.data.content.keys().hasOnly([
+          'levels',
+          'questions',
+          'schemaVersion',
+          'supplementalQuestions',
+          'unitTitle',
+          'zoneEncouragements'
+        ])
+        && request.resource.data.content.keys().hasAll([
+          'levels',
+          'questions',
+          'schemaVersion'
+        ])
+        && request.resource.data.content.schemaVersion == 1
+        && request.resource.data.content.levels is list
+        && request.resource.data.content.levels.size() > 0
+        && request.resource.data.content.levels.size() <= 40
+        && request.resource.data.content.questions is list
+        && request.resource.data.content.questions.size() > 0
+        && request.resource.data.content.questions.size() <= 300
+        && (
+          !request.resource.data.content.keys().hasAny(['supplementalQuestions'])
+          || (
+            request.resource.data.content.supplementalQuestions is list
+            && request.resource.data.content.supplementalQuestions.size() <= 300
+          )
+        )
+        && (
+          !request.resource.data.content.keys().hasAny(['unitTitle'])
+          || (
+            request.resource.data.content.unitTitle is string
+            && request.resource.data.content.unitTitle.size() <= 120
+          )
+        )
+        && (
+          !request.resource.data.content.keys().hasAny(['zoneEncouragements'])
+          || (
+            request.resource.data.content.zoneEncouragements is list
+            && request.resource.data.content.zoneEncouragements.size() <= 80
+          )
+        );
+    }
+
+    function isValidEditableGameVersion(versionId) {
+      return request.resource.data.keys().hasOnly([
+          'content',
+          'createdAt',
+          'schemaVersion',
+          'status',
+          'updatedAt',
+          'updatedBy',
+          'versionId'
+        ])
+        && request.resource.data.keys().hasAll([
+          'content',
+          'schemaVersion',
+          'status',
+          'updatedAt',
+          'updatedBy',
+          'versionId'
+        ])
+        && request.resource.data.versionId == versionId
+        && request.resource.data.versionId is string
+        && request.resource.data.versionId.size() > 0
+        && request.resource.data.versionId.size() <= 80
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.status in [
+          'draft',
+          'published'
+        ]
+        && isValidEditableGameContent()
+        && (
+          !request.resource.data.keys().hasAny(['createdAt'])
+          || request.resource.data.createdAt is timestamp
+        )
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.token.email;
+    }
+
+    function isSoundSafariLevelFieldsValid() {
+      return request.resource.data.keys().hasAll([
+          'levelId',
+          'levelIndex',
+          'levelName'
+        ])
+        && request.resource.data.levelId in [
+          'level-1',
+          'level-2',
+          'level-3',
+          'level-4',
+          'level-5',
+          'level-6'
+        ]
+        && request.resource.data.levelIndex is int
+        && request.resource.data.levelIndex >= 0
+        && request.resource.data.levelIndex <= 5
+        && request.resource.data.levelName is string
+        && request.resource.data.levelName in [
+          'Back-to-School Basecamp',
+          'Code Trail',
+          'Digraph Crossing',
+          'Spelling Ridge',
+          'Sentence Springs',
+          'Unit 1 Summit'
+        ];
+    }
+
+    function isSoundSafariResultTotalsValid() {
+      return isSoundSafariLevelFieldsValid()
+        && (
+          (
+            request.resource.data.levelId == 'level-1'
+            && request.resource.data.levelIndex == 0
+            && request.resource.data.levelName == 'Back-to-School Basecamp'
+            && request.resource.data.totalQuestions == 12
+            && request.resource.data.score <= 12
+            && request.resource.data.missedCount <= 12
+            && request.resource.data.missedQuestions.size() <= 12
+          )
+          || (
+            request.resource.data.levelId == 'level-2'
+            && request.resource.data.levelIndex == 1
+            && request.resource.data.levelName == 'Code Trail'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.missedCount <= 15
+            && request.resource.data.missedQuestions.size() <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-3'
+            && request.resource.data.levelIndex == 2
+            && request.resource.data.levelName == 'Digraph Crossing'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.missedCount <= 15
+            && request.resource.data.missedQuestions.size() <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-4'
+            && request.resource.data.levelIndex == 3
+            && request.resource.data.levelName == 'Spelling Ridge'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.missedCount <= 15
+            && request.resource.data.missedQuestions.size() <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-5'
+            && request.resource.data.levelIndex == 4
+            && request.resource.data.levelName == 'Sentence Springs'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.missedCount <= 15
+            && request.resource.data.missedQuestions.size() <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-6'
+            && request.resource.data.levelIndex == 5
+            && request.resource.data.levelName == 'Unit 1 Summit'
+            && request.resource.data.totalQuestions == 20
+            && request.resource.data.score <= 20
+            && request.resource.data.missedCount <= 20
+            && request.resource.data.missedQuestions.size() <= 20
+          )
+        );
+    }
+
+    function isSoundSafariProgressTotalsValid() {
+      return isSoundSafariLevelFieldsValid()
+        && (
+          (
+            request.resource.data.levelId == 'level-1'
+            && request.resource.data.levelIndex == 0
+            && request.resource.data.levelName == 'Back-to-School Basecamp'
+            && request.resource.data.totalQuestions == 12
+            && request.resource.data.score <= 12
+            && request.resource.data.questionsCompleted <= 12
+            && request.resource.data.currentQuestionIndex <= 12
+          )
+          || (
+            request.resource.data.levelId == 'level-2'
+            && request.resource.data.levelIndex == 1
+            && request.resource.data.levelName == 'Code Trail'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.questionsCompleted <= 15
+            && request.resource.data.currentQuestionIndex <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-3'
+            && request.resource.data.levelIndex == 2
+            && request.resource.data.levelName == 'Digraph Crossing'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.questionsCompleted <= 15
+            && request.resource.data.currentQuestionIndex <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-4'
+            && request.resource.data.levelIndex == 3
+            && request.resource.data.levelName == 'Spelling Ridge'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.questionsCompleted <= 15
+            && request.resource.data.currentQuestionIndex <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-5'
+            && request.resource.data.levelIndex == 4
+            && request.resource.data.levelName == 'Sentence Springs'
+            && request.resource.data.totalQuestions == 15
+            && request.resource.data.score <= 15
+            && request.resource.data.questionsCompleted <= 15
+            && request.resource.data.currentQuestionIndex <= 15
+          )
+          || (
+            request.resource.data.levelId == 'level-6'
+            && request.resource.data.levelIndex == 5
+            && request.resource.data.levelName == 'Unit 1 Summit'
+            && request.resource.data.totalQuestions == 20
+            && request.resource.data.score <= 20
+            && request.resource.data.questionsCompleted <= 20
+            && request.resource.data.currentQuestionIndex <= 20
+          )
+        );
+    }
+
+    function isSoundSafariMasteryFieldsValid() {
+      return request.resource.data.keys().hasAll([
+          'masteredLevel',
+          'masteryCount',
+          'masteryEarned',
+          'masteryTarget',
+          'soundSafariComplete'
+        ])
+        && request.resource.data.masteredLevel is bool
+        && request.resource.data.masteryCount is int
+        && request.resource.data.masteryCount >= 0
+        && request.resource.data.masteryCount <= 3
+        && request.resource.data.masteryEarned is bool
+        && request.resource.data.masteryTarget == 3
+        && request.resource.data.soundSafariComplete is bool;
+    }
+
+    function isValidCardEdit() {
+      return request.resource.data.keys().hasOnly([
+          'description',
+          'icon',
+          'title',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && request.resource.data.keys().hasAll([
+          'description',
+          'icon',
+          'title',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 240
+        && request.resource.data.icon is string
+        && request.resource.data.icon.size() > 0
+        && request.resource.data.icon.size() <= 500
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.token.email;
+    }
+
+    function isValidTeacherLog() {
+      return request.resource.data.keys().hasOnly([
+          'action',
+          'cardKey',
+          'email',
+          'timestamp'
+        ])
+        && request.resource.data.keys().hasAll([
+          'action',
+          'cardKey',
+          'email',
+          'timestamp'
+        ])
+        && request.resource.data.action in [
+          'enter-edit-mode',
+          'exit-edit-mode',
+          'reset-card',
+          'update-card'
+        ]
+        && (
+          request.resource.data.cardKey == null
+          || (
+            request.resource.data.cardKey is string
+            && isValidCardId(request.resource.data.cardKey)
+          )
+        )
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.timestamp is timestamp;
+    }
+
+    function isValidScholar() {
+      return request.resource.data.keys().hasOnly([
+          'active',
+          'createdAt',
+          'firstName',
+          'firstNameKey',
+          'lastName',
+          'lastNameKey',
+          'teacherEmail',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'active',
+          'createdAt',
+          'firstName',
+          'firstNameKey',
+          'lastName',
+          'lastNameKey',
+          'teacherEmail',
+          'updatedAt'
+        ])
+        && request.resource.data.active is bool
+        && isValidName(request.resource.data.firstName)
+        && isValidName(request.resource.data.lastName)
+        && isValidNameKey(request.resource.data.firstNameKey)
+        && isValidNameKey(request.resource.data.lastNameKey)
+        && request.resource.data.teacherEmail == request.auth.token.email
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function isValidIndividualResult() {
+      return request.resource.data.keys().hasOnly([
+          'attempts',
+          'completedAt',
+          'createdAt',
+          'gameId',
+          'gameTitle',
+          'incorrectSelections',
+          'levelId',
+          'levelIndex',
+          'levelName',
+          'masteredLevel',
+          'masteryCount',
+          'masteryEarned',
+          'masteryTarget',
+          'missedCount',
+          'missedQuestions',
+          'mode',
+          'percent',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'soundSafariComplete',
+          'teacherEmail',
+          'totalQuestions'
+        ])
+        && request.resource.data.keys().hasAll([
+          'attempts',
+          'completedAt',
+          'createdAt',
+          'gameId',
+          'gameTitle',
+          'incorrectSelections',
+          'missedCount',
+          'missedQuestions',
+          'mode',
+          'percent',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'teacherEmail',
+          'totalQuestions'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.mode == 'individual-complete'
+        && request.resource.data.teacherEmail == 'unassigned'
+        && request.resource.data.scholarId == null
+        && isValidName(request.resource.data.scholarFirstName)
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && isValidPublicGameId(request.resource.data.gameId)
+        && request.resource.data.gameTitle is string
+        && request.resource.data.gameTitle.size() > 0
+        && request.resource.data.gameTitle.size() <= 80
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && (
+          (
+            request.resource.data.gameId == 'ckla-unit-1-word-builder-blast'
+            && request.resource.data.score <= 34
+            && request.resource.data.totalQuestions == 34
+            && request.resource.data.missedCount <= 34
+            && request.resource.data.missedQuestions.size() <= 34
+          )
+          || (
+            request.resource.data.gameId == 'ckla-unit-2-long-vowel-quest'
+            && request.resource.data.score <= 34
+            && request.resource.data.totalQuestions == 34
+            && request.resource.data.missedCount <= 34
+            && request.resource.data.missedQuestions.size() <= 34
+          )
+          || (
+            request.resource.data.gameId == 'unit1-zone1-sound-safari'
+            && isSoundSafariResultTotalsValid()
+            && isSoundSafariMasteryFieldsValid()
+          )
+        )
+        && request.resource.data.percent is int
+        && request.resource.data.percent >= 0
+        && request.resource.data.percent <= 100
+        && request.resource.data.attempts is int
+        && request.resource.data.attempts >= 0
+        && request.resource.data.attempts <= 100
+        && request.resource.data.missedCount is int
+        && request.resource.data.missedCount >= 0
+        && request.resource.data.incorrectSelections is list
+        && request.resource.data.incorrectSelections.size() <= 100
+        && request.resource.data.missedQuestions is list
+        && request.resource.data.completedAt is timestamp
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidWholeClassMiss() {
+      return request.resource.data.keys().hasOnly([
+          'attempts',
+          'completedAt',
+          'correctAnswer',
+          'createdAt',
+          'gameId',
+          'gameTitle',
+          'incorrectSelection',
+          'incorrectSelections',
+          'missedCount',
+          'missedQuestions',
+          'mode',
+          'questionIndex',
+          'schemaVersion',
+          'scholarDisplayName',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'teacherEmail',
+          'totalQuestions',
+          'word'
+        ])
+        && request.resource.data.keys().hasAll([
+          'attempts',
+          'completedAt',
+          'correctAnswer',
+          'createdAt',
+          'gameId',
+          'gameTitle',
+          'incorrectSelection',
+          'incorrectSelections',
+          'missedCount',
+          'missedQuestions',
+          'mode',
+          'questionIndex',
+          'schemaVersion',
+          'scholarDisplayName',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'teacherEmail',
+          'totalQuestions',
+          'word'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.mode == 'whole-class-miss'
+        && (
+          request.resource.data.teacherEmail == 'unassigned'
+          || request.resource.data.teacherEmail in [
+            'davisg230@gmail.com',
+            'lvest1@crossroadsschoolskc.org'
+          ]
+        )
+        && request.resource.data.scholarId == null
+        && isValidName(request.resource.data.scholarFirstName)
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && request.resource.data.scholarDisplayName is string
+        && request.resource.data.scholarDisplayName.matches('^[A-Z]{1,3}(-[0-9]+)?$')
+        && isValidPublicGameId(request.resource.data.gameId)
+        && request.resource.data.gameTitle is string
+        && request.resource.data.gameTitle.size() > 0
+        && request.resource.data.gameTitle.size() <= 80
+        && isValidWord(request.resource.data.word)
+        && isValidChoice(request.resource.data.correctAnswer)
+        && isValidChoice(request.resource.data.incorrectSelection)
+        && request.resource.data.questionIndex is int
+        && request.resource.data.questionIndex >= 1
+        && (
+          (
+            request.resource.data.gameId == 'ckla-unit-1-word-builder-blast'
+            && request.resource.data.questionIndex <= 34
+          )
+          || (
+            request.resource.data.gameId == 'ckla-unit-2-long-vowel-quest'
+            && request.resource.data.questionIndex <= 34
+          )
+          || (
+            request.resource.data.gameId == 'unit1-zone1-sound-safari'
+            && request.resource.data.questionIndex <= 65
+          )
+        )
+        && request.resource.data.score == 0
+        && request.resource.data.totalQuestions == 1
+        && request.resource.data.attempts == 1
+        && request.resource.data.missedCount == 1
+        && request.resource.data.incorrectSelections is list
+        && request.resource.data.incorrectSelections.size() == 1
+        && request.resource.data.missedQuestions is list
+        && request.resource.data.missedQuestions.size() == 1
+        && request.resource.data.completedAt is timestamp
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidProgressSubmission(progressId) {
+      return request.resource.data.keys().hasOnly([
+          'completedAt',
+          'createdAt',
+          'currentQuestionIndex',
+          'currentQuestionLabel',
+          'currentWord',
+          'gameId',
+          'gameTitle',
+          'levelId',
+          'levelIndex',
+          'levelName',
+          'mode',
+          'percentComplete',
+          'questionsCompleted',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'sessionId',
+          'status',
+          'teacherEmail',
+          'totalQuestions',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'completedAt',
+          'createdAt',
+          'currentQuestionIndex',
+          'currentQuestionLabel',
+          'currentWord',
+          'gameId',
+          'gameTitle',
+          'mode',
+          'percentComplete',
+          'questionsCompleted',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'sessionId',
+          'status',
+          'teacherEmail',
+          'totalQuestions',
+          'updatedAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.mode == 'session-progress'
+        && request.resource.data.sessionId == progressId
+        && request.resource.data.sessionId is string
+        && request.resource.data.sessionId.matches('^[A-Za-z0-9-]{10,80}$')
+        && request.resource.data.status in [
+          'started',
+          'in-progress',
+          'left-early',
+          'completed'
+        ]
+        && (
+          request.resource.data.teacherEmail == 'unassigned'
+          || request.resource.data.teacherEmail in [
+            'davisg230@gmail.com',
+            'lvest1@crossroadsschoolskc.org'
+          ]
+        )
+        && request.resource.data.scholarId == null
+        && isValidName(request.resource.data.scholarFirstName)
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && isValidPublicGameId(request.resource.data.gameId)
+        && request.resource.data.gameTitle is string
+        && request.resource.data.gameTitle.size() > 0
+        && request.resource.data.gameTitle.size() <= 80
+        && request.resource.data.currentQuestionLabel is string
+        && request.resource.data.currentQuestionLabel.size() > 0
+        && request.resource.data.currentQuestionLabel.size() <= 100
+        && isValidWord(request.resource.data.currentWord)
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.questionsCompleted is int
+        && request.resource.data.questionsCompleted >= 0
+        && request.resource.data.currentQuestionIndex is int
+        && request.resource.data.currentQuestionIndex >= 1
+        && (
+          (
+            request.resource.data.gameId == 'ckla-unit-1-word-builder-blast'
+            && request.resource.data.totalQuestions == 34
+            && request.resource.data.score <= 34
+            && request.resource.data.questionsCompleted <= 34
+            && request.resource.data.currentQuestionIndex <= 34
+          )
+          || (
+            request.resource.data.gameId == 'ckla-unit-2-long-vowel-quest'
+            && request.resource.data.totalQuestions == 34
+            && request.resource.data.score <= 34
+            && request.resource.data.questionsCompleted <= 34
+            && request.resource.data.currentQuestionIndex <= 34
+          )
+          || (
+            request.resource.data.gameId == 'unit1-zone1-sound-safari'
+            && isSoundSafariProgressTotalsValid()
+          )
+        )
+        && request.resource.data.percentComplete is int
+        && request.resource.data.percentComplete >= 0
+        && request.resource.data.percentComplete <= 100
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (
+          request.resource.data.completedAt == null
+          || request.resource.data.completedAt is timestamp
+        );
+    }
+
+    function canReadResult() {
+      return isTeacherEditor();
+    }
+
+    match /gameHubCards/{cardId} {
+      allow read: if true;
+      allow create, update: if isTeacherEditor()
+        && isValidCardId(cardId)
+        && isValidCardEdit();
+      allow delete: if isTeacherEditor()
+        && isValidCardId(cardId);
+    }
+
+    match /gameHubTeacherLogs/{logId} {
+      allow create: if isTeacherEditor()
+        && isValidTeacherLog();
+      allow read, delete: if isTeacherEditor();
+      allow update: if false;
+    }
+
+    match /gameHubGameDefinitions/{gameId} {
+      allow read: if isValidEditableGameId(gameId);
+      allow create, update: if isTeacherEditor()
+        && isValidEditableGameId(gameId)
+        && isValidEditableGameDefinition(gameId);
+      allow delete: if isTeacherEditor()
+        && isValidEditableGameId(gameId);
+
+      match /versions/{versionId} {
+        allow read: if isTeacherEditor()
+          || resource.data.status == 'published';
+        allow create, update: if isTeacherEditor()
+          && isValidEditableGameId(gameId)
+          && isValidEditableGameVersion(versionId);
+        allow delete: if isTeacherEditor()
+          && isValidEditableGameId(gameId);
+      }
+
+      match /audioClips/{clipId} {
+        allow read, write: if isTeacherEditor()
+          && isValidEditableGameId(gameId);
+      }
+    }
+
+    match /gameHubScholars/{scholarId} {
+      allow create: if isTeacherEditor()
+        && isValidScholar();
+      allow read: if isTeacherEditor();
+      allow delete: if isOwnedBySignedInTeacher();
+      allow update: if isOwnedBySignedInTeacher()
+        && isValidScholar();
+    }
+
+    match /gameHubResultSubmissions/{resultId} {
+      allow create: if isValidIndividualResult()
+        || isValidWholeClassMiss();
+      allow read, delete: if canReadResult();
+      allow update: if false;
+    }
+
+    match /gameHubProgressSubmissions/{progressId} {
+      allow create, update: if isValidProgressSubmission(progressId);
+      allow read, delete: if isTeacherEditor();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

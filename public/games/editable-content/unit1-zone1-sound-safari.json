@@ -1,0 +1,3621 @@
+{
+  "content": {
+    "levels": [
+      {
+        "name": "Back-to-School Basecamp",
+        "lessonRange": "Lessons 1-5",
+        "practiceLabel": "Practice after Lesson 5",
+        "detail": "Match early letters and sounds, read short-vowel words, identify nouns, and practice the first Tricky Words.",
+        "learningTarget": "I can match letters and sounds and read early Unit 1 words.",
+        "icon": "flag"
+      },
+      {
+        "name": "Code Trail",
+        "lessonRange": "Lessons 11-16",
+        "practiceLabel": "Practice after Lesson 16",
+        "detail": "Practice more consonants, all five short vowels, sister sounds, decoding, nouns, and new Tricky Words.",
+        "learningTarget": "I can use more letter sounds and short vowels to read words.",
+        "icon": "route"
+      },
+      {
+        "name": "Digraph Crossing",
+        "lessonRange": "Lessons 17-20",
+        "practiceLabel": "Practice after Lesson 20",
+        "detail": "Read and spell words with ch, sh, th, ng, and qu while practicing new Tricky Words.",
+        "learningTarget": "I can read words with consonant digraphs and qu.",
+        "icon": "git-branch"
+      },
+      {
+        "name": "Spelling Ridge",
+        "lessonRange": "Lessons 21-24",
+        "practiceLabel": "Practice after Lesson 24",
+        "detail": "Review vowels and consonants and read words with ck and double-letter spellings.",
+        "learningTarget": "I can choose the correct spelling for sounds in one-syllable words.",
+        "icon": "mountain"
+      },
+      {
+        "name": "Sentence Springs",
+        "lessonRange": "Lessons 25-29",
+        "practiceLabel": "Practice after Lesson 29",
+        "detail": "Read later Tricky Words and practice nouns, questions, question marks, and quotation marks.",
+        "learningTarget": "I can read Tricky Words and choose the correct punctuation.",
+        "icon": "message-square-quote"
+      },
+      {
+        "name": "Unit 1 Summit",
+        "lessonRange": "Lessons 30-32",
+        "practiceLabel": "End-of-Unit Review",
+        "detail": "Climb through a complete review of Unit 1 sounds, spellings, words, Tricky Words, grammar, and punctuation.",
+        "learningTarget": "I can use everything I learned in Unit 1 to read words and sentences.",
+        "icon": "star"
+      }
+    ],
+    "questions": [
+      {
+        "zone": 0,
+        "id": "l1-q01-lowercase-p",
+        "lessonRange": "Lessons 1-5",
+        "type": "uppercase-lowercase",
+        "category": "uppercase-lowercase",
+        "skill": "Uppercase and lowercase",
+        "word": "P",
+        "display": "P",
+        "prompt": "Find the lowercase letter that matches P.",
+        "spokenDirections": "Look at the uppercase letter. Choose its lowercase match.",
+        "answer": "p",
+        "correctAnswer": "p",
+        "hint": "Uppercase P matches lowercase p.",
+        "visibleExplanation": "Uppercase P matches lowercase p.",
+        "spokenExplanation": "Uppercase P matches lowercase p.",
+        "choices": [
+          [
+            "p",
+            "p"
+          ],
+          [
+            "n",
+            "n"
+          ],
+          [
+            "m",
+            "m"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q02-lowercase-g",
+        "lessonRange": "Lessons 1-5",
+        "type": "uppercase-lowercase",
+        "category": "uppercase-lowercase",
+        "skill": "Uppercase and lowercase",
+        "word": "G",
+        "display": "G",
+        "prompt": "Find the lowercase letter that matches G.",
+        "spokenDirections": "Look at the uppercase letter. Choose its lowercase match.",
+        "answer": "g",
+        "correctAnswer": "g",
+        "hint": "Uppercase G matches lowercase g.",
+        "visibleExplanation": "Uppercase G matches lowercase g.",
+        "spokenExplanation": "Uppercase G matches lowercase g.",
+        "choices": [
+          [
+            "c",
+            "c"
+          ],
+          [
+            "g",
+            "g"
+          ],
+          [
+            "n",
+            "n"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q03-beginning-map",
+        "lessonRange": "Lessons 1-5",
+        "type": "beginning-sound",
+        "category": "beginning-sound",
+        "skill": "Beginning sound",
+        "word": "map",
+        "prompt": "Listen to the word. Choose the beginning sound.",
+        "spokenDirections": "Listen to the word. Choose the beginning sound.",
+        "spokenTarget": "map",
+        "requiresTargetAudio": true,
+        "answer": "m",
+        "correctAnswer": "m",
+        "hint": "Map begins with the /m/ sound, spelled m.",
+        "visibleExplanation": "Map begins with the /m/ sound, spelled m.",
+        "spokenExplanation": "Map begins with the m sound, spelled m.",
+        "choices": [
+          [
+            "m",
+            "m"
+          ],
+          [
+            "n",
+            "n"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q04-beginning-dog",
+        "lessonRange": "Lessons 1-5",
+        "type": "beginning-sound",
+        "category": "beginning-sound",
+        "skill": "Beginning sound",
+        "word": "dog",
+        "prompt": "Listen to the word. Choose the beginning sound.",
+        "spokenDirections": "Listen to the word. Choose the beginning sound.",
+        "spokenTarget": "dog",
+        "requiresTargetAudio": true,
+        "answer": "d",
+        "correctAnswer": "d",
+        "hint": "Dog begins with the /d/ sound, spelled d.",
+        "visibleExplanation": "Dog begins with the /d/ sound, spelled d.",
+        "spokenExplanation": "Dog begins with the d sound, spelled d.",
+        "choices": [
+          [
+            "g",
+            "g"
+          ],
+          [
+            "d",
+            "d"
+          ],
+          [
+            "t",
+            "t"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q05-ending-pig",
+        "lessonRange": "Lessons 1-5",
+        "type": "ending-sound",
+        "category": "ending-sound",
+        "skill": "Ending sound",
+        "word": "pig",
+        "prompt": "Listen to the word. Choose the ending sound.",
+        "spokenDirections": "Listen to the word. Choose the ending sound.",
+        "spokenTarget": "pig",
+        "requiresTargetAudio": true,
+        "answer": "g",
+        "correctAnswer": "g",
+        "hint": "Pig ends with the /g/ sound, spelled g.",
+        "visibleExplanation": "Pig ends with the /g/ sound, spelled g.",
+        "spokenExplanation": "Pig ends with the g sound, spelled g.",
+        "choices": [
+          [
+            "p",
+            "p"
+          ],
+          [
+            "g",
+            "g"
+          ],
+          [
+            "n",
+            "n"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q06-ending-hat",
+        "lessonRange": "Lessons 1-5",
+        "type": "ending-sound",
+        "category": "ending-sound",
+        "skill": "Ending sound",
+        "word": "hat",
+        "prompt": "Listen to the word. Choose the ending sound.",
+        "spokenDirections": "Listen to the word. Choose the ending sound.",
+        "spokenTarget": "hat",
+        "requiresTargetAudio": true,
+        "answer": "t",
+        "correctAnswer": "t",
+        "hint": "Hat ends with the /t/ sound, spelled t.",
+        "visibleExplanation": "Hat ends with the /t/ sound, spelled t.",
+        "spokenExplanation": "Hat ends with the t sound, spelled t.",
+        "choices": [
+          [
+            "d",
+            "d"
+          ],
+          [
+            "t",
+            "t"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q07-middle-cat",
+        "lessonRange": "Lessons 1-5",
+        "type": "middle-short-vowel",
+        "category": "middle-short-vowel",
+        "skill": "Middle short vowel",
+        "word": "cat",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "cat",
+        "requiresTargetAudio": true,
+        "answer": "a",
+        "correctAnswer": "a",
+        "hint": "Cat has the short /a/ sound in the middle.",
+        "visibleExplanation": "Cat has the short /a/ sound in the middle.",
+        "spokenExplanation": "Cat has the short a sound in the middle.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "i",
+            "i"
+          ],
+          [
+            "o",
+            "o"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q08-complete-dog",
+        "lessonRange": "Lessons 1-5",
+        "type": "complete-word",
+        "category": "complete-word",
+        "skill": "Complete a word",
+        "word": "dog",
+        "display": "_og",
+        "prompt": "Listen to the word. Choose the spelling that completes it.",
+        "spokenDirections": "Listen to the word. Choose the spelling that completes it.",
+        "spokenTarget": "dog",
+        "requiresTargetAudio": true,
+        "answer": "d",
+        "correctAnswer": "d",
+        "hint": "The /d/ sound, spelled d, completes dog.",
+        "visibleExplanation": "The /d/ sound, spelled d, completes dog.",
+        "spokenExplanation": "The d sound, spelled d, completes dog.",
+        "choices": [
+          [
+            "d",
+            "d"
+          ],
+          [
+            "g",
+            "g"
+          ],
+          [
+            "n",
+            "n"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q09-blend-pig",
+        "lessonRange": "Lessons 1-5",
+        "type": "blending",
+        "category": "blending",
+        "skill": "Blending",
+        "word": "pig",
+        "display": "/p/ /i/ /g/",
+        "prompt": "Blend the sounds. Choose the word.",
+        "spokenDirections": "Listen to the sounds. Blend them together. Then choose the word.",
+        "soundsSpeech": "puh ... short i ... guh",
+        "requiresSoundAudio": true,
+        "answer": "pig",
+        "correctAnswer": "pig",
+        "hint": "The sounds /p/ /i/ /g/ blend to make pig.",
+        "visibleExplanation": "The sounds /p/ /i/ /g/ blend to make pig.",
+        "spokenExplanation": "The sounds p, short i, and g blend to make pig.",
+        "choices": [
+          [
+            "pig",
+            "pig"
+          ],
+          [
+            "dig",
+            "dig"
+          ],
+          [
+            "pin",
+            "pin"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q10-tricky-no",
+        "lessonRange": "Lessons 1-5",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "no",
+        "prompt": "Choose the missing Tricky Word: __ hats are on the mat.",
+        "spokenDirections": "Read the sentence. Choose the Tricky Word that completes it.",
+        "independentReading": true,
+        "trickyWord": "no",
+        "answer": "no",
+        "correctAnswer": "no",
+        "hint": "No completes the sentence: No hats are on the mat.",
+        "visibleExplanation": "No completes the sentence: No hats are on the mat.",
+        "spokenExplanation": "No completes the sentence. No hats are on the mat.",
+        "choices": [
+          [
+            "no",
+            "no"
+          ],
+          [
+            "so",
+            "so"
+          ],
+          [
+            "of",
+            "of"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q11-tricky-i-sentence",
+        "lessonRange": "Lessons 1-5",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "I",
+        "prompt": "Choose the missing Tricky Word: __ am Sam.",
+        "spokenDirections": "Read the sentence. Choose the Tricky Word that completes it.",
+        "independentReading": true,
+        "trickyWord": "I",
+        "answer": "I",
+        "correctAnswer": "I",
+        "hint": "The sentence begins with the Tricky Word I.",
+        "visibleExplanation": "The sentence begins with the Tricky Word I.",
+        "spokenExplanation": "The sentence begins with the Tricky Word I.",
+        "choices": [
+          [
+            "I",
+            "I"
+          ],
+          [
+            "a",
+            "a"
+          ],
+          [
+            "of",
+            "of"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-q12-noun-dog",
+        "lessonRange": "Lessons 1-5",
+        "type": "noun",
+        "category": "noun",
+        "skill": "Noun",
+        "word": "dog",
+        "prompt": "Read each word. Choose the noun.",
+        "spokenDirections": "Read each word. Choose the noun. A noun names a person, place, or thing.",
+        "independentReading": true,
+        "answer": "dog",
+        "correctAnswer": "dog",
+        "hint": "Dog names an animal, so dog is a noun.",
+        "visibleExplanation": "Dog names an animal, so dog is a noun.",
+        "spokenExplanation": "Dog names an animal, so dog is a noun.",
+        "choices": [
+          [
+            "dog",
+            "dog"
+          ],
+          [
+            "hop",
+            "hop"
+          ],
+          [
+            "hot",
+            "hot"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q01-lowercase-b",
+        "lessonRange": "Lessons 11-16",
+        "type": "uppercase-lowercase",
+        "category": "uppercase-lowercase",
+        "skill": "Uppercase and lowercase",
+        "word": "B",
+        "display": "B",
+        "prompt": "Find the lowercase letter that matches B.",
+        "spokenDirections": "Look at the uppercase letter. Choose its lowercase match.",
+        "independentReading": true,
+        "answer": "b",
+        "correctAnswer": "b",
+        "hint": "Uppercase B matches lowercase b.",
+        "visibleExplanation": "Uppercase B matches lowercase b.",
+        "spokenExplanation": "Uppercase B matches lowercase b.",
+        "choices": [
+          [
+            "d",
+            "d"
+          ],
+          [
+            "b",
+            "b"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q02-lowercase-r",
+        "lessonRange": "Lessons 11-16",
+        "type": "uppercase-lowercase",
+        "category": "uppercase-lowercase",
+        "skill": "Uppercase and lowercase",
+        "word": "R",
+        "display": "R",
+        "prompt": "Find the lowercase letter that matches R.",
+        "spokenDirections": "Look at the uppercase letter. Choose its lowercase match.",
+        "independentReading": true,
+        "answer": "r",
+        "correctAnswer": "r",
+        "hint": "Uppercase R matches lowercase r.",
+        "visibleExplanation": "Uppercase R matches lowercase r.",
+        "spokenExplanation": "Uppercase R matches lowercase r.",
+        "choices": [
+          [
+            "n",
+            "n"
+          ],
+          [
+            "r",
+            "r"
+          ],
+          [
+            "v",
+            "v"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q03-beginning-web",
+        "lessonRange": "Lessons 11-16",
+        "type": "beginning-sound",
+        "category": "beginning-sound",
+        "skill": "Beginning sound",
+        "word": "web",
+        "prompt": "Listen to the word. Choose the beginning sound.",
+        "spokenDirections": "Listen to the word. Choose the beginning sound.",
+        "spokenTarget": "web",
+        "requiresTargetAudio": true,
+        "answer": "w",
+        "correctAnswer": "w",
+        "hint": "Web begins with the /w/ sound, spelled w.",
+        "visibleExplanation": "Web begins with the /w/ sound, spelled w.",
+        "spokenExplanation": "Web begins with the w sound, spelled w.",
+        "choices": [
+          [
+            "w",
+            "w"
+          ],
+          [
+            "v",
+            "v"
+          ],
+          [
+            "y",
+            "y"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q04-beginning-rug",
+        "lessonRange": "Lessons 11-16",
+        "type": "beginning-sound",
+        "category": "beginning-sound",
+        "skill": "Beginning sound",
+        "word": "rug",
+        "prompt": "Listen to the word. Choose the beginning sound.",
+        "spokenDirections": "Listen to the word. Choose the beginning sound.",
+        "spokenTarget": "rug",
+        "requiresTargetAudio": true,
+        "answer": "r",
+        "correctAnswer": "r",
+        "hint": "Rug begins with the /r/ sound, spelled r.",
+        "visibleExplanation": "Rug begins with the /r/ sound, spelled r.",
+        "spokenExplanation": "Rug begins with the r sound, spelled r.",
+        "choices": [
+          [
+            "l",
+            "l"
+          ],
+          [
+            "b",
+            "b"
+          ],
+          [
+            "r",
+            "r"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q05-ending-box",
+        "lessonRange": "Lessons 11-16",
+        "type": "ending-sound",
+        "category": "ending-sound",
+        "skill": "Ending sound",
+        "word": "box",
+        "prompt": "Listen to the word. Choose the ending sound.",
+        "spokenDirections": "Listen to the word. Choose the ending sound.",
+        "spokenTarget": "box",
+        "requiresTargetAudio": true,
+        "answer": "x",
+        "correctAnswer": "x",
+        "hint": "Box ends with the /ks/ sound, spelled x.",
+        "visibleExplanation": "Box ends with the /ks/ sound, spelled x.",
+        "spokenExplanation": "Box ends with the k s sound, spelled x.",
+        "choices": [
+          [
+            "k",
+            "k"
+          ],
+          [
+            "x",
+            "x"
+          ],
+          [
+            "s",
+            "s"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q06-ending-web",
+        "lessonRange": "Lessons 11-16",
+        "type": "ending-sound",
+        "category": "ending-sound",
+        "skill": "Ending sound",
+        "word": "web",
+        "prompt": "Listen to the word. Choose the ending sound.",
+        "spokenDirections": "Listen to the word. Choose the ending sound.",
+        "spokenTarget": "web",
+        "requiresTargetAudio": true,
+        "answer": "b",
+        "correctAnswer": "b",
+        "hint": "Web ends with the /b/ sound, spelled b.",
+        "visibleExplanation": "Web ends with the /b/ sound, spelled b.",
+        "spokenExplanation": "Web ends with the b sound, spelled b.",
+        "choices": [
+          [
+            "b",
+            "b"
+          ],
+          [
+            "d",
+            "d"
+          ],
+          [
+            "w",
+            "w"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q07-middle-bed",
+        "lessonRange": "Lessons 11-16",
+        "type": "middle-short-vowel",
+        "category": "middle-short-vowel",
+        "skill": "Middle short vowel",
+        "word": "bed",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "bed",
+        "requiresTargetAudio": true,
+        "answer": "e",
+        "correctAnswer": "e",
+        "hint": "Bed has the short /e/ sound in the middle.",
+        "visibleExplanation": "Bed has the short /e/ sound in the middle.",
+        "spokenExplanation": "Bed has the short e sound in the middle.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "e",
+            "e"
+          ],
+          [
+            "u",
+            "u"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q08-middle-sun",
+        "lessonRange": "Lessons 11-16",
+        "type": "middle-short-vowel",
+        "category": "middle-short-vowel",
+        "skill": "Middle short vowel",
+        "word": "sun",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "sun",
+        "requiresTargetAudio": true,
+        "answer": "u",
+        "correctAnswer": "u",
+        "hint": "Sun has the short /u/ sound in the middle.",
+        "visibleExplanation": "Sun has the short /u/ sound in the middle.",
+        "spokenExplanation": "Sun has the short u sound in the middle.",
+        "choices": [
+          [
+            "o",
+            "o"
+          ],
+          [
+            "i",
+            "i"
+          ],
+          [
+            "u",
+            "u"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q09-sister-van",
+        "lessonRange": "Lessons 11-16",
+        "type": "sister-sound",
+        "category": "sister-sound",
+        "skill": "Sister sounds",
+        "word": "van",
+        "prompt": "Listen to the word. Choose the sister sound you hear at the beginning.",
+        "spokenDirections": "Listen to the word. Choose the sister sound you hear.",
+        "spokenTarget": "van",
+        "requiresTargetAudio": true,
+        "answer": "v as in van",
+        "correctAnswer": "v as in van",
+        "hint": "Van begins with the /v/ sound, spelled v. The /v/ and /f/ sounds are sister sounds.",
+        "visibleExplanation": "Van begins with the /v/ sound, spelled v. The /v/ and /f/ sounds are sister sounds.",
+        "spokenExplanation": "Van begins with the v sound, spelled v. The v and f sounds are sister sounds.",
+        "choices": [
+          [
+            "f as in fan",
+            "f as in fan"
+          ],
+          [
+            "v as in van",
+            "v as in van"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q10-sister-zip",
+        "lessonRange": "Lessons 11-16",
+        "type": "sister-sound",
+        "category": "sister-sound",
+        "skill": "Sister sounds",
+        "word": "zip",
+        "prompt": "Listen to the word. Choose the sister sound you hear at the beginning.",
+        "spokenDirections": "Listen to the word. Choose the sister sound you hear.",
+        "spokenTarget": "zip",
+        "requiresTargetAudio": true,
+        "answer": "z as in zip",
+        "correctAnswer": "z as in zip",
+        "hint": "Zip begins with the /z/ sound, spelled z. The /z/ and /s/ sounds are sister sounds.",
+        "visibleExplanation": "Zip begins with the /z/ sound, spelled z. The /z/ and /s/ sounds are sister sounds.",
+        "spokenExplanation": "Zip begins with the z sound, spelled z. The z and s sounds are sister sounds.",
+        "choices": [
+          [
+            "s as in sun",
+            "s as in sun"
+          ],
+          [
+            "z as in zip",
+            "z as in zip"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q11-blend-jam",
+        "lessonRange": "Lessons 11-16",
+        "type": "blending",
+        "category": "blending",
+        "skill": "Blending",
+        "word": "jam",
+        "display": "/j/ /a/ /m/",
+        "prompt": "Blend the sounds. Choose the word.",
+        "spokenDirections": "Listen to the sounds. Blend them together. Then choose the word.",
+        "soundsSpeech": "juh ... short a ... mmm",
+        "requiresSoundAudio": true,
+        "answer": "jam",
+        "correctAnswer": "jam",
+        "hint": "The sounds /j/ /a/ /m/ blend to make jam.",
+        "visibleExplanation": "The sounds /j/ /a/ /m/ blend to make jam.",
+        "spokenExplanation": "The sounds j, short a, and m blend to make jam.",
+        "choices": [
+          [
+            "jam",
+            "jam"
+          ],
+          [
+            "yam",
+            "yam"
+          ],
+          [
+            "Jim",
+            "Jim"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q12-complete-jet",
+        "lessonRange": "Lessons 11-16",
+        "type": "complete-word",
+        "category": "complete-word",
+        "skill": "Complete a word",
+        "word": "jet",
+        "display": "_et",
+        "prompt": "Listen to the word. Choose the spelling that completes it.",
+        "spokenDirections": "Listen to the word. Choose the spelling that completes it.",
+        "spokenTarget": "jet",
+        "requiresTargetAudio": true,
+        "answer": "j",
+        "correctAnswer": "j",
+        "hint": "The /j/ sound, spelled j, completes jet.",
+        "visibleExplanation": "The /j/ sound, spelled j, completes jet.",
+        "spokenExplanation": "The j sound, spelled j, completes jet.",
+        "choices": [
+          [
+            "j",
+            "j"
+          ],
+          [
+            "y",
+            "y"
+          ],
+          [
+            "w",
+            "w"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q13-tricky-some-listen",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-listening",
+        "category": "tricky-word-listening",
+        "skill": "Tricky Word listening",
+        "word": "some",
+        "prompt": "Listen to the word. Choose the matching Tricky Word.",
+        "spokenDirections": "Listen to the word. Choose the matching Tricky Word.",
+        "spokenTarget": "some",
+        "requiresTargetAudio": true,
+        "trickyWord": "some",
+        "answer": "some",
+        "correctAnswer": "some",
+        "hint": "The matching Tricky Word is some.",
+        "visibleExplanation": "The matching Tricky Word is some.",
+        "spokenExplanation": "The matching Tricky Word is some.",
+        "choices": [
+          [
+            "some",
+            "some"
+          ],
+          [
+            "from",
+            "from"
+          ],
+          [
+            "word",
+            "word"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q14-tricky-are-sentence",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "are",
+        "prompt": "Choose the missing Tricky Word: Today, we __ at the park.",
+        "spokenDirections": "Choose the missing Tricky Word: Today, we __ at the park.",
+        "independentReading": true,
+        "trickyWord": "are",
+        "answer": "are",
+        "correctAnswer": "are",
+        "hint": "Are completes the sentence: Today, we are at the park.",
+        "visibleExplanation": "Are completes the sentence: Today, we are at the park.",
+        "spokenExplanation": "Are completes the sentence. Today, we are at the park.",
+        "choices": [
+          [
+            "are",
+            "are"
+          ],
+          [
+            "were",
+            "were"
+          ],
+          [
+            "have",
+            "have"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-q15-noun-pen",
+        "lessonRange": "Lessons 11-16",
+        "type": "noun",
+        "category": "noun",
+        "skill": "Noun",
+        "word": "pen",
+        "prompt": "Which word is a noun?",
+        "spokenDirections": "Read each word. Choose the noun. A noun names a person, place, or thing.",
+        "independentReading": true,
+        "answer": "pen",
+        "correctAnswer": "pen",
+        "hint": "Pen names a thing, so pen is a noun.",
+        "visibleExplanation": "Pen names a thing, so pen is a noun.",
+        "spokenExplanation": "Pen names a thing, so pen is a noun.",
+        "choices": [
+          [
+            "pen",
+            "pen"
+          ],
+          [
+            "is",
+            "is"
+          ],
+          [
+            "at",
+            "at"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q01-digraph-ship",
+        "lessonRange": "Lessons 17-20",
+        "type": "digraph",
+        "category": "digraph",
+        "skill": "Beginning digraph",
+        "word": "ship",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "ship",
+        "requiresTargetAudio": true,
+        "answer": "sh",
+        "correctAnswer": "sh",
+        "hint": "Ship begins with the /sh/ sound, spelled sh.",
+        "visibleExplanation": "Ship begins with the /sh/ sound, spelled sh.",
+        "spokenExplanation": "Ship begins with the sh sound, spelled S H.",
+        "choices": [
+          [
+            "sh",
+            "sh"
+          ],
+          [
+            "ch",
+            "ch"
+          ],
+          [
+            "th",
+            "th"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q02-digraph-chin",
+        "lessonRange": "Lessons 17-20",
+        "type": "digraph",
+        "category": "digraph",
+        "skill": "Beginning digraph",
+        "word": "chin",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "chin",
+        "requiresTargetAudio": true,
+        "answer": "ch",
+        "correctAnswer": "ch",
+        "hint": "Chin begins with the /ch/ sound, spelled ch.",
+        "visibleExplanation": "Chin begins with the /ch/ sound, spelled ch.",
+        "spokenExplanation": "Chin begins with the ch sound, spelled C H.",
+        "choices": [
+          [
+            "th",
+            "th"
+          ],
+          [
+            "ch",
+            "ch"
+          ],
+          [
+            "sh",
+            "sh"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q03-digraph-thin",
+        "lessonRange": "Lessons 17-20",
+        "type": "digraph",
+        "category": "digraph",
+        "skill": "Beginning digraph",
+        "word": "thin",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "thin",
+        "requiresTargetAudio": true,
+        "answer": "th",
+        "correctAnswer": "th",
+        "hint": "Thin begins with the unvoiced /th/ sound, spelled th.",
+        "visibleExplanation": "Thin begins with the unvoiced /th/ sound, spelled th.",
+        "spokenExplanation": "Thin begins with the unvoiced th sound, spelled T H.",
+        "choices": [
+          [
+            "ch",
+            "ch"
+          ],
+          [
+            "sh",
+            "sh"
+          ],
+          [
+            "th",
+            "th"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q04-digraph-ring",
+        "lessonRange": "Lessons 17-20",
+        "type": "digraph",
+        "category": "digraph",
+        "skill": "Ending digraph",
+        "word": "ring",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "ring",
+        "requiresTargetAudio": true,
+        "answer": "ng",
+        "correctAnswer": "ng",
+        "hint": "Ring ends with the /ng/ sound, spelled ng.",
+        "visibleExplanation": "Ring ends with the /ng/ sound, spelled ng.",
+        "spokenExplanation": "Ring ends with the ng sound, spelled N G.",
+        "choices": [
+          [
+            "ng",
+            "ng"
+          ],
+          [
+            "sh",
+            "sh"
+          ],
+          [
+            "ch",
+            "ch"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q05-sister-th-them",
+        "lessonRange": "Lessons 17-20",
+        "type": "sister-sound",
+        "category": "sister-sound",
+        "skill": "Sister sounds",
+        "word": "them",
+        "prompt": "Listen to the word. Choose the th sound you hear.",
+        "spokenDirections": "Listen to the word. Choose the th sound you hear.",
+        "spokenTarget": "them",
+        "requiresTargetAudio": true,
+        "answer": "th as in them",
+        "correctAnswer": "th as in them",
+        "hint": "Them begins with the voiced /th/ sound. Thin begins with the unvoiced /th/ sound.",
+        "visibleExplanation": "Them begins with the voiced /th/ sound. Thin begins with the unvoiced /th/ sound.",
+        "spokenExplanation": "Them begins with the voiced th sound. Thin begins with the unvoiced th sound.",
+        "choices": [
+          [
+            "th as in thin",
+            "th as in thin"
+          ],
+          [
+            "th as in them",
+            "th as in them"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q06-qu-quit",
+        "lessonRange": "Lessons 17-20",
+        "type": "beginning-spelling",
+        "category": "beginning-spelling",
+        "skill": "Beginning spelling",
+        "word": "quit",
+        "prompt": "Listen to the word. Choose the spelling you hear at the beginning.",
+        "spokenDirections": "Listen to the word. Choose the spelling you hear at the beginning.",
+        "spokenTarget": "quit",
+        "requiresTargetAudio": true,
+        "answer": "qu",
+        "correctAnswer": "qu",
+        "hint": "Quit begins with the /kw/ sound, spelled qu.",
+        "visibleExplanation": "Quit begins with the /kw/ sound, spelled qu.",
+        "spokenExplanation": "Quit begins with the kw sound, spelled Q U.",
+        "choices": [
+          [
+            "qu",
+            "qu"
+          ],
+          [
+            "ch",
+            "ch"
+          ],
+          [
+            "sh",
+            "sh"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q07-complete-ship",
+        "lessonRange": "Lessons 17-20",
+        "type": "complete-word",
+        "category": "complete-word",
+        "skill": "Complete a word",
+        "word": "ship",
+        "display": "_ip",
+        "prompt": "Listen to the word. Choose the spelling that completes it.",
+        "spokenDirections": "Listen to the word. Choose the spelling that completes it.",
+        "spokenTarget": "ship",
+        "requiresTargetAudio": true,
+        "answer": "sh",
+        "correctAnswer": "sh",
+        "hint": "The /sh/ sound, spelled sh, completes ship.",
+        "visibleExplanation": "The /sh/ sound, spelled sh, completes ship.",
+        "spokenExplanation": "The sh sound, spelled S H, completes ship.",
+        "choices": [
+          [
+            "sh",
+            "sh"
+          ],
+          [
+            "s",
+            "s"
+          ],
+          [
+            "ch",
+            "ch"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q08-complete-ring",
+        "lessonRange": "Lessons 17-20",
+        "type": "complete-word",
+        "category": "complete-word",
+        "skill": "Complete a word",
+        "word": "ring",
+        "display": "ri_",
+        "prompt": "Listen to the word. Choose the spelling that completes it.",
+        "spokenDirections": "Listen to the word. Choose the spelling that completes it.",
+        "spokenTarget": "ring",
+        "requiresTargetAudio": true,
+        "answer": "ng",
+        "correctAnswer": "ng",
+        "hint": "The /ng/ sound, spelled ng, completes ring.",
+        "visibleExplanation": "The /ng/ sound, spelled ng, completes ring.",
+        "spokenExplanation": "The ng sound, spelled N G, completes ring.",
+        "choices": [
+          [
+            "ng",
+            "ng"
+          ],
+          [
+            "th",
+            "th"
+          ],
+          [
+            "ch",
+            "ch"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q09-complete-quit",
+        "lessonRange": "Lessons 17-20",
+        "type": "complete-word",
+        "category": "complete-word",
+        "skill": "Complete a word",
+        "word": "quit",
+        "display": "_it",
+        "prompt": "Listen to the word. Choose the spelling that completes it.",
+        "spokenDirections": "Listen to the word. Choose the spelling that completes it.",
+        "spokenTarget": "quit",
+        "requiresTargetAudio": true,
+        "answer": "qu",
+        "correctAnswer": "qu",
+        "hint": "The /kw/ sound, spelled qu, completes quit.",
+        "visibleExplanation": "The /kw/ sound, spelled qu, completes quit.",
+        "spokenExplanation": "The kw sound, spelled Q U, completes quit.",
+        "choices": [
+          [
+            "qu",
+            "qu"
+          ],
+          [
+            "sh",
+            "sh"
+          ],
+          [
+            "ch",
+            "ch"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q10-decode-chest",
+        "lessonRange": "Lessons 17-20",
+        "type": "independent-decoding",
+        "category": "independent-decoding",
+        "skill": "Independent decoding",
+        "word": "chest",
+        "prompt": "Read each word. Choose the word that starts with ch.",
+        "spokenDirections": "Read each word. Choose the word that starts with ch.",
+        "independentReading": true,
+        "answer": "chest",
+        "correctAnswer": "chest",
+        "hint": "Chest starts with the /ch/ sound, spelled ch.",
+        "visibleExplanation": "Chest starts with the /ch/ sound, spelled ch.",
+        "spokenExplanation": "Chest starts with the ch sound, spelled C H.",
+        "choices": [
+          [
+            "chest",
+            "chest"
+          ],
+          [
+            "fresh",
+            "fresh"
+          ],
+          [
+            "rush",
+            "rush"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q11-noun-shop",
+        "lessonRange": "Lessons 17-20",
+        "type": "noun",
+        "category": "noun",
+        "skill": "Noun",
+        "word": "shop",
+        "prompt": "Read each word. Choose the noun.",
+        "spokenDirections": "Read each word. Choose the noun.",
+        "independentReading": true,
+        "answer": "shop",
+        "correctAnswer": "shop",
+        "hint": "Shop names a place, so shop is a noun.",
+        "visibleExplanation": "Shop names a place, so shop is a noun.",
+        "spokenExplanation": "Shop names a place, so shop is a noun.",
+        "choices": [
+          [
+            "shop",
+            "shop"
+          ],
+          [
+            "red",
+            "red"
+          ],
+          [
+            "has",
+            "has"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q12-tricky-do",
+        "lessonRange": "Lessons 17-20",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "do",
+        "prompt": "Choose the missing Tricky Word: Sam can __ it.",
+        "spokenDirections": "Choose the missing Tricky Word: Sam can __ it.",
+        "independentReading": true,
+        "trickyWord": "do",
+        "answer": "do",
+        "correctAnswer": "do",
+        "hint": "Do completes the sentence: Sam can do it.",
+        "visibleExplanation": "Do completes the sentence: Sam can do it.",
+        "spokenExplanation": "Do completes the sentence. Sam can do it.",
+        "choices": [
+          [
+            "do",
+            "do"
+          ],
+          [
+            "two",
+            "two"
+          ],
+          [
+            "who",
+            "who"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q13-tricky-who",
+        "lessonRange": "Lessons 17-20",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "who",
+        "prompt": "Choose the Tricky Word that starts with wh and has the /oo/ sound.",
+        "spokenDirections": "Choose the Tricky Word that starts with wh and has the /oo/ sound.",
+        "independentReading": true,
+        "trickyWord": "who",
+        "answer": "who",
+        "correctAnswer": "who",
+        "hint": "Who starts with wh and has the /oo/ sound.",
+        "visibleExplanation": "Who starts with wh and has the /oo/ sound.",
+        "spokenExplanation": "Who starts with W H and has the oo sound.",
+        "choices": [
+          [
+            "the",
+            "the"
+          ],
+          [
+            "who",
+            "who"
+          ],
+          [
+            "said",
+            "said"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q14-tricky-the-sentence",
+        "lessonRange": "Lessons 17-20",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "The",
+        "prompt": "Choose the missing Tricky Word: __ dog is big.",
+        "spokenDirections": "Read the sentence. Choose the Tricky Word that completes it.",
+        "independentReading": true,
+        "trickyWord": "the",
+        "answer": "The",
+        "correctAnswer": "The",
+        "hint": "The sentence begins with the Tricky Word The.",
+        "visibleExplanation": "The sentence begins with the Tricky Word The.",
+        "spokenExplanation": "The sentence begins with the Tricky Word The.",
+        "choices": [
+          [
+            "The",
+            "The"
+          ],
+          [
+            "Who",
+            "Who"
+          ],
+          [
+            "Two",
+            "Two"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-q15-tricky-said-sentence",
+        "lessonRange": "Lessons 17-20",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "said",
+        "prompt": "Choose the missing Tricky Word: Yesterday, Mom __ no.",
+        "spokenDirections": "Choose the missing Tricky Word: Yesterday, Mom __ no.",
+        "independentReading": true,
+        "trickyWord": "said",
+        "answer": "said",
+        "correctAnswer": "said",
+        "hint": "Said completes the sentence: Yesterday, Mom said no.",
+        "visibleExplanation": "Said completes the sentence: Yesterday, Mom said no.",
+        "spokenExplanation": "Said completes the sentence. Yesterday, Mom said no.",
+        "choices": [
+          [
+            "said",
+            "said"
+          ],
+          [
+            "says",
+            "says"
+          ],
+          [
+            "who",
+            "who"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q01-vowel-rug",
+        "lessonRange": "Lessons 21-24",
+        "type": "middle-short-vowel",
+        "category": "lesson-21-vowel-review",
+        "skill": "Middle short vowel",
+        "word": "rug",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "rug",
+        "requiresTargetAudio": true,
+        "answer": "u",
+        "correctAnswer": "u",
+        "hint": "Rug has the short /u/ sound in the middle.",
+        "visibleExplanation": "Rug has the short /u/ sound in the middle.",
+        "spokenExplanation": "Rug has the short u sound in the middle.",
+        "choices": [
+          [
+            "u",
+            "u"
+          ],
+          [
+            "o",
+            "o"
+          ],
+          [
+            "a",
+            "a"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q02-ending-mask",
+        "lessonRange": "Lessons 21-24",
+        "type": "ending-sound",
+        "category": "lesson-22-consonant-review",
+        "skill": "Ending sound",
+        "word": "mask",
+        "prompt": "Listen to the word. Choose the ending sound.",
+        "spokenDirections": "Listen to the word. Choose the ending sound.",
+        "spokenTarget": "mask",
+        "requiresTargetAudio": true,
+        "answer": "k",
+        "correctAnswer": "k",
+        "hint": "Mask ends with the /k/ sound.",
+        "visibleExplanation": "Mask ends with the /k/ sound.",
+        "spokenExplanation": "Mask ends with the k sound.",
+        "choices": [
+          [
+            "k",
+            "k"
+          ],
+          [
+            "s",
+            "s"
+          ],
+          [
+            "m",
+            "m"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q03-vowel-lid",
+        "lessonRange": "Lessons 21-24",
+        "type": "middle-short-vowel",
+        "category": "lesson-22-vowel-review",
+        "skill": "Middle short vowel",
+        "word": "lid",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "lid",
+        "requiresTargetAudio": true,
+        "answer": "i",
+        "correctAnswer": "i",
+        "hint": "Lid has the short /i/ sound in the middle.",
+        "visibleExplanation": "Lid has the short /i/ sound in the middle.",
+        "spokenExplanation": "Lid has the short i sound in the middle.",
+        "choices": [
+          [
+            "i",
+            "i"
+          ],
+          [
+            "e",
+            "e"
+          ],
+          [
+            "a",
+            "a"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q04-beginning-jam",
+        "lessonRange": "Lessons 21-24",
+        "type": "beginning-sound",
+        "category": "lesson-22-consonant-review",
+        "skill": "Beginning sound",
+        "word": "jam",
+        "prompt": "Listen to the word. Choose the beginning sound.",
+        "spokenDirections": "Listen to the word. Choose the beginning sound.",
+        "spokenTarget": "jam",
+        "requiresTargetAudio": true,
+        "answer": "j",
+        "correctAnswer": "j",
+        "hint": "Jam begins with the /j/ sound.",
+        "visibleExplanation": "Jam begins with the /j/ sound.",
+        "spokenExplanation": "Jam begins with the j sound.",
+        "choices": [
+          [
+            "j",
+            "j"
+          ],
+          [
+            "y",
+            "y"
+          ],
+          [
+            "g",
+            "g"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q05-noun-egg",
+        "lessonRange": "Lessons 21-24",
+        "type": "noun",
+        "category": "lesson-22-noun-review",
+        "skill": "Noun",
+        "word": "egg",
+        "prompt": "Read each word. Choose the noun.",
+        "spokenDirections": "Read each word. Choose the noun.",
+        "independentReading": true,
+        "answer": "egg",
+        "correctAnswer": "egg",
+        "hint": "Egg names a thing, so egg is a noun.",
+        "visibleExplanation": "Egg names a thing, so egg is a noun.",
+        "spokenExplanation": "Egg names a thing, so egg is a noun.",
+        "choices": [
+          [
+            "egg",
+            "egg"
+          ],
+          [
+            "ran",
+            "ran"
+          ],
+          [
+            "fast",
+            "fast"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q06-k-spellings-sort",
+        "lessonRange": "Lessons 21-24",
+        "type": "correct-spelling",
+        "category": "k-spellings",
+        "skill": "/k/ spellings",
+        "word": "cat kit rock hiccup",
+        "prompt": "Choose the row that matches the spellings for the /k/ sound.",
+        "spokenDirections": "Choose the row that matches the spellings for the /k/ sound.",
+        "independentReading": true,
+        "answer": "cat-c, kit-k, rock-ck, hiccup-cc",
+        "correctAnswer": "cat-c, kit-k, rock-ck, hiccup-cc",
+        "hint": "Cat uses c, kit uses k, rock uses ck, and hiccup uses cc.",
+        "visibleExplanation": "Cat uses c, kit uses k, rock uses ck, and hiccup uses cc.",
+        "spokenExplanation": "Cat uses c, kit uses k, rock uses C K, and hiccup uses double c.",
+        "choices": [
+          [
+            "cat-c, kit-k, rock-ck, hiccup-cc",
+            "cat-c, kit-k, rock-ck, hiccup-cc"
+          ],
+          [
+            "cat-k, kit-c, rock-cc, hiccup-ck",
+            "cat-k, kit-c, rock-cc, hiccup-ck"
+          ],
+          [
+            "cat-ck, kit-cc, rock-c, hiccup-k",
+            "cat-ck, kit-cc, rock-c, hiccup-k"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q07-ending-rubbing",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "rubbing",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "rubbing",
+        "requiresTargetAudio": true,
+        "answer": "bb",
+        "correctAnswer": "bb",
+        "hint": "Rubbing has the /b/ sound spelled bb. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Rubbing has the /b/ sound spelled bb. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Rubbing has the b sound spelled double b. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "bb",
+            "bb"
+          ],
+          [
+            "b",
+            "b"
+          ],
+          [
+            "dd",
+            "dd"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q08-ending-add",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "add",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "add",
+        "requiresTargetAudio": true,
+        "answer": "dd",
+        "correctAnswer": "dd",
+        "hint": "Add ends with the /d/ sound, spelled dd. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Add ends with the /d/ sound, spelled dd. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Add ends with the d sound, spelled double d. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "d",
+            "d"
+          ],
+          [
+            "dd",
+            "dd"
+          ],
+          [
+            "tt",
+            "tt"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q09-ending-stuff",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "stuff",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "stuff",
+        "requiresTargetAudio": true,
+        "answer": "ff",
+        "correctAnswer": "ff",
+        "hint": "Stuff ends with the /f/ sound, spelled ff. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Stuff ends with the /f/ sound, spelled ff. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Stuff ends with the f sound, spelled double f. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "ff",
+            "ff"
+          ],
+          [
+            "ss",
+            "ss"
+          ],
+          [
+            "ll",
+            "ll"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q10-ending-bell",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "bell",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "bell",
+        "requiresTargetAudio": true,
+        "answer": "ll",
+        "correctAnswer": "ll",
+        "hint": "Bell ends with the /l/ sound, spelled ll. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Bell ends with the /l/ sound, spelled ll. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Bell ends with the l sound, spelled double l. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "ll",
+            "ll"
+          ],
+          [
+            "l",
+            "l"
+          ],
+          [
+            "ss",
+            "ss"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q11-ending-swimming",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "swimming",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "swimming",
+        "requiresTargetAudio": true,
+        "answer": "mm",
+        "correctAnswer": "mm",
+        "hint": "Swimming has the /m/ sound spelled mm. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Swimming has the /m/ sound spelled mm. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Swimming has the m sound spelled double m. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "m",
+            "m"
+          ],
+          [
+            "mm",
+            "mm"
+          ],
+          [
+            "nn",
+            "nn"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q12-ending-running",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "running",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "running",
+        "requiresTargetAudio": true,
+        "answer": "nn",
+        "correctAnswer": "nn",
+        "hint": "Running has the /n/ sound spelled nn. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Running has the /n/ sound spelled nn. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Running has the n sound spelled double n. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "n",
+            "n"
+          ],
+          [
+            "nn",
+            "nn"
+          ],
+          [
+            "mm",
+            "mm"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q13-ending-shopping",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "shopping",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "shopping",
+        "requiresTargetAudio": true,
+        "answer": "pp",
+        "correctAnswer": "pp",
+        "hint": "Shopping has the /p/ sound spelled pp. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Shopping has the /p/ sound spelled pp. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Shopping has the p sound spelled double p. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "p",
+            "p"
+          ],
+          [
+            "pp",
+            "pp"
+          ],
+          [
+            "bb",
+            "bb"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q14-complete-duck",
+        "lessonRange": "Lessons 21-24",
+        "type": "complete-word",
+        "category": "complete-word",
+        "skill": "Complete a word",
+        "word": "duck",
+        "display": "du_",
+        "prompt": "Listen to the word. Choose the spelling that completes it.",
+        "spokenDirections": "Listen to the word. Choose the spelling that completes it.",
+        "spokenTarget": "duck",
+        "requiresTargetAudio": true,
+        "answer": "ck",
+        "correctAnswer": "ck",
+        "hint": "The /k/ sound, spelled ck, completes duck.",
+        "visibleExplanation": "The /k/ sound, spelled ck, completes duck.",
+        "spokenExplanation": "The k sound, spelled C K, completes duck.",
+        "choices": [
+          [
+            "ck",
+            "ck"
+          ],
+          [
+            "k",
+            "k"
+          ],
+          [
+            "c",
+            "c"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-q15-picture-dress",
+        "lessonRange": "Lessons 21-24",
+        "type": "independent-decoding",
+        "category": "independent-decoding",
+        "skill": "Independent decoding",
+        "word": "dress",
+        "picture": "dress",
+        "prompt": "Look at the picture. Choose the word that names it.",
+        "spokenDirections": "Look at the picture. Choose the word that names it.",
+        "independentReading": true,
+        "answer": "dress",
+        "correctAnswer": "dress",
+        "hint": "Dress names the picture. Dress ends with the /s/ sound, spelled ss.",
+        "visibleExplanation": "Dress names the picture. Dress ends with the /s/ sound, spelled ss.",
+        "spokenExplanation": "Dress names the picture. Dress ends with the s sound, spelled double s.",
+        "choices": [
+          [
+            "dress",
+            "dress"
+          ],
+          [
+            "desk",
+            "desk"
+          ],
+          [
+            "duck",
+            "duck"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q01-tricky-was",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "was",
+        "prompt": "Choose the missing Tricky Word: Nat __ at camp.",
+        "spokenDirections": "Choose the missing Tricky Word: Nat __ at camp.",
+        "independentReading": true,
+        "trickyWord": "was",
+        "answer": "was",
+        "correctAnswer": "was",
+        "hint": "Was completes the sentence: Nat was at camp.",
+        "visibleExplanation": "Was completes the sentence: Nat was at camp.",
+        "spokenExplanation": "Was completes the sentence. Nat was at camp.",
+        "choices": [
+          [
+            "was",
+            "was"
+          ],
+          [
+            "what",
+            "what"
+          ],
+          [
+            "when",
+            "when"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q02-tricky-when",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "when",
+        "prompt": "Choose the question word that asks about time.",
+        "spokenDirections": "Choose the question word that asks about time.",
+        "independentReading": true,
+        "trickyWord": "when",
+        "answer": "when",
+        "correctAnswer": "when",
+        "hint": "When asks about time.",
+        "visibleExplanation": "When asks about time.",
+        "spokenExplanation": "When asks about time.",
+        "choices": [
+          [
+            "where",
+            "where"
+          ],
+          [
+            "when",
+            "when"
+          ],
+          [
+            "why",
+            "why"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q03-tricky-why",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "why",
+        "prompt": "Choose the question word that asks for a reason.",
+        "spokenDirections": "Choose the question word that asks for a reason.",
+        "independentReading": true,
+        "trickyWord": "why",
+        "answer": "why",
+        "correctAnswer": "why",
+        "hint": "Why asks for a reason.",
+        "visibleExplanation": "Why asks for a reason.",
+        "spokenExplanation": "Why asks for a reason.",
+        "choices": [
+          [
+            "which",
+            "which"
+          ],
+          [
+            "what",
+            "what"
+          ],
+          [
+            "why",
+            "why"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q04-sister-dogs",
+        "lessonRange": "Lessons 25-29",
+        "type": "sister-sound",
+        "category": "sister-sound",
+        "skill": "Sister sounds",
+        "word": "dogs",
+        "prompt": "Listen to the word. Choose the sister sound you hear at the end.",
+        "spokenDirections": "Listen to the word. Choose the sister sound you hear at the end.",
+        "spokenTarget": "dogs",
+        "requiresTargetAudio": true,
+        "answer": "z as in dogs",
+        "correctAnswer": "z as in dogs",
+        "hint": "Dogs ends with the /z/ sound. The /s/ and /z/ sounds are sister sounds.",
+        "visibleExplanation": "Dogs ends with the /z/ sound. The /s/ and /z/ sounds are sister sounds.",
+        "spokenExplanation": "Dogs ends with the z sound. The s and z sounds are sister sounds.",
+        "choices": [
+          [
+            "s as in cats",
+            "s as in cats"
+          ],
+          [
+            "z as in dogs",
+            "z as in dogs"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q05-tricky-which",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "which",
+        "prompt": "Choose the question word that asks someone to pick one.",
+        "spokenDirections": "Choose the question word that asks someone to pick one.",
+        "independentReading": true,
+        "trickyWord": "which",
+        "answer": "which",
+        "correctAnswer": "which",
+        "hint": "Which asks someone to pick one.",
+        "visibleExplanation": "Which asks someone to pick one.",
+        "spokenExplanation": "Which asks someone to pick one.",
+        "choices": [
+          [
+            "which",
+            "which"
+          ],
+          [
+            "when",
+            "when"
+          ],
+          [
+            "what",
+            "what"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q06-tricky-what",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "what",
+        "prompt": "Choose the question word that asks about a thing or idea.",
+        "spokenDirections": "Choose the question word that asks about a thing or idea.",
+        "independentReading": true,
+        "trickyWord": "what",
+        "answer": "what",
+        "correctAnswer": "what",
+        "hint": "What asks about a thing or idea.",
+        "visibleExplanation": "What asks about a thing or idea.",
+        "spokenExplanation": "What asks about a thing or idea.",
+        "choices": [
+          [
+            "was",
+            "was"
+          ],
+          [
+            "what",
+            "what"
+          ],
+          [
+            "where",
+            "where"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q07-tricky-here",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "here",
+        "prompt": "Choose the Tricky Word that means in this place.",
+        "spokenDirections": "Choose the Tricky Word that means in this place.",
+        "independentReading": true,
+        "trickyWord": "here",
+        "answer": "here",
+        "correctAnswer": "here",
+        "hint": "Here means in this place.",
+        "visibleExplanation": "Here means in this place.",
+        "spokenExplanation": "Here means in this place.",
+        "choices": [
+          [
+            "there",
+            "there"
+          ],
+          [
+            "here",
+            "here"
+          ],
+          [
+            "where",
+            "where"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q08-tricky-there",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "there",
+        "prompt": "Choose the Tricky Word that means in that place.",
+        "spokenDirections": "Choose the Tricky Word that means in that place.",
+        "independentReading": true,
+        "trickyWord": "there",
+        "answer": "there",
+        "correctAnswer": "there",
+        "hint": "There means in that place.",
+        "visibleExplanation": "There means in that place.",
+        "spokenExplanation": "There means in that place.",
+        "choices": [
+          [
+            "here",
+            "here"
+          ],
+          [
+            "there",
+            "there"
+          ],
+          [
+            "where",
+            "where"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q09-question-cat",
+        "lessonRange": "Lessons 25-29",
+        "type": "question-sentence",
+        "category": "question-sentence",
+        "skill": "Question sentence",
+        "word": "Where is the cat?",
+        "prompt": "Which sentence asks a question?",
+        "spokenDirections": "Read each sentence. Choose the sentence that asks a question.",
+        "independentReading": true,
+        "answer": "Where is the cat?",
+        "correctAnswer": "Where is the cat?",
+        "hint": "Where is the cat? asks a question, so it ends with a question mark.",
+        "visibleExplanation": "Where is the cat? asks a question, so it ends with a question mark.",
+        "spokenExplanation": "Where is the cat asks a question, so it ends with a question mark.",
+        "choices": [
+          [
+            "Where is the cat?",
+            "Where is the cat?"
+          ],
+          [
+            "The cat is here.",
+            "The cat is here."
+          ],
+          [
+            "I see the cat.",
+            "I see the cat."
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q10-ending-punctuation",
+        "lessonRange": "Lessons 25-29",
+        "type": "ending-punctuation",
+        "category": "ending-punctuation",
+        "skill": "Ending punctuation",
+        "word": "What is that?",
+        "prompt": "Choose the mark that belongs at the end: \"What is that__\"",
+        "spokenDirections": "Read the sentence. Choose the mark that belongs at the end.",
+        "independentReading": true,
+        "answer": "?",
+        "correctAnswer": "?",
+        "hint": "What is that asks a question, so it ends with a question mark.",
+        "visibleExplanation": "What is that asks a question, so it ends with a question mark.",
+        "spokenExplanation": "What is that asks a question, so it ends with a question mark.",
+        "choices": [
+          [
+            "?",
+            "?"
+          ],
+          [
+            ".",
+            "."
+          ],
+          [
+            "!",
+            "!"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q11-correct-sentence",
+        "lessonRange": "Lessons 25-29",
+        "type": "correct-sentence",
+        "category": "correct-sentence",
+        "skill": "Correct sentence",
+        "word": "Where is it?",
+        "prompt": "Which sentence is written correctly?",
+        "spokenDirections": "Read each sentence. Choose the sentence that is written correctly.",
+        "independentReading": true,
+        "answer": "Where is it?",
+        "correctAnswer": "Where is it?",
+        "hint": "Where is it? starts with an uppercase letter and ends with a question mark.",
+        "visibleExplanation": "Where is it? starts with an uppercase letter and ends with a question mark.",
+        "spokenExplanation": "Where is it starts with an uppercase letter and ends with a question mark.",
+        "choices": [
+          [
+            "Where is it?",
+            "Where is it?"
+          ],
+          [
+            "Where is it.",
+            "Where is it."
+          ],
+          [
+            "where is it?",
+            "where is it?"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q12-quotation-sam",
+        "lessonRange": "Lessons 25-29",
+        "type": "quotation-marks",
+        "category": "quotation-marks",
+        "skill": "Quotation marks",
+        "word": "\"I see it,\" said Sam.",
+        "prompt": "Which sentence uses quotation marks correctly?",
+        "spokenDirections": "Read each sentence. Choose the sentence with quotation marks in the correct places.",
+        "independentReading": true,
+        "answer": "\"I see it,\" said Sam.",
+        "correctAnswer": "\"I see it,\" said Sam.",
+        "hint": "Quotation marks show the exact words Sam says.",
+        "visibleExplanation": "Quotation marks show the exact words Sam says.",
+        "spokenExplanation": "Quotation marks show the exact words Sam says.",
+        "choices": [
+          [
+            "\"I see it,\" said Sam.",
+            "\"I see it,\" said Sam."
+          ],
+          [
+            "I \"see it, said\" Sam.",
+            "I \"see it, said\" Sam."
+          ],
+          [
+            "I see \"it, said Sam.\"",
+            "I see \"it, said Sam.\""
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q13-quotation-mom",
+        "lessonRange": "Lessons 25-29",
+        "type": "quotation-marks",
+        "category": "quotation-marks",
+        "skill": "Quotation marks",
+        "word": "Mom said, \"Sit here.\"",
+        "prompt": "Which sentence uses quotation marks correctly?",
+        "spokenDirections": "Read each sentence. Choose the sentence with quotation marks in the correct places.",
+        "independentReading": true,
+        "answer": "Mom said, \"Sit here.\"",
+        "correctAnswer": "Mom said, \"Sit here.\"",
+        "hint": "Quotation marks go around the exact words Mom says.",
+        "visibleExplanation": "Quotation marks go around the exact words Mom says.",
+        "spokenExplanation": "Quotation marks go around the exact words Mom says.",
+        "choices": [
+          [
+            "Mom said, \"Sit here.\"",
+            "Mom said, \"Sit here.\""
+          ],
+          [
+            "\"Mom said, Sit\" here.",
+            "\"Mom said, Sit\" here."
+          ],
+          [
+            "Mom \"said, Sit here.\"",
+            "Mom \"said, Sit here.\""
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q14-noun-cat",
+        "lessonRange": "Lessons 25-29",
+        "type": "noun",
+        "category": "noun",
+        "skill": "Noun",
+        "word": "cat",
+        "prompt": "Which word is a noun?",
+        "spokenDirections": "Read each word. Choose the noun. A noun names a person, place, or thing.",
+        "independentReading": true,
+        "answer": "cat",
+        "correctAnswer": "cat",
+        "hint": "Cat names an animal, so cat is a noun.",
+        "visibleExplanation": "Cat names an animal, so cat is a noun.",
+        "spokenExplanation": "Cat names an animal, so cat is a noun.",
+        "choices": [
+          [
+            "cat",
+            "cat"
+          ],
+          [
+            "was",
+            "was"
+          ],
+          [
+            "when",
+            "when"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "id": "l5-q15-tricky-where-sentence",
+        "lessonRange": "Lessons 25-29",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "Where",
+        "prompt": "Choose the missing Tricky Word: \"__ did the dog go?\"",
+        "spokenDirections": "Choose the missing Tricky Word: \"__ did the dog go?\"",
+        "independentReading": true,
+        "trickyWord": "where",
+        "answer": "Where",
+        "correctAnswer": "Where",
+        "hint": "Where completes the question: Where did the dog go?",
+        "visibleExplanation": "Where completes the question: Where did the dog go?",
+        "spokenExplanation": "Where completes the question. Where did the dog go?",
+        "choices": [
+          [
+            "Where",
+            "Where"
+          ],
+          [
+            "There",
+            "There"
+          ],
+          [
+            "Which",
+            "Which"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q01-middle-map",
+        "lessonRange": "Lessons 30-32",
+        "type": "middle-short-vowel",
+        "category": "short-vowel-a",
+        "skill": "Middle short vowel",
+        "word": "map",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "map",
+        "requiresTargetAudio": true,
+        "answer": "a",
+        "correctAnswer": "a",
+        "hint": "Map has the short /a/ sound in the middle.",
+        "visibleExplanation": "Map has the short /a/ sound in the middle.",
+        "spokenExplanation": "Map has the short a sound in the middle.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "e",
+            "e"
+          ],
+          [
+            "i",
+            "i"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q02-middle-bed",
+        "lessonRange": "Lessons 30-32",
+        "type": "middle-short-vowel",
+        "category": "short-vowel-e",
+        "skill": "Middle short vowel",
+        "word": "bed",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "bed",
+        "requiresTargetAudio": true,
+        "answer": "e",
+        "correctAnswer": "e",
+        "hint": "Bed has the short /e/ sound in the middle.",
+        "visibleExplanation": "Bed has the short /e/ sound in the middle.",
+        "spokenExplanation": "Bed has the short e sound in the middle.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "e",
+            "e"
+          ],
+          [
+            "u",
+            "u"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q03-middle-sit",
+        "lessonRange": "Lessons 30-32",
+        "type": "middle-short-vowel",
+        "category": "short-vowel-i",
+        "skill": "Middle short vowel",
+        "word": "sit",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "sit",
+        "requiresTargetAudio": true,
+        "answer": "i",
+        "correctAnswer": "i",
+        "hint": "Sit has the short /i/ sound in the middle.",
+        "visibleExplanation": "Sit has the short /i/ sound in the middle.",
+        "spokenExplanation": "Sit has the short i sound in the middle.",
+        "choices": [
+          [
+            "i",
+            "i"
+          ],
+          [
+            "e",
+            "e"
+          ],
+          [
+            "a",
+            "a"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q04-middle-log",
+        "lessonRange": "Lessons 30-32",
+        "type": "middle-short-vowel",
+        "category": "short-vowel-o",
+        "skill": "Middle short vowel",
+        "word": "log",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "log",
+        "requiresTargetAudio": true,
+        "answer": "o",
+        "correctAnswer": "o",
+        "hint": "Log has the short /o/ sound in the middle.",
+        "visibleExplanation": "Log has the short /o/ sound in the middle.",
+        "spokenExplanation": "Log has the short o sound in the middle.",
+        "choices": [
+          [
+            "u",
+            "u"
+          ],
+          [
+            "o",
+            "o"
+          ],
+          [
+            "a",
+            "a"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q05-middle-sun",
+        "lessonRange": "Lessons 30-32",
+        "type": "middle-short-vowel",
+        "category": "short-vowel-u",
+        "skill": "Middle short vowel",
+        "word": "sun",
+        "prompt": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenDirections": "Listen to the word. Choose the vowel sound you hear in the middle.",
+        "spokenTarget": "sun",
+        "requiresTargetAudio": true,
+        "answer": "u",
+        "correctAnswer": "u",
+        "hint": "Sun has the short /u/ sound in the middle.",
+        "visibleExplanation": "Sun has the short /u/ sound in the middle.",
+        "spokenExplanation": "Sun has the short u sound in the middle.",
+        "choices": [
+          [
+            "o",
+            "o"
+          ],
+          [
+            "i",
+            "i"
+          ],
+          [
+            "u",
+            "u"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q06-sister-van",
+        "lessonRange": "Lessons 30-32",
+        "type": "sister-sound",
+        "category": "sister-f-v",
+        "skill": "Sister sounds",
+        "word": "van",
+        "prompt": "Listen to the word. Choose the sister sound you hear at the beginning.",
+        "spokenDirections": "Listen to the word. Choose the sister sound you hear at the beginning.",
+        "spokenTarget": "van",
+        "requiresTargetAudio": true,
+        "answer": "v as in van",
+        "correctAnswer": "v as in van",
+        "hint": "Van begins with the /v/ sound. The /f/ and /v/ sounds are sister sounds.",
+        "visibleExplanation": "Van begins with the /v/ sound. The /f/ and /v/ sounds are sister sounds.",
+        "spokenExplanation": "Van begins with the v sound. The f and v sounds are sister sounds.",
+        "choices": [
+          [
+            "f as in fan",
+            "f as in fan"
+          ],
+          [
+            "v as in van",
+            "v as in van"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q07-sister-dogs",
+        "lessonRange": "Lessons 30-32",
+        "type": "sister-sound",
+        "category": "sister-s-z",
+        "skill": "Sister sounds",
+        "word": "dogs",
+        "prompt": "Listen to the word. Choose the sister sound you hear at the end.",
+        "spokenDirections": "Listen to the word. Choose the sister sound you hear at the end.",
+        "spokenTarget": "dogs",
+        "requiresTargetAudio": true,
+        "answer": "z as in dogs",
+        "correctAnswer": "z as in dogs",
+        "hint": "Dogs ends with the /z/ sound. The /s/ and /z/ sounds are sister sounds.",
+        "visibleExplanation": "Dogs ends with the /z/ sound. The /s/ and /z/ sounds are sister sounds.",
+        "spokenExplanation": "Dogs ends with the z sound. The s and z sounds are sister sounds.",
+        "choices": [
+          [
+            "s as in cats",
+            "s as in cats"
+          ],
+          [
+            "z as in dogs",
+            "z as in dogs"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q08-sister-th-them",
+        "lessonRange": "Lessons 30-32",
+        "type": "sister-sound",
+        "category": "th-voiced-unvoiced",
+        "skill": "Sister sounds",
+        "word": "them",
+        "prompt": "Listen to the word. Choose the th sound you hear.",
+        "spokenDirections": "Listen to the word. Choose the th sound you hear.",
+        "spokenTarget": "them",
+        "requiresTargetAudio": true,
+        "answer": "th as in them",
+        "correctAnswer": "th as in them",
+        "hint": "Them begins with the voiced /th/ sound. Thin begins with the unvoiced /th/ sound.",
+        "visibleExplanation": "Them begins with the voiced /th/ sound. Thin begins with the unvoiced /th/ sound.",
+        "spokenExplanation": "Them begins with the voiced th sound. Thin begins with the unvoiced th sound.",
+        "choices": [
+          [
+            "th as in thin",
+            "th as in thin"
+          ],
+          [
+            "th as in them",
+            "th as in them"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q09-digraph-shell",
+        "lessonRange": "Lessons 30-32",
+        "type": "digraph",
+        "category": "digraph-sh",
+        "skill": "Beginning digraph",
+        "word": "shell",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "shell",
+        "requiresTargetAudio": true,
+        "answer": "sh",
+        "correctAnswer": "sh",
+        "hint": "Shell begins with the /sh/ sound, spelled sh.",
+        "visibleExplanation": "Shell begins with the /sh/ sound, spelled sh.",
+        "spokenExplanation": "Shell begins with the sh sound, spelled S H.",
+        "choices": [
+          [
+            "sh",
+            "sh"
+          ],
+          [
+            "ch",
+            "ch"
+          ],
+          [
+            "th",
+            "th"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q10-digraph-rich",
+        "lessonRange": "Lessons 30-32",
+        "type": "digraph",
+        "category": "digraph-ch",
+        "skill": "Ending digraph",
+        "word": "rich",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "rich",
+        "requiresTargetAudio": true,
+        "answer": "ch",
+        "correctAnswer": "ch",
+        "hint": "Rich ends with the /ch/ sound, spelled ch.",
+        "visibleExplanation": "Rich ends with the /ch/ sound, spelled ch.",
+        "spokenExplanation": "Rich ends with the ch sound, spelled C H.",
+        "choices": [
+          [
+            "ng",
+            "ng"
+          ],
+          [
+            "th",
+            "th"
+          ],
+          [
+            "ch",
+            "ch"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q11-digraph-sing",
+        "lessonRange": "Lessons 30-32",
+        "type": "digraph",
+        "category": "digraph-ng",
+        "skill": "Ending digraph",
+        "word": "sing",
+        "prompt": "Listen to the word. Choose the digraph you hear.",
+        "spokenDirections": "Listen to the word. Choose the digraph you hear.",
+        "spokenTarget": "sing",
+        "requiresTargetAudio": true,
+        "answer": "ng",
+        "correctAnswer": "ng",
+        "hint": "Sing ends with the /ng/ sound, spelled ng.",
+        "visibleExplanation": "Sing ends with the /ng/ sound, spelled ng.",
+        "spokenExplanation": "Sing ends with the ng sound, spelled N G.",
+        "choices": [
+          [
+            "n",
+            "n"
+          ],
+          [
+            "ng",
+            "ng"
+          ],
+          [
+            "g",
+            "g"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q12-qu-quit",
+        "lessonRange": "Lessons 30-32",
+        "type": "beginning-spelling",
+        "category": "qu",
+        "skill": "Beginning spelling",
+        "word": "quit",
+        "prompt": "Listen to the word. Choose the spelling you hear at the beginning.",
+        "spokenDirections": "Listen to the word. Choose the spelling you hear at the beginning.",
+        "spokenTarget": "quit",
+        "requiresTargetAudio": true,
+        "answer": "qu",
+        "correctAnswer": "qu",
+        "hint": "Quit begins with the /kw/ sound, spelled qu.",
+        "visibleExplanation": "Quit begins with the /kw/ sound, spelled qu.",
+        "spokenExplanation": "Quit begins with the kw sound, spelled Q U.",
+        "choices": [
+          [
+            "qu",
+            "qu"
+          ],
+          [
+            "ch",
+            "ch"
+          ],
+          [
+            "ck",
+            "ck"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q13-ck-duck",
+        "lessonRange": "Lessons 30-32",
+        "type": "ending-spelling",
+        "category": "ck",
+        "skill": "Ending spelling",
+        "word": "duck",
+        "prompt": "Listen to the word. Choose the spelling you hear at the end.",
+        "spokenDirections": "Listen to the word. Choose the spelling you hear at the end.",
+        "spokenTarget": "duck",
+        "requiresTargetAudio": true,
+        "answer": "ck",
+        "correctAnswer": "ck",
+        "hint": "Duck ends with the /k/ sound, spelled ck.",
+        "visibleExplanation": "Duck ends with the /k/ sound, spelled ck.",
+        "spokenExplanation": "Duck ends with the k sound, spelled C K.",
+        "choices": [
+          [
+            "c",
+            "c"
+          ],
+          [
+            "k",
+            "k"
+          ],
+          [
+            "ck",
+            "ck"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q14-double-buzz",
+        "lessonRange": "Lessons 30-32",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "buzz",
+        "prompt": "Listen to the word. Choose the spelling you hear at the end.",
+        "spokenDirections": "Listen to the word. Choose the spelling you hear at the end.",
+        "spokenTarget": "buzz",
+        "requiresTargetAudio": true,
+        "answer": "zz",
+        "correctAnswer": "zz",
+        "hint": "Buzz ends with the /z/ sound, spelled zz. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Buzz ends with the /z/ sound, spelled zz. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Buzz ends with the z sound, spelled double z. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "ss",
+            "ss"
+          ],
+          [
+            "zz",
+            "zz"
+          ],
+          [
+            "gg",
+            "gg"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q15-tricky-said",
+        "lessonRange": "Lessons 30-32",
+        "type": "tricky-word-sentence",
+        "category": "cumulative-tricky-word",
+        "skill": "Missing Tricky Word",
+        "word": "said",
+        "prompt": "Choose the missing Tricky Word: Yesterday, Mom __ no.",
+        "spokenDirections": "Choose the missing Tricky Word: Yesterday, Mom __ no.",
+        "independentReading": true,
+        "trickyWord": "said",
+        "answer": "said",
+        "correctAnswer": "said",
+        "hint": "Said completes the sentence: Yesterday, Mom said no.",
+        "visibleExplanation": "Said completes the sentence: Yesterday, Mom said no.",
+        "spokenExplanation": "Said completes the sentence. Yesterday, Mom said no.",
+        "choices": [
+          [
+            "says",
+            "says"
+          ],
+          [
+            "said",
+            "said"
+          ],
+          [
+            "was",
+            "was"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q16-tricky-where",
+        "lessonRange": "Lessons 30-32",
+        "type": "tricky-word-sentence",
+        "category": "cumulative-tricky-word",
+        "skill": "Missing Tricky Word",
+        "word": "Where",
+        "prompt": "Choose the missing Tricky Word: __ did the dog go?",
+        "spokenDirections": "Choose the missing Tricky Word: __ did the dog go?",
+        "independentReading": true,
+        "trickyWord": "where",
+        "answer": "Where",
+        "correctAnswer": "Where",
+        "hint": "Where completes the question: Where did the dog go?",
+        "visibleExplanation": "Where completes the question: Where did the dog go?",
+        "spokenExplanation": "Where completes the question. Where did the dog go.",
+        "choices": [
+          [
+            "Where",
+            "Where"
+          ],
+          [
+            "There",
+            "There"
+          ],
+          [
+            "Which",
+            "Which"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q17-tricky-here",
+        "lessonRange": "Lessons 30-32",
+        "type": "tricky-word-feature",
+        "category": "cumulative-tricky-word",
+        "skill": "Tricky Word recognition",
+        "word": "here",
+        "prompt": "Choose the Tricky Word that means in this place.",
+        "spokenDirections": "Choose the Tricky Word that means in this place.",
+        "independentReading": true,
+        "trickyWord": "here",
+        "answer": "here",
+        "correctAnswer": "here",
+        "hint": "Here means in this place.",
+        "visibleExplanation": "Here means in this place.",
+        "spokenExplanation": "Here means in this place.",
+        "choices": [
+          [
+            "there",
+            "there"
+          ],
+          [
+            "here",
+            "here"
+          ],
+          [
+            "where",
+            "where"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q18-noun-rabbit",
+        "lessonRange": "Lessons 30-32",
+        "type": "noun",
+        "category": "noun",
+        "skill": "Noun",
+        "word": "rabbit",
+        "prompt": "Which word is a noun?",
+        "spokenDirections": "Which word is a noun?",
+        "independentReading": true,
+        "answer": "rabbit",
+        "correctAnswer": "rabbit",
+        "hint": "Rabbit names an animal, so rabbit is a noun.",
+        "visibleExplanation": "Rabbit names an animal, so rabbit is a noun.",
+        "spokenExplanation": "Rabbit names an animal, so rabbit is a noun.",
+        "choices": [
+          [
+            "rabbit",
+            "rabbit"
+          ],
+          [
+            "was",
+            "was"
+          ],
+          [
+            "quick",
+            "quick"
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q19-question-box",
+        "lessonRange": "Lessons 30-32",
+        "type": "question-sentence",
+        "category": "question-sentence",
+        "skill": "Question sentence",
+        "word": "What is in the box?",
+        "prompt": "Which sentence asks a question?",
+        "spokenDirections": "Which sentence asks a question?",
+        "independentReading": true,
+        "answer": "What is in the box?",
+        "correctAnswer": "What is in the box?",
+        "hint": "What is in the box? asks a question, so it ends with a question mark.",
+        "visibleExplanation": "What is in the box? asks a question, so it ends with a question mark.",
+        "spokenExplanation": "What is in the box asks a question, so it ends with a question mark.",
+        "choices": [
+          [
+            "What is in the box?",
+            "What is in the box?"
+          ],
+          [
+            "It is in the box.",
+            "It is in the box."
+          ],
+          [
+            "I have the box.",
+            "I have the box."
+          ]
+        ]
+      },
+      {
+        "zone": 5,
+        "id": "l6-q20-quotation-mom",
+        "lessonRange": "Lessons 30-32",
+        "type": "quotation-marks",
+        "category": "quotation-marks",
+        "skill": "Quotation marks",
+        "word": "\"I have it,\" said Mom.",
+        "prompt": "Which sentence uses quotation marks correctly?",
+        "spokenDirections": "Which sentence uses quotation marks correctly?",
+        "independentReading": true,
+        "answer": "\"I have it,\" said Mom.",
+        "correctAnswer": "\"I have it,\" said Mom.",
+        "hint": "Quotation marks show the exact words Mom says.",
+        "visibleExplanation": "Quotation marks show the exact words Mom says.",
+        "spokenExplanation": "Quotation marks show the exact words Mom says.",
+        "choices": [
+          [
+            "\"I have it,\" said Mom.",
+            "\"I have it,\" said Mom."
+          ],
+          [
+            "I \"have it, said\" Mom.",
+            "I \"have it, said\" Mom."
+          ],
+          [
+            "I have \"it, said Mom.\"",
+            "I have \"it, said Mom.\""
+          ]
+        ]
+      }
+    ],
+    "schemaVersion": 1,
+    "supplementalQuestions": [
+      {
+        "zone": 0,
+        "id": "l1-extra-tricky-a",
+        "lessonRange": "Lessons 1-5",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "a",
+        "prompt": "Choose the missing Tricky Word: __ dog can dig.",
+        "spokenDirections": "Choose the missing Tricky Word: __ dog can dig.",
+        "independentReading": true,
+        "trickyWord": "a",
+        "answer": "a",
+        "correctAnswer": "a",
+        "hint": "A completes the sentence: A dog can dig.",
+        "visibleExplanation": "A completes the sentence: A dog can dig.",
+        "spokenExplanation": "A completes the sentence. A dog can dig.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "I",
+            "I"
+          ],
+          [
+            "no",
+            "no"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-extra-tricky-so",
+        "lessonRange": "Lessons 1-5",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "so",
+        "prompt": "Choose the missing Tricky Word: The sun is __ hot.",
+        "spokenDirections": "Choose the missing Tricky Word: The sun is __ hot.",
+        "independentReading": true,
+        "trickyWord": "so",
+        "answer": "so",
+        "correctAnswer": "so",
+        "hint": "So completes the sentence: The sun is so hot.",
+        "visibleExplanation": "So completes the sentence: The sun is so hot.",
+        "spokenExplanation": "So completes the sentence. The sun is so hot.",
+        "choices": [
+          [
+            "so",
+            "so"
+          ],
+          [
+            "no",
+            "no"
+          ],
+          [
+            "of",
+            "of"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "id": "l1-extra-tricky-of",
+        "lessonRange": "Lessons 1-5",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "of",
+        "prompt": "Choose the missing Tricky Word: The top __ the box is red.",
+        "spokenDirections": "Choose the missing Tricky Word: The top __ the box is red.",
+        "independentReading": true,
+        "trickyWord": "of",
+        "answer": "of",
+        "correctAnswer": "of",
+        "hint": "Of completes the sentence: The top of the box is red.",
+        "visibleExplanation": "Of completes the sentence: The top of the box is red.",
+        "spokenExplanation": "Of completes the sentence. The top of the box is red.",
+        "choices": [
+          [
+            "of",
+            "of"
+          ],
+          [
+            "so",
+            "so"
+          ],
+          [
+            "no",
+            "no"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-is",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "is",
+        "prompt": "Choose the missing Tricky Word: It __ a cat.",
+        "spokenDirections": "Choose the missing Tricky Word: It __ a cat.",
+        "independentReading": true,
+        "trickyWord": "is",
+        "answer": "is",
+        "correctAnswer": "is",
+        "hint": "Is completes the sentence: It is a cat.",
+        "visibleExplanation": "Is completes the sentence: It is a cat.",
+        "spokenExplanation": "Is completes the sentence. It is a cat.",
+        "choices": [
+          [
+            "is",
+            "is"
+          ],
+          [
+            "to",
+            "to"
+          ],
+          [
+            "all",
+            "all"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-to",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "to",
+        "prompt": "Choose the missing Tricky Word: Sam went __ bed.",
+        "spokenDirections": "Choose the missing Tricky Word: Sam went __ bed.",
+        "independentReading": true,
+        "trickyWord": "to",
+        "answer": "to",
+        "correctAnswer": "to",
+        "hint": "To completes the sentence: Sam went to bed.",
+        "visibleExplanation": "To completes the sentence: Sam went to bed.",
+        "spokenExplanation": "To completes the sentence. Sam went to bed.",
+        "choices": [
+          [
+            "to",
+            "to"
+          ],
+          [
+            "is",
+            "is"
+          ],
+          [
+            "all",
+            "all"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-all",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "All",
+        "prompt": "Choose the missing Tricky Word: __ the kids ran.",
+        "spokenDirections": "Choose the missing Tricky Word: __ the kids ran.",
+        "independentReading": true,
+        "trickyWord": "all",
+        "answer": "All",
+        "correctAnswer": "All",
+        "hint": "All completes the sentence: All the kids ran.",
+        "visibleExplanation": "All completes the sentence: All the kids ran.",
+        "spokenExplanation": "All completes the sentence. All the kids ran.",
+        "choices": [
+          [
+            "All",
+            "All"
+          ],
+          [
+            "Some",
+            "Some"
+          ],
+          [
+            "From",
+            "From"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-from",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "from",
+        "prompt": "Choose the missing Tricky Word: I ran __ the bus.",
+        "spokenDirections": "Choose the missing Tricky Word: I ran __ the bus.",
+        "independentReading": true,
+        "trickyWord": "from",
+        "answer": "from",
+        "correctAnswer": "from",
+        "hint": "From completes the sentence: I ran from the bus.",
+        "visibleExplanation": "From completes the sentence: I ran from the bus.",
+        "spokenExplanation": "From completes the sentence. I ran from the bus.",
+        "choices": [
+          [
+            "from",
+            "from"
+          ],
+          [
+            "some",
+            "some"
+          ],
+          [
+            "word",
+            "word"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-word",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-feature",
+        "category": "tricky-word-feature",
+        "skill": "Tricky Word recognition",
+        "word": "word",
+        "prompt": "Choose the Tricky one with w at the beginning and d at the end.",
+        "spokenDirections": "Choose the Tricky one with w at the beginning and d at the end.",
+        "independentReading": true,
+        "trickyWord": "word",
+        "answer": "word",
+        "correctAnswer": "word",
+        "hint": "Word begins with w and ends with d.",
+        "visibleExplanation": "Word begins with w and ends with d.",
+        "spokenExplanation": "Word begins with W and ends with D.",
+        "choices": [
+          [
+            "word",
+            "word"
+          ],
+          [
+            "from",
+            "from"
+          ],
+          [
+            "some",
+            "some"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-have",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "have",
+        "prompt": "Choose the missing Tricky Word: I __ a red pen.",
+        "spokenDirections": "Choose the missing Tricky Word: I __ a red pen.",
+        "independentReading": true,
+        "trickyWord": "have",
+        "answer": "have",
+        "correctAnswer": "have",
+        "hint": "Have completes the sentence: I have a red pen.",
+        "visibleExplanation": "Have completes the sentence: I have a red pen.",
+        "spokenExplanation": "Have completes the sentence. I have a red pen.",
+        "choices": [
+          [
+            "have",
+            "have"
+          ],
+          [
+            "were",
+            "were"
+          ],
+          [
+            "are",
+            "are"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-were",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "were",
+        "prompt": "Choose the missing Tricky Word: Yesterday, we __ at the park.",
+        "spokenDirections": "Choose the missing Tricky Word: Yesterday, we __ at the park.",
+        "independentReading": true,
+        "trickyWord": "were",
+        "answer": "were",
+        "correctAnswer": "were",
+        "hint": "Were completes the sentence: Yesterday, we were at the park.",
+        "visibleExplanation": "Were completes the sentence: Yesterday, we were at the park.",
+        "spokenExplanation": "Were completes the sentence. Yesterday, we were at the park.",
+        "choices": [
+          [
+            "were",
+            "were"
+          ],
+          [
+            "have",
+            "have"
+          ],
+          [
+            "are",
+            "are"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-one",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "one",
+        "prompt": "Choose the missing Tricky Word: I have __ red pen.",
+        "spokenDirections": "Choose the missing Tricky Word: I have __ red pen.",
+        "independentReading": true,
+        "trickyWord": "one",
+        "answer": "one",
+        "correctAnswer": "one",
+        "hint": "One completes the sentence: I have one red pen.",
+        "visibleExplanation": "One completes the sentence: I have one red pen.",
+        "spokenExplanation": "One completes the sentence. I have one red pen.",
+        "choices": [
+          [
+            "one",
+            "one"
+          ],
+          [
+            "once",
+            "once"
+          ],
+          [
+            "to",
+            "to"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "id": "l2-extra-tricky-once",
+        "lessonRange": "Lessons 11-16",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "once",
+        "prompt": "Choose the missing Tricky Word: I read it __.",
+        "spokenDirections": "Choose the missing Tricky Word: I read it __.",
+        "independentReading": true,
+        "trickyWord": "once",
+        "answer": "once",
+        "correctAnswer": "once",
+        "hint": "Once completes the sentence: I read it once.",
+        "visibleExplanation": "Once completes the sentence: I read it once.",
+        "spokenExplanation": "Once completes the sentence. I read it once.",
+        "choices": [
+          [
+            "once",
+            "once"
+          ],
+          [
+            "one",
+            "one"
+          ],
+          [
+            "to",
+            "to"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-extra-tricky-two",
+        "lessonRange": "Lessons 17-20",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "two",
+        "prompt": "Choose the missing Tricky Word: I have __ red pens.",
+        "spokenDirections": "Choose the missing Tricky Word: I have __ red pens.",
+        "independentReading": true,
+        "trickyWord": "two",
+        "answer": "two",
+        "correctAnswer": "two",
+        "hint": "Two completes the sentence: I have two red pens.",
+        "visibleExplanation": "Two completes the sentence: I have two red pens.",
+        "spokenExplanation": "Two completes the sentence. I have two red pens.",
+        "choices": [
+          [
+            "two",
+            "two"
+          ],
+          [
+            "to",
+            "to"
+          ],
+          [
+            "do",
+            "do"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "id": "l3-extra-tricky-says",
+        "lessonRange": "Lessons 17-20",
+        "type": "tricky-word-sentence",
+        "category": "tricky-word-sentence",
+        "skill": "Missing Tricky Word",
+        "word": "says",
+        "prompt": "Choose the missing Tricky Word: Every day, Dad __ yes.",
+        "spokenDirections": "Choose the missing Tricky Word: Every day, Dad __ yes.",
+        "independentReading": true,
+        "trickyWord": "says",
+        "answer": "says",
+        "correctAnswer": "says",
+        "hint": "Says completes the sentence: Every day, Dad says yes.",
+        "visibleExplanation": "Says completes the sentence: Every day, Dad says yes.",
+        "spokenExplanation": "Says completes the sentence. Every day, Dad says yes.",
+        "choices": [
+          [
+            "says",
+            "says"
+          ],
+          [
+            "said",
+            "said"
+          ],
+          [
+            "who",
+            "who"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-extra-ending-egg",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "egg",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "egg",
+        "requiresTargetAudio": true,
+        "answer": "gg",
+        "correctAnswer": "gg",
+        "hint": "Egg ends with the /g/ sound, spelled gg. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Egg ends with the /g/ sound, spelled gg. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Egg ends with the g sound, spelled double g. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "gg",
+            "gg"
+          ],
+          [
+            "g",
+            "g"
+          ],
+          [
+            "dd",
+            "dd"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-extra-ending-dress",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "dress",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "dress",
+        "requiresTargetAudio": true,
+        "answer": "ss",
+        "correctAnswer": "ss",
+        "hint": "Dress ends with the /s/ sound, spelled ss. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Dress ends with the /s/ sound, spelled ss. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Dress ends with the s sound, spelled double s. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "ss",
+            "ss"
+          ],
+          [
+            "zz",
+            "zz"
+          ],
+          [
+            "ff",
+            "ff"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-extra-ending-ferret",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "ferret",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "ferret",
+        "requiresTargetAudio": true,
+        "answer": "rr",
+        "correctAnswer": "rr",
+        "hint": "Ferret has the /r/ sound spelled rr. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Ferret has the /r/ sound spelled rr. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Ferret has the r sound spelled double r. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "r",
+            "r"
+          ],
+          [
+            "rr",
+            "rr"
+          ],
+          [
+            "tt",
+            "tt"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-extra-ending-mitt",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "mitt",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "mitt",
+        "requiresTargetAudio": true,
+        "answer": "tt",
+        "correctAnswer": "tt",
+        "hint": "Mitt ends with the /t/ sound, spelled tt. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Mitt ends with the /t/ sound, spelled tt. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Mitt ends with the t sound, spelled double t. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "tt",
+            "tt"
+          ],
+          [
+            "pp",
+            "pp"
+          ],
+          [
+            "dd",
+            "dd"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-extra-ending-buzz",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "double-letter-spelling",
+        "skill": "Double-letter spelling",
+        "word": "buzz",
+        "prompt": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenDirections": "Listen to the word. Choose the double-letter spelling you hear.",
+        "spokenTarget": "buzz",
+        "requiresTargetAudio": true,
+        "answer": "zz",
+        "correctAnswer": "zz",
+        "hint": "Buzz ends with the /z/ sound, spelled zz. The double-letter spelling represents one consonant sound.",
+        "visibleExplanation": "Buzz ends with the /z/ sound, spelled zz. The double-letter spelling represents one consonant sound.",
+        "spokenExplanation": "Buzz ends with the z sound, spelled double z. The double-letter spelling represents one consonant sound.",
+        "choices": [
+          [
+            "ss",
+            "ss"
+          ],
+          [
+            "zz",
+            "zz"
+          ],
+          [
+            "gg",
+            "gg"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "id": "l4-extra-hiccup-cc",
+        "lessonRange": "Lessons 21-24",
+        "type": "double-letter-spelling",
+        "category": "k-spellings",
+        "skill": "/k/ spellings",
+        "word": "hiccup",
+        "prompt": "Listen to the word. Choose the spelling for the /k/ sound.",
+        "spokenDirections": "Listen to the word. Choose the spelling for the /k/ sound.",
+        "spokenTarget": "hiccup",
+        "requiresTargetAudio": true,
+        "answer": "cc",
+        "correctAnswer": "cc",
+        "hint": "Hiccup has the /k/ sound spelled cc.",
+        "visibleExplanation": "Hiccup has the /k/ sound spelled cc.",
+        "spokenExplanation": "Hiccup has the k sound spelled double c.",
+        "choices": [
+          [
+            "cc",
+            "cc"
+          ],
+          [
+            "ck",
+            "ck"
+          ],
+          [
+            "c",
+            "c"
+          ]
+        ]
+      }
+    ],
+    "unitTitle": "CKLA Unit 1 Sound Safari",
+    "zoneEncouragements": [
+      "Nice work. Keep listening.",
+      "Great matching. Let's keep going.",
+      "Super work. Try the next trail.",
+      "You are working hard. Keep climbing.",
+      "Almost to Unit 1 Summit.",
+      "You made it to Unit 1 Summit."
+    ]
+  },
+  "gameId": "unit1-zone1-sound-safari",
+  "schemaVersion": 1,
+  "subject": "ckla",
+  "title": "CKLA Unit 1 Sound Safari",
+  "unitSlug": "unit-1"
+}
