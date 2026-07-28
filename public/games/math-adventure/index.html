@@ -1438,10 +1438,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const finish = start + hops;
       const showLandingNumber = q.mathVisualShowLandingNumber !== false;
       const showPathSentence = q.mathVisualShowPathSentence !== false;
+      const hideBeforeStart = q.mathVisualHideBeforeStart === true;
       const cellWidth = 46;
-      const svgWidth = Math.max(460, pathEnd * cellWidth);
+      const firstVisibleNumber = hideBeforeStart ? start : 1;
+      const visibleNumberCount = pathEnd - firstVisibleNumber + 1;
+      const svgWidth = Math.max(460, visibleNumberCount * cellWidth);
       const center = number =>
-        ((number - 1) * cellWidth) + (cellWidth / 2);
+        ((number - firstVisibleNumber) * cellWidth) + (cellWidth / 2);
 
       const arcs = Array.from(
         {length: hops},
@@ -1467,9 +1470,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       ).join("");
 
       const cells = Array.from(
-        {length: pathEnd},
+        {length: visibleNumberCount},
         (_, index) => {
-          const number = index + 1;
+          const number = firstVisibleNumber + index;
           const selected =
             number === start || number === finish;
           const traveled =
@@ -1505,7 +1508,7 @@ ${showLandingNumber && number === finish ? "" : number}
 
       return `
         <div
-          aria-label="Number path from 1 to ${pathEnd}, starting at ${start} and making ${hops} hops to ${finish}"
+          aria-label="Number path from ${firstVisibleNumber} to ${pathEnd}, starting at ${start} and making ${hops} hops to ${finish}"
           class="math-visual math-number-path"
           role="img"
           style="
@@ -1562,7 +1565,7 @@ ${showLandingNumber && number === finish ? "" : number}
               style="
                 display:grid;
                 grid-template-columns:repeat(
-                  ${pathEnd},
+                  ${visibleNumberCount},
                   ${cellWidth}px
                 );
               "

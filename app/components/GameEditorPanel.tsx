@@ -144,6 +144,7 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualPartTwoMissing?: boolean;
   mathVisualShowLandingNumber?: boolean;
   mathVisualShowPathSentence?: boolean;
+  mathVisualHideBeforeStart?: boolean;
   mathVisualObject?: string;
   mathVisualObjects?: string;
   mathVisualPartOne?: number;
@@ -930,14 +931,17 @@ function MathVisualPreview({
     const finish = start + hops;
     const showLandingNumber = question.mathVisualShowLandingNumber !== false;
     const showPathSentence = question.mathVisualShowPathSentence !== false;
+    const hideBeforeStart = question.mathVisualHideBeforeStart === true;
     const cellWidth = 46;
-    const svgWidth = Math.max(460, pathEnd * cellWidth);
+    const firstVisibleNumber = hideBeforeStart ? start : 1;
+    const visibleNumberCount = pathEnd - firstVisibleNumber + 1;
+    const svgWidth = Math.max(460, visibleNumberCount * cellWidth);
     const numberCenter = (number: number) =>
-      ((number - 1) * cellWidth) + (cellWidth / 2);
+      ((number - firstVisibleNumber) * cellWidth) + (cellWidth / 2);
 
     return (
       <div
-        aria-label={`Number path from 1 to ${pathEnd}, starting at ${start} and making ${hops} hops to ${finish}`}
+        aria-label={`Number path from ${firstVisibleNumber} to ${pathEnd}, starting at ${start} and making ${hops} hops to ${finish}`}
         role="img"
         style={{
           ...shellStyle,
@@ -1010,13 +1014,13 @@ function MathVisualPreview({
             style={{
               display: "grid",
               gridTemplateColumns:
-                `repeat(${pathEnd}, ${cellWidth}px)`,
+                `repeat(${visibleNumberCount}, ${cellWidth}px)`,
             }}
           >
             {Array.from(
-              {length: pathEnd},
+              {length: visibleNumberCount},
               (_, index) => {
-                const number = index + 1;
+                const number = firstVisibleNumber + index;
                 const isStart = number === start;
                 const isFinish = number === finish;
                 const isTraveled =
@@ -4744,6 +4748,14 @@ export function GameEditorPanel({
                                       type="checkbox"
                                     />
                                     Show sentence underneath
+                                  </label>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualHideBeforeStart === true}
+                                      onChange={(event) => updateQuestion("mathVisualHideBeforeStart", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Hide numbers before starting number
                                   </label>
                                 </>
                               ) : null}
