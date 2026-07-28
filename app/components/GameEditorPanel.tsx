@@ -1333,7 +1333,8 @@ function MathVisualPreview({
               width: "78px",
             }}
           >
-            {whole ?? \          </div>
+            {whole ?? ""}
+            </div>
 
           <div
             aria-hidden="true"
@@ -1368,7 +1369,8 @@ function MathVisualPreview({
                   width: "68px",
                 }}
               >
-                {part ?? \              </div>
+                {part ?? ""}
+                </div>
             ))}
           </div>
         </div>
