@@ -1391,6 +1391,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "circles";
     const visualObjectSymbols = {
       apples: "\uD83C\uDF4E",
+      backpacks: "\uD83C\uDF92",
+      bananas: "\uD83C\uDF4C",
+      birds: "\uD83D\uDC26",
+      books: "\uD83D\uDCD6",
+      cats: "\uD83D\uDC31",
+      cookies: "\uD83C\uDF6A",
+      crayons: "\uD83D\uDD8D",
+      dogs: "\uD83D\uDC36",
+      fish: "\uD83D\uDC1F",
+      pencils: "\u270E",
+      pizza: "\uD83C\uDF55",
       bears: "\uD83D\uDC3B",
       circles: "\u25CF",
       cubes: "\u25A0",
@@ -1748,6 +1759,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         squares: "\u25A0",
         triangles: "\u25B2",
         apples: "🍎",
+        backpacks: "\uD83C\uDF92",
+        bananas: "\uD83C\uDF4C",
+        birds: "\uD83D\uDC26",
+        books: "\uD83D\uDCD6",
+        cats: "\uD83D\uDC31",
+        cookies: "\uD83C\uDF6A",
+        crayons: "\uD83D\uDD8D",
+        dogs: "\uD83D\uDC36",
+        fish: "\uD83D\uDC1F",
+        pencils: "\u270E",
+        pizza: "\uD83C\uDF55",
         bears: "🧸",
         stars: "★",
       };
@@ -1974,6 +1996,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         squares: "\u25A0",
         triangles: "\u25B2",
         apples: "🍎",
+        backpacks: "\uD83C\uDF92",
+        bananas: "\uD83C\uDF4C",
+        birds: "\uD83D\uDC26",
+        books: "\uD83D\uDCD6",
+        cats: "\uD83D\uDC31",
+        cookies: "\uD83C\uDF6A",
+        crayons: "\uD83D\uDD8D",
+        dogs: "\uD83D\uDC36",
+        fish: "\uD83D\uDC1F",
+        pencils: "\u270E",
+        pizza: "\uD83C\uDF55",
         bears: "🧸",
         circles: "●",
         cubes: "■",
@@ -2105,21 +2138,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         `;
       };
 
+      const showTotals = q.mathVisualShowTotals !== false;
+
       const rows = labels.map(
         (label, index) => `
           <span style="padding:10px">${escapeHtml(label)}</span>
           <strong style="font-family:monospace;font-size:22px;padding:10px">${tally(values[index])}</strong>
-          <strong style="padding:10px">${values[index]}</strong>
+          ${showTotals ? `<strong style="padding:10px">${values[index]}</strong>` : ""}
         `,
       ).join("");
 
       return `
         <div class="math-visual math-tally-table" role="img"
           style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px">
-          <div style="border:3px solid #354b63;display:grid;grid-template-columns:1fr 1.5fr .5fr">
+          <div style="border:3px solid #354b63;display:grid;grid-template-columns:1fr 1.5fr${showTotals ? " .5fr" : ""}">
             <strong style="background:#e9f4ff;padding:10px">Category</strong>
             <strong style="background:#e9f4ff;padding:10px">Tallies</strong>
-            <strong style="background:#e9f4ff;padding:10px">Total</strong>
+            ${showTotals ? `<strong style="background:#e9f4ff;padding:10px">Total</strong>` : ""}
             ${rows}
           </div>
         </div>

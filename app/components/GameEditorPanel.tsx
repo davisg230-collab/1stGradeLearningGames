@@ -861,6 +861,17 @@ function MathVisualPreview({
       : "circles";
   const visualObjectSymbols: Record<string, string> = {
     apples: "\uD83C\uDF4E",
+    backpacks: "\uD83C\uDF92",
+    bananas: "\uD83C\uDF4C",
+    birds: "\uD83D\uDC26",
+    books: "\uD83D\uDCD6",
+    cats: "\uD83D\uDC31",
+    cookies: "\uD83C\uDF6A",
+    crayons: "\uD83D\uDD8D",
+    dogs: "\uD83D\uDC36",
+    fish: "\uD83D\uDC1F",
+    pencils: "\u270E",
+    pizza: "\uD83C\uDF55",
     bears: "\uD83D\uDC3B",
     circles: "\u25CF",
     cubes: "\u25A0",
@@ -1378,6 +1389,17 @@ function MathVisualPreview({
       squares: "\u25A0",
       triangles: "\u25B2",
       apples: "🍎",
+      backpacks: "\uD83C\uDF92",
+      bananas: "\uD83C\uDF4C",
+      birds: "\uD83D\uDC26",
+      books: "\uD83D\uDCD6",
+      cats: "\uD83D\uDC31",
+      cookies: "\uD83C\uDF6A",
+      crayons: "\uD83D\uDD8D",
+      dogs: "\uD83D\uDC36",
+      fish: "\uD83D\uDC1F",
+      pencils: "\u270E",
+      pizza: "\uD83C\uDF55",
       bears: "🧸",
       stars: "★",
     };
@@ -1660,6 +1682,17 @@ function MathVisualPreview({
       squares: "\u25A0",
       triangles: "\u25B2",
       apples: "🍎",
+      backpacks: "\uD83C\uDF92",
+      bananas: "\uD83C\uDF4C",
+      birds: "\uD83D\uDC26",
+      books: "\uD83D\uDCD6",
+      cats: "\uD83D\uDC31",
+      cookies: "\uD83C\uDF6A",
+      crayons: "\uD83D\uDD8D",
+      dogs: "\uD83D\uDC36",
+      fish: "\uD83D\uDC1F",
+      pencils: "\u270E",
+      pizza: "\uD83C\uDF55",
       bears: "🧸",
       circles: "●",
       cubes: "■",
@@ -1849,6 +1882,8 @@ function MathVisualPreview({
       );
     };
 
+    const showTotals = question.mathVisualShowTotals !== false;
+
     return (
       <div
         aria-label="Tally table"
@@ -1859,10 +1894,12 @@ function MathVisualPreview({
           style={{
             border: "3px solid #354b63",
             display: "grid",
-            gridTemplateColumns: "1fr 1.5fr .5fr",
+            gridTemplateColumns: showTotals
+              ? "1fr 1.5fr .5fr"
+              : "1fr 1.5fr",
           }}
         >
-          {["Category", "Tallies", "Total"].map((heading) => (
+          {["Category", "Tallies", ...(showTotals ? ["Total"] : [])].map((heading) => (
             <strong
               key={heading}
               style={{
@@ -1889,9 +1926,13 @@ function MathVisualPreview({
             >
               {tallyMarks(values[index])}
             </strong>,
-            <strong key={`${label}-total`} style={{padding: "10px"}}>
-              {values[index]}
-            </strong>,
+            ...(showTotals
+              ? [
+                <strong key={`${label}-total`} style={{padding: "10px"}}>
+                  {values[index]}
+                </strong>,
+              ]
+              : []),
           ])}
         </div>
       </div>
@@ -4322,6 +4363,17 @@ export function GameEditorPanel({
                                       Enter matching numbers separated by commas.
                                     </span>
                                   </label>
+                                  {selectedQuestion.mathVisualType
+                                    === "tally-table" ? (
+                                    <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                      <input
+                                        checked={selectedQuestion.mathVisualShowTotals !== false}
+                                        onChange={(event) => updateQuestion("mathVisualShowTotals", event.target.checked)}
+                                        type="checkbox"
+                                      />
+                                      Show totals column
+                                    </label>
+                                  ) : null}
                                 </>
                               ) : null}
                               {selectedQuestion.mathVisualType
@@ -4364,16 +4416,34 @@ export function GameEditorPanel({
                                               );
                                             }}
                                           >
-                                            <option value="circles">Circles</option>
-                                            <option value="cubes">Cubes</option>
-                                            <option value="bears">Bears</option>
-                                            <option value="stars">Stars</option>
-                                            <option value="apples">Apples</option>
-                                            <option value="triangles">Triangles</option>
-                                            <option value="squares">Squares</option>
-                                            <option value="diamonds">Diamonds</option>
-                                            <option value="hearts">Hearts</option>
-                                            <option value="hexagons">Hexagons</option>
+                                            <optgroup label="Shapes">
+                                              <option value="circles">Circles</option>
+                                              <option value="cubes">Cubes</option>
+                                              <option value="triangles">Triangles</option>
+                                              <option value="squares">Squares</option>
+                                              <option value="diamonds">Diamonds</option>
+                                              <option value="hearts">Hearts</option>
+                                              <option value="hexagons">Hexagons</option>
+                                            </optgroup>
+                                            <optgroup label="Animals">
+                                              <option value="bears">Bears</option>
+                                              <option value="cats">Cats</option>
+                                              <option value="dogs">Dogs</option>
+                                              <option value="fish">Fish</option>
+                                              <option value="birds">Birds</option>
+                                            </optgroup>
+                                            <optgroup label="School items">
+                                              <option value="pencils">Pencils</option>
+                                              <option value="books">Books</option>
+                                              <option value="crayons">Crayons</option>
+                                              <option value="backpacks">Backpacks</option>
+                                            </optgroup>
+                                            <optgroup label="Food">
+                                              <option value="apples">Apples</option>
+                                              <option value="bananas">Bananas</option>
+                                              <option value="pizza">Pizza</option>
+                                              <option value="cookies">Cookies</option>
+                                            </optgroup>
                                           </select>
                                         </label>
                                       );
@@ -4509,36 +4579,74 @@ export function GameEditorPanel({
                                       )
                                     }
                                   >
-                                    <option value="circles">
-                                      Circles
-                                    </option>
-                                    <option value="cubes">
-                                      Cubes
-                                    </option>
-                                    <option value="bears">
-                                      Bears
-                                    </option>
-                                    <option value="stars">
-                                      Stars
-                                    </option>
-                                    <option value="apples">
-                                      Apples
-                                    </option>
-                                    <option value="triangles">
-                                      Triangles
-                                    </option>
-                                    <option value="squares">
-                                      Squares
-                                    </option>
-                                    <option value="diamonds">
-                                      Diamonds
-                                    </option>
-                                    <option value="hearts">
-                                      Hearts
-                                    </option>
-                                    <option value="hexagons">
-                                      Hexagons
-                                    </option>
+                                    <optgroup label="Shapes">
+                                      <option value="circles">
+                                        Circles
+                                      </option>
+                                      <option value="cubes">
+                                        Cubes
+                                      </option>
+                                      <option value="triangles">
+                                        Triangles
+                                      </option>
+                                      <option value="squares">
+                                        Squares
+                                      </option>
+                                      <option value="diamonds">
+                                        Diamonds
+                                      </option>
+                                      <option value="hearts">
+                                        Hearts
+                                      </option>
+                                      <option value="hexagons">
+                                        Hexagons
+                                      </option>
+                                    </optgroup>
+                                    <optgroup label="Animals">
+                                      <option value="bears">
+                                        Bears
+                                      </option>
+                                      <option value="cats">
+                                        Cats
+                                      </option>
+                                      <option value="dogs">
+                                        Dogs
+                                      </option>
+                                      <option value="fish">
+                                        Fish
+                                      </option>
+                                      <option value="birds">
+                                        Birds
+                                      </option>
+                                    </optgroup>
+                                    <optgroup label="School items">
+                                      <option value="pencils">
+                                        Pencils
+                                      </option>
+                                      <option value="books">
+                                        Books
+                                      </option>
+                                      <option value="crayons">
+                                        Crayons
+                                      </option>
+                                      <option value="backpacks">
+                                        Backpacks
+                                      </option>
+                                    </optgroup>
+                                    <optgroup label="Food">
+                                      <option value="apples">
+                                        Apples
+                                      </option>
+                                      <option value="bananas">
+                                        Bananas
+                                      </option>
+                                      <option value="pizza">
+                                        Pizza
+                                      </option>
+                                      <option value="cookies">
+                                        Cookies
+                                      </option>
+                                    </optgroup>
                                   </select>
                                 </label>
                               ) : null}
