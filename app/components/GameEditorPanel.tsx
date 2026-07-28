@@ -771,17 +771,18 @@ function deriveSpeakerButtons(question: EditableQuestion): SpeakerButton[] {
 
 function blankQuestion(zone: number): EditableQuestion {
   return {
-    answer: "yes",
+    answer: "answer-1",
     choices: [
-      ["yes", "yes"],
-      ["no", "no"],
+      ["answer-1", ""],
+      ["answer-2", ""],
+      ["answer-3", ""],
     ],
-    correctAnswer: "yes",
+    correctAnswer: "answer-1",
     id: makeId("question"),
-    prompt: "Choose the correct answer.",
-    skill: "Practice",
-    type: "custom",
-    word: "practice",
+    prompt: "",
+    skill: "",
+    type: "",
+    word: "",
     zone,
   };
 }
@@ -1154,6 +1155,9 @@ function MathVisualPreview({
               style={{
                 background: "#e9f4ff",
                 padding: "8px 2px",
+                boxShadow: (index + 1) % 5 === 0
+                  ? "inset -3px 0 0 #7a4cc2"
+                  : "none",
                 textAlign: "center",
               }}
             >
@@ -1178,6 +1182,9 @@ function MathVisualPreview({
                     ? colors[rowIndex]
                     : "#ffffff",
                   border: "2px solid #354b63",
+                  boxShadow: (cellIndex + 1) % 5 === 0
+                    ? "inset -3px 0 0 #7a4cc2"
+                    : "none",
                   height: "28px",
                   margin: "1px",
                   width: "28px",
@@ -1432,6 +1439,7 @@ function MathVisualPreview({
     const isCube = object === "cubes";
     const showGroupLabels = question.mathVisualShowGroupLabels !== false;
     const showTotals = question.mathVisualShowTotals !== false;
+    const useContinuousAddends = showTotals;
     const parseCircleNumbers = (value: unknown) =>
       typeof value === "string"
         ? value
@@ -1464,9 +1472,9 @@ function MathVisualPreview({
         </p>) : null}
         <div
           style={{
-            display: "flex",
-            flexWrap: "wrap",
+            display: "grid",
             gap: "10px",
+            gridTemplateColumns: "repeat(5, 52px)",
             justifyContent: "center",
           }}
         >
@@ -1515,6 +1523,71 @@ function MathVisualPreview({
       </div>
     );
 
+    const combinedGroup = (
+      <div style={{flex: "1 1 100%"}}>
+        {showGroupLabels ? (
+          <p
+            style={{
+              color: "#596b7d",
+              fontWeight: 900,
+              textAlign: "center",
+            }}
+          >
+            Part 1: {count} + Part 2: {secondCount}
+          </p>
+        ) : null}
+        <div
+          style={{
+            display: "grid",
+            gap: "10px",
+            gridTemplateColumns: "repeat(5, 52px)",
+            justifyContent: "center",
+          }}
+        >
+          {Array.from({length: count + secondCount}, (_, index) => {
+            const isPartOne = index < count;
+            const color = isPartOne ? colorOne : colorTwo;
+            const numbers = isPartOne ? partOneNumbers : partTwoNumbers;
+            const numberIndex = isPartOne ? index : index - count;
+            const circleNumber =
+              numbers.length === 1
+                ? numbers[0]
+                : numbers[numberIndex] ?? "";
+            const hasNumber = Boolean(circleNumber);
+
+            return (
+              <span
+                aria-hidden="true"
+                key={index}
+                style={{
+                  alignItems: "center",
+                  background:
+                    hasNumber || !symbol ? color : "transparent",
+                  border:
+                    hasNumber || !symbol
+                      ? "3px solid #354b63"
+                      : "none",
+                  borderRadius: isCube ? "9px" : "50%",
+                  boxShadow:
+                    isCube
+                      ? "inset -6px -6px 0 rgba(0,0,0,.12)"
+                      : "none",
+                  color: hasNumber ? "#ffffff" : color,
+                  display: "flex",
+                  fontSize: hasNumber ? "22px" : symbol ? "42px" : "0",
+                  fontWeight: hasNumber ? 900 : undefined,
+                  height: "52px",
+                  justifyContent: "center",
+                  width: "52px",
+                }}
+              >
+                {circleNumber || symbol}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    );
     return (
       <div
         aria-label={`Two groups showing ${count} and ${secondCount}`}
@@ -1529,8 +1602,12 @@ function MathVisualPreview({
             justifyContent: "center",
           }}
         >
-          {group(count, colorOne, "Part 1", partOneNumbers)}
-          {group(secondCount, colorTwo, "Part 2", partTwoNumbers)}
+          {useContinuousAddends ? combinedGroup : (
+            <>
+              {group(count, colorOne, "Part 1", partOneNumbers)}
+              {group(secondCount, colorTwo, "Part 2", partTwoNumbers)}
+            </>
+          )}
         </div>
         {showTotals ? (
           <p
@@ -2102,6 +2179,9 @@ function MathVisualPreview({
     && visualType !== "ten-frame"
     && visualType !== "linking-cubes"
     && question.mathVisualObject !== "cubes";
+  const useFiveColumnRows =
+    visualType === "counters"
+    || visualType === "linking-cubes";
 
   return (
     <div
@@ -2114,7 +2194,7 @@ function MathVisualPreview({
           display: "grid",
           gap: groupSize ? "4px" : "10px",
           gridTemplateColumns:
-            visualType === "ten-frame"
+            visualType === "ten-frame" || useFiveColumnRows
               ? "repeat(5, 58px)"
               : "repeat(auto-fit, minmax(52px, 58px))",
           justifyContent: "center",
@@ -2688,7 +2768,7 @@ export function GameEditorPanel({
 
     updateQuestion("choices", [
       ...selectedQuestion.choices,
-      [choiceValue, "New answer"],
+      [choiceValue, ""],
     ]);
   }
   function deleteChoice(choiceIndex: number) {

@@ -1622,7 +1622,7 @@ ${showLandingNumber && number === finish ? "" : number}
         <strong style="background:#e9f4ff;padding:8px">${escapeHtml(categoryHeader)}</strong>
         ${Array.from(
           {length: maximum},
-          (_, index) => `<strong style="background:#e9f4ff;padding:8px 2px;text-align:center">${showNumbers ? index + 1 : ""}</strong>`,
+          (_, index) => `<strong style="background:#e9f4ff;box-shadow:${(index + 1) % 5 === 0 ? "inset -3px 0 0 #7a4cc2" : "none"};padding:8px 2px;text-align:center">${showNumbers ? index + 1 : ""}</strong>`,
         ).join("")}
         ${showTotals ? `<strong style="background:#e9f4ff;padding:8px">${escapeHtml(totalLabel)}</strong>` : ""}
       `;
@@ -1634,7 +1634,7 @@ ${showLandingNumber && number === finish ? "" : number}
             (_, cellIndex) => `
               <span
                 aria-label="${escapeHtml(`${label} ${cellIndex + 1}: ${cellIndex < values[rowIndex] ? "filled" : "empty"}`)}"
-                style="background:${cellIndex < values[rowIndex] ? colors[rowIndex] : "#ffffff"};border:2px solid #354b63;height:28px;margin:1px;width:28px"
+                style="background:${cellIndex < values[rowIndex] ? colors[rowIndex] : "#ffffff"};border:2px solid #354b63;box-shadow:${(cellIndex + 1) % 5 === 0 ? "inset -3px 0 0 #7a4cc2" : "none"};height:28px;margin:1px;width:28px"
               ></span>
             `,
           ).join("")}
@@ -1787,6 +1787,7 @@ ${showLandingNumber && number === finish ? "" : number}
       const cube = object === "cubes";
       const showGroupLabels = q.mathVisualShowGroupLabels !== false;
       const showTotals = q.mathVisualShowTotals !== false;
+      const useContinuousAddends = showTotals;
       const parseCircleNumbers = value =>
         typeof value === "string"
           ? value.split(/[,\n]+/).map(item => item.trim()).filter(Boolean)
@@ -1832,13 +1833,61 @@ ${showLandingNumber && number === finish ? "" : number}
             ${showGroupLabels ? `<p style="color:#596b7d;font-weight:900;text-align:center">
               ${label}: ${amount}
             </p>` : ""}
-            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+            <div style="display:grid;gap:10px;grid-template-columns:repeat(5,52px);justify-content:center">
               ${objects}
             </div>
           </div>
         `;
       };
 
+      const combinedGroupMarkup = () => {
+        const objects = Array.from(
+          {length: count + secondCount},
+          (_, index) => {
+            const isPartOne = index < count;
+            const color = isPartOne ? colorOne : colorTwo;
+            const numbers = isPartOne ? partOneNumbers : partTwoNumbers;
+            const numberIndex = isPartOne ? index : index - count;
+            const circleNumber = numbers.length === 1
+              ? numbers[0]
+              : numbers[numberIndex] || "";
+            const hasNumber = Boolean(circleNumber);
+
+            return `
+            <span
+              aria-hidden="true"
+              style="
+                align-items:center;
+                background:${hasNumber || !symbol ? color : "transparent"};
+                border:${hasNumber || !symbol ? "3px solid #354b63" : "none"};
+                border-radius:${cube ? "9px" : "50%"};
+                box-shadow:${cube
+                  ? "inset -6px -6px 0 rgba(0,0,0,.12)"
+                  : "none"};
+                color:${hasNumber ? "#ffffff" : color};
+                display:flex;
+                font-size:${hasNumber ? "22px" : symbol ? "42px" : "0"};
+                font-weight:${hasNumber ? "900" : "normal"};
+                height:52px;
+                justify-content:center;
+                width:52px;
+              "
+            >${escapeHtml(circleNumber || symbol)}</span>
+          `;
+          },
+        ).join("");
+
+        return `
+          <div style="flex:1 1 100%">
+            ${showGroupLabels ? `<p style="color:#596b7d;font-weight:900;text-align:center">
+              Part 1: ${count} + Part 2: ${secondCount}
+            </p>` : ""}
+            <div style="display:grid;gap:10px;grid-template-columns:repeat(5,52px);justify-content:center">
+              ${objects}
+            </div>
+          </div>
+        `;
+      };
       return `
         <div
           aria-label="Two groups showing ${count} and ${secondCount}"
@@ -1847,8 +1896,9 @@ ${showLandingNumber && number === finish ? "" : number}
           style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px"
         >
           <div style="display:flex;flex-wrap:wrap;gap:28px;justify-content:center">
-            ${groupMarkup(count, colorOne, "Part 1", partOneNumbers)}
-            ${groupMarkup(secondCount, colorTwo, "Part 2", partTwoNumbers)}
+            ${useContinuousAddends
+              ? combinedGroupMarkup()
+              : groupMarkup(count, colorOne, "Part 1", partOneNumbers) + groupMarkup(secondCount, colorTwo, "Part 2", partTwoNumbers)}
           </div>
           ${showTotals ? `<p style="color:#354b63;font-size:22px;font-weight:900;margin:20px 0 0;text-align:center">
             ${count} + ${secondCount} = ${count + secondCount}
@@ -2260,6 +2310,9 @@ ${showLandingNumber && number === finish ? "" : number}
       && type !== "ten-frame"
       && type !== "linking-cubes"
       && q.mathVisualObject !== "cubes";
+    const useFiveColumnRows =
+      type === "counters"
+      || type === "linking-cubes";
 
     const cells = Array.from(
       {length: cellCount},
@@ -2329,7 +2382,7 @@ ${showLandingNumber && number === finish ? "" : number}
         style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px"
       >
         <div
-          style="display:grid;gap:${groupSize ? "4px" : "10px"};grid-template-columns:${type === "ten-frame" ? "repeat(5,58px)" : "repeat(auto-fit,minmax(52px,58px))"};justify-content:center"
+          style="display:grid;gap:${groupSize ? "4px" : "10px"};grid-template-columns:${type === "ten-frame" || useFiveColumnRows ? "repeat(5,58px)" : "repeat(auto-fit,minmax(52px,58px))"};justify-content:center"
         >
           ${cells}
         </div>
