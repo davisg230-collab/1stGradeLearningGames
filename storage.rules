@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isTeacherEditor() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'davisg230@gmail.com',
+          'lvest1@crossroadsschoolskc.org'
+        ];
+    }
+
+    function isValidEditableGameId(gameId) {
+      return gameId.matches('^[a-z0-9-]{3,80}$');
+    }
+
+    match /gameAudio/{gameId}/{audioFile} {
+      allow read: if isValidEditableGameId(gameId);
+      allow create, update: if isTeacherEditor()
+        && isValidEditableGameId(gameId)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if isTeacherEditor()
+        && isValidEditableGameId(gameId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

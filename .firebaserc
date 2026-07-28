@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "stgradelearninggames"
+  },
+  "targets": {
+    "stgradelearninggames": {
+      "hosting": {
+        "firstgradelearninggames": [
+          "firstgradelearninggames"
+        ]
+      }
+    }
+  }
+}

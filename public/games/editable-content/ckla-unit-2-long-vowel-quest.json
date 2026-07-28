@@ -1,0 +1,911 @@
+{
+  "content": {
+    "levels": [
+      {
+        "name": "Sound Safari",
+        "detail": "Hear long-vowel sounds",
+        "icon": "ear"
+      },
+      {
+        "name": "Team Trail",
+        "detail": "Choose the written word",
+        "icon": "link"
+      },
+      {
+        "name": "Word Workshop",
+        "detail": "Build separated vowel teams",
+        "icon": "puzzle"
+      },
+      {
+        "name": "Word Village",
+        "detail": "Tricky Words and nouns",
+        "icon": "building-2"
+      },
+      {
+        "name": "Story Summit",
+        "detail": "Read and understand",
+        "icon": "flag"
+      }
+    ],
+    "questions": [
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "ee",
+        "word": "SEED",
+        "speak": "seed",
+        "prompt": "Listen to this word. Which long-vowel sound do you hear?",
+        "answer": "ee",
+        "hint": "Stretch seed: s, eee, d. The two e letters work as a team.",
+        "choices": [
+          [
+            "ee",
+            "/ee/"
+          ],
+          [
+            "ae",
+            "/ae/"
+          ],
+          [
+            "ie",
+            "/ie/"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "ee",
+        "word": "FEET",
+        "speak": "feet",
+        "prompt": "Listen to this word. Which spelling makes the long e sound?",
+        "answer": "ee",
+        "hint": "Feet uses ee to spell the long e sound.",
+        "choices": [
+          [
+            "ee",
+            "ee"
+          ],
+          [
+            "ae",
+            "a_e"
+          ],
+          [
+            "ue",
+            "u_e"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "ee",
+        "word": "GREEN",
+        "speak": "green",
+        "prompt": "Listen to this word. Which spelling makes the long e sound?",
+        "answer": "ee",
+        "hint": "Green uses ee, the same vowel team as seed and feet.",
+        "choices": [
+          [
+            "ee",
+            "ee"
+          ],
+          [
+            "ie",
+            "i_e"
+          ],
+          [
+            "oe",
+            "o_e"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "a_e",
+        "word": "CAKE",
+        "speak": "cake",
+        "prompt": "Listen to this word. Which long-vowel sound do you hear?",
+        "answer": "ae",
+        "hint": "The a says its name in cake because a and final e work together.",
+        "choices": [
+          [
+            "oe",
+            "/oe/"
+          ],
+          [
+            "ae",
+            "/ae/"
+          ],
+          [
+            "ue",
+            "/ue/"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "i_e",
+        "word": "BIKE",
+        "speak": "bike",
+        "prompt": "Listen to this word. Which long-vowel sound do you hear?",
+        "answer": "ie",
+        "hint": "Bike has the long i sound. The i and final e are a separated team.",
+        "choices": [
+          [
+            "ie",
+            "/ie/"
+          ],
+          [
+            "ee",
+            "/ee/"
+          ],
+          [
+            "oe",
+            "/oe/"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "o_e",
+        "word": "ROSE",
+        "speak": "rose",
+        "prompt": "Listen to this word. Which long-vowel sound do you hear?",
+        "answer": "oe",
+        "hint": "Rose has the same long o sound as home and hope.",
+        "choices": [
+          [
+            "ae",
+            "/ae/"
+          ],
+          [
+            "ue",
+            "/ue/"
+          ],
+          [
+            "oe",
+            "/oe/"
+          ]
+        ]
+      },
+      {
+        "zone": 0,
+        "type": "sound",
+        "pattern": "u_e",
+        "word": "CUBE",
+        "speak": "cube",
+        "prompt": "Listen to this word. Which long-vowel sound do you hear?",
+        "answer": "ue",
+        "hint": "Cube starts with the long u sound. The u and final e are a team.",
+        "choices": [
+          [
+            "ue",
+            "/ue/"
+          ],
+          [
+            "ie",
+            "/ie/"
+          ],
+          [
+            "ee",
+            "/ee/"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "a_e",
+        "word": "CAPE",
+        "speak": "cape",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "cape",
+        "hint": "Cap has short a. Add e and the a says its name: cape.",
+        "choices": [
+          [
+            "cap",
+            "cap"
+          ],
+          [
+            "cape",
+            "cape"
+          ],
+          [
+            "cup",
+            "cup"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "a_e",
+        "word": "TAPE",
+        "speak": "tape",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "tape",
+        "hint": "Tap has short a. Tape uses the separated vowel team a_e.",
+        "choices": [
+          [
+            "tap",
+            "tap"
+          ],
+          [
+            "tape",
+            "tape"
+          ],
+          [
+            "top",
+            "top"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "i_e",
+        "word": "KITE",
+        "speak": "kite",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "kite",
+        "hint": "Kit has short i. In kite, final e works with i.",
+        "choices": [
+          [
+            "kit",
+            "kit"
+          ],
+          [
+            "kite",
+            "kite"
+          ],
+          [
+            "kate",
+            "kate"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "i_e",
+        "word": "RIDE",
+        "speak": "ride",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "ride",
+        "hint": "Rid has short i. Ride uses i_e for long i.",
+        "choices": [
+          [
+            "rid",
+            "rid"
+          ],
+          [
+            "red",
+            "red"
+          ],
+          [
+            "ride",
+            "ride"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "o_e",
+        "word": "HOPE",
+        "speak": "hope",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "hope",
+        "hint": "Hop has short o. Hope uses o_e for long o.",
+        "choices": [
+          [
+            "hop",
+            "hop"
+          ],
+          [
+            "hope",
+            "hope"
+          ],
+          [
+            "hip",
+            "hip"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "o_e",
+        "word": "ROBE",
+        "speak": "robe",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "robe",
+        "hint": "Rob has short o. Robe uses o_e for long o.",
+        "choices": [
+          [
+            "rob",
+            "rob"
+          ],
+          [
+            "rub",
+            "rub"
+          ],
+          [
+            "robe",
+            "robe"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "u_e",
+        "word": "CUBE",
+        "speak": "cube",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "cube",
+        "hint": "Cub has short u. Cube uses u_e for long u.",
+        "choices": [
+          [
+            "cub",
+            "cub"
+          ],
+          [
+            "cab",
+            "cab"
+          ],
+          [
+            "cube",
+            "cube"
+          ]
+        ]
+      },
+      {
+        "zone": 1,
+        "type": "contrast",
+        "pattern": "u_e",
+        "word": "CUTE",
+        "speak": "cute",
+        "prompt": "Listen to the word. Choose the word you hear.",
+        "answer": "cute",
+        "hint": "Cut has short u. Cute uses u_e for long u.",
+        "choices": [
+          [
+            "cut",
+            "cut"
+          ],
+          [
+            "cute",
+            "cute"
+          ],
+          [
+            "cat",
+            "cat"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "build",
+        "pattern": "a_e",
+        "word": "CAKE",
+        "speak": "cake",
+        "prompt": "Listen to the word. Choose the vowel that completes it.",
+        "build": [
+          "c",
+          "_",
+          "k",
+          "e"
+        ],
+        "answer": "a",
+        "hint": "Cake uses a_e. The a and e work as a separated vowel team.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "i",
+            "i"
+          ],
+          [
+            "o",
+            "o"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "build",
+        "pattern": "i_e",
+        "word": "BIKE",
+        "speak": "bike",
+        "prompt": "Listen to the word. Choose the vowel that completes it.",
+        "build": [
+          "b",
+          "_",
+          "k",
+          "e"
+        ],
+        "answer": "i",
+        "hint": "Bike uses i_e. The i and e work together.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "i",
+            "i"
+          ],
+          [
+            "u",
+            "u"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "build",
+        "pattern": "o_e",
+        "word": "HOME",
+        "speak": "home",
+        "prompt": "Listen to the word. Choose the vowel that completes it.",
+        "build": [
+          "h",
+          "_",
+          "m",
+          "e"
+        ],
+        "answer": "o",
+        "hint": "Home uses o_e, just like hope and rose.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "o",
+            "o"
+          ],
+          [
+            "u",
+            "u"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "build",
+        "pattern": "u_e",
+        "word": "CUBE",
+        "speak": "cube",
+        "prompt": "Listen to the word. Choose the vowel that completes it.",
+        "build": [
+          "c",
+          "_",
+          "b",
+          "e"
+        ],
+        "answer": "u",
+        "hint": "Cube uses u_e. The u and e work as a separated team.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "u",
+            "u"
+          ],
+          [
+            "i",
+            "i"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "build",
+        "pattern": "ee",
+        "word": "SEED",
+        "speak": "seed",
+        "prompt": "Listen to the word. Choose the vowel team that completes it.",
+        "build": [
+          "s",
+          "__",
+          "d"
+        ],
+        "answer": "ee",
+        "hint": "Seed has two e letters side by side: ee.",
+        "choices": [
+          [
+            "a",
+            "a"
+          ],
+          [
+            "ee",
+            "ee"
+          ],
+          [
+            "ie",
+            "i_e"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "team",
+        "pattern": "a_e",
+        "word": "NAME",
+        "speak": "name",
+        "prompt": "Listen to the word. Which letters are the separated vowel team?",
+        "team": [
+          "n",
+          "a",
+          "m",
+          "e"
+        ],
+        "answer": "ae",
+        "hint": "In name, a and e work together even though m is between them.",
+        "choices": [
+          [
+            "ae",
+            "a and e"
+          ],
+          [
+            "nm",
+            "n and m"
+          ],
+          [
+            "me",
+            "m and e"
+          ]
+        ]
+      },
+      {
+        "zone": 2,
+        "type": "team",
+        "pattern": "i_e",
+        "word": "SHINE",
+        "speak": "shine",
+        "prompt": "Listen to the word. Which letters work together for long i?",
+        "team": [
+          "sh",
+          "i",
+          "n",
+          "e"
+        ],
+        "answer": "ie",
+        "hint": "In shine, i and final e work together for long i.",
+        "choices": [
+          [
+            "ie",
+            "i and e"
+          ],
+          [
+            "she",
+            "sh and e"
+          ],
+          [
+            "ne",
+            "n and e"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "tricky",
+        "pattern": "tricky",
+        "word": "WE",
+        "speak": "we",
+        "prompt": "Which Tricky Word completes this sentence? Maya and Lee said, ___ can ride bikes together.",
+        "answer": "we",
+        "hint": "We means more than one person, including the speaker.",
+        "choices": [
+          [
+            "by",
+            "by"
+          ],
+          [
+            "your",
+            "your"
+          ],
+          [
+            "we",
+            "we"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "tricky",
+        "pattern": "tricky",
+        "word": "YOUR",
+        "speak": "your",
+        "prompt": "Which Tricky Word completes this sentence? Is this ___ cube?",
+        "answer": "your",
+        "hint": "Your shows who owns or has something.",
+        "choices": [
+          [
+            "you",
+            "you"
+          ],
+          [
+            "by",
+            "by"
+          ],
+          [
+            "your",
+            "your"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "tricky",
+        "pattern": "tricky",
+        "word": "THEIR",
+        "speak": "their",
+        "prompt": "Which Tricky Word completes this sentence? Maya and Lee ride ___ bikes.",
+        "answer": "their",
+        "hint": "Their shows that something belongs to them.",
+        "choices": [
+          [
+            "they",
+            "they"
+          ],
+          [
+            "their",
+            "their"
+          ],
+          [
+            "there",
+            "there"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "tricky",
+        "pattern": "tricky",
+        "word": "YOU",
+        "speak": "you",
+        "prompt": "Which Tricky Word completes this sentence? Can ___ see me?",
+        "answer": "you",
+        "hint": "You names the person being spoken to.",
+        "choices": [
+          [
+            "you",
+            "you"
+          ],
+          [
+            "your",
+            "your"
+          ],
+          [
+            "by",
+            "by"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "tricky",
+        "pattern": "tricky",
+        "word": "BY",
+        "speak": "by",
+        "prompt": "Which Tricky Word completes this sentence? The mule is ___ the gate.",
+        "answer": "by",
+        "hint": "By can mean beside or near.",
+        "choices": [
+          [
+            "be",
+            "be"
+          ],
+          [
+            "me",
+            "me"
+          ],
+          [
+            "by",
+            "by"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "noun",
+        "pattern": "noun",
+        "word": "MAYA",
+        "speak": "Maya",
+        "prompt": "Maya is a name. Does Maya name a person, place, or thing?",
+        "answer": "person",
+        "hint": "A person's name is a noun. Maya names a person.",
+        "choices": [
+          [
+            "person",
+            "person"
+          ],
+          [
+            "place",
+            "place"
+          ],
+          [
+            "thing",
+            "thing"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "noun",
+        "pattern": "noun",
+        "word": "ROSEPARK",
+        "speak": "Rose Park",
+        "prompt": "Rose Park names one special place. What kind of noun is it?",
+        "answer": "proper",
+        "hint": "A special name begins with capital letters. Rose Park is a proper noun.",
+        "choices": [
+          [
+            "common",
+            "common noun"
+          ],
+          [
+            "proper",
+            "proper noun"
+          ],
+          [
+            "notnoun",
+            "not a noun"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "noun",
+        "pattern": "noun",
+        "word": "CUBE",
+        "speak": "cube",
+        "prompt": "Which word is a noun that names a thing?",
+        "answer": "cube",
+        "hint": "Cube names a thing, so it is a noun.",
+        "choices": [
+          [
+            "green",
+            "green"
+          ],
+          [
+            "cube",
+            "cube"
+          ],
+          [
+            "ride",
+            "ride"
+          ]
+        ]
+      },
+      {
+        "zone": 3,
+        "type": "noun",
+        "pattern": "noun",
+        "word": "HOME",
+        "speak": "home",
+        "prompt": "Which word is a noun that names a place?",
+        "answer": "home",
+        "hint": "Home names a place.",
+        "choices": [
+          [
+            "cute",
+            "cute"
+          ],
+          [
+            "late",
+            "late"
+          ],
+          [
+            "home",
+            "home"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "type": "reading",
+        "pattern": "reading",
+        "word": "BIKES",
+        "speak": "bikes",
+        "prompt": "What do Maya and Lee ride?",
+        "storyTitle": "A Ride to Pine Lake",
+        "passage": "Maya and Lee ride bikes to Pine Lake. They see three green trees by the gate. A cute mule stands by a rope. Maya has a cube in her bag. Lee can make a rose with the cube blocks. They hope to get home before it is late.",
+        "answer": "bikes",
+        "hint": "Look back at the first sentence: Maya and Lee ride bikes.",
+        "choices": [
+          [
+            "bikes",
+            "bikes"
+          ],
+          [
+            "mules",
+            "mules"
+          ],
+          [
+            "cubes",
+            "cubes"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "type": "reading",
+        "pattern": "reading",
+        "word": "LAKE",
+        "speak": "Pine Lake",
+        "prompt": "Where do Maya and Lee go?",
+        "storyTitle": "A Ride to Pine Lake",
+        "passage": "Maya and Lee ride bikes to Pine Lake. They see three green trees by the gate. A cute mule stands by a rope. Maya has a cube in her bag. Lee can make a rose with the cube blocks. They hope to get home before it is late.",
+        "answer": "lake",
+        "hint": "The first sentence tells the place: Pine Lake.",
+        "choices": [
+          [
+            "home",
+            "home"
+          ],
+          [
+            "lake",
+            "Pine Lake"
+          ],
+          [
+            "shop",
+            "a shop"
+          ]
+        ]
+      },
+      {
+        "zone": 4,
+        "type": "reading",
+        "pattern": "reading",
+        "word": "MULE",
+        "speak": "mule",
+        "prompt": "What stands by a rope?",
+        "storyTitle": "A Ride to Pine Lake",
+        "passage": "Maya and Lee ride bikes to Pine Lake. They see three green trees by the gate. A cute mule stands by a rope. Maya has a cube in her bag. Lee can make a rose with the cube blocks. They hope to get home before it is late.",
+        "answer": "mule",
+        "hint": "The story says a cute mule stands by a rope.",
+        "choices": [
+          [
+            "mule",
+            "a mule"
+          ],
+          [
+            "rose",
+            "a rose"
+          ],
+          [
+            "bike",
+            "a bike"
+          ]
+        ]
+      }
+    ],
+    "schemaVersion": 1,
+    "supplementalQuestions": [],
+    "unitTitle": "CKLA Unit 2 Long Vowel Quest",
+    "zoneEncouragements": [
+      "Nice work. Keep climbing.",
+      "Great blending. Let's keep going.",
+      "Super work. Try the next trail.",
+      "You are working hard. Keep going.",
+      "You made it to Story Summit."
+    ]
+  },
+  "gameId": "ckla-unit-2-long-vowel-quest",
+  "schemaVersion": 1,
+  "subject": "ckla",
+  "title": "CKLA Unit 2 Long Vowel Quest",
+  "unitSlug": "unit-2"
+}

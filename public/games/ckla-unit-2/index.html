@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg">
+  <title>CKLA Unit 2 Long Vowel Quest</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="/games/editable-game-content.js"></script>
+  <style>
+    :root{
+      --ink:#2d2d2f;--coral:#ef817d;--yellow:#efbd43;--blue:#879bac;
+      --mint:#59b978;--cream:#fff7ea;--muted:#5d6470;--orange:#ff9900;
+      --card:#fffaf0;--line:rgba(123,95,53,.14);
+      --shadow:0 10px 0 rgba(73,52,22,.08),0 22px 44px rgba(73,52,22,.12)
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-width:320px;min-height:100%;background:var(--cream)}
+    body{font-family:"Arial Rounded MT Bold","Trebuchet MS",Arial,Helvetica,sans-serif;color:var(--ink);overflow-x:hidden}
+    button,input{font:inherit}
+    button{cursor:pointer}
+    button:focus-visible,input:focus-visible{outline:4px solid var(--ink);outline-offset:4px}
+    .game-shell{position:relative;min-height:100vh;overflow:hidden;background:radial-gradient(circle at 20% 0%,rgba(255,255,255,.72),transparent 34rem),var(--cream)}
+    .game-shell:before,.game-shell:after{content:"";position:fixed;z-index:0;border-radius:999px;pointer-events:none}
+    .game-shell:before{width:34rem;height:34rem;right:-12rem;top:-18rem;background:rgba(239,189,67,.28)}
+    .game-shell:after{width:31rem;height:31rem;left:-13rem;bottom:-15rem;background:rgba(89,185,120,.22)}
+    .dot-field{position:fixed;inset:0;z-index:0;opacity:.15;pointer-events:none;background-image:radial-gradient(rgba(45,45,47,.22) 1.5px,transparent 1.5px);background-size:24px 24px;mask-image:linear-gradient(#000,transparent 92%)}
+    header,main,footer{position:relative;z-index:1}
+    .game-home-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:3px solid var(--line);border-radius:999px;background:var(--coral);box-shadow:0 7px 0 rgba(73,52,22,.13);color:#fff!important;padding:.65rem 1rem;font-weight:900;text-decoration:none;transition:.2s}
+    .game-home-link:hover,.primary-action:hover:not(:disabled),.answer-btn:hover:not(:disabled),.speak-button:hover:not(:disabled){transform:translateY(-3px)}
+    .status-pill,.panel,.zone-tab,.prompt-card,.answer-btn,.primary-action,.speak-button{border:3px solid var(--line);box-shadow:var(--shadow)}
+    .status-pill{border-width:2px;background:rgba(255,250,240,.94)}
+    .panel{background:var(--card);border-radius:2rem}
+    .start-panel{width:min(100%,760px);margin:0 auto 1.5rem;padding:clamp(1.25rem,3vw,2rem);border:3px solid var(--line);border-radius:1.6rem;background:var(--card);box-shadow:var(--shadow);text-align:center}
+    .start-panel.is-hidden{display:none}
+    .start-panel h2{margin:0;font-size:clamp(1.8rem,4vw,2.7rem);font-weight:900}
+    .start-panel p{margin:.7rem auto 0;max-width:36rem;color:var(--muted);font-weight:800;line-height:1.45}
+    .start-options{display:grid;gap:.9rem;margin-top:1.2rem}
+    .start-panel label{display:grid;gap:.45rem;color:var(--ink);font-weight:900;text-align:left}
+    .start-panel input{width:100%;border:3px solid rgba(123,95,53,.16);border-radius:1rem;padding:.9rem 1rem;background:#fff;color:var(--ink);font-size:1.1rem}
+    .start-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:.8rem}
+    main.is-locked #zone-nav,main.is-locked #play-layout{display:none!important}
+    .class-mode-pill{display:none;margin:.9rem auto 1rem;width:max-content;max-width:calc(100% - 2rem);border-radius:999px;background:#dcf4e6;color:#1d6d4f;padding:.5rem .85rem;font-weight:900}
+    .class-mode-pill.is-active{display:block}
+    .quest-nav{overflow-x:auto;scrollbar-width:thin;padding-bottom:.55rem}
+    .zone-tab{min-width:180px;border-radius:18px;background:#fff0c8;color:var(--ink);padding:.78rem 1rem;font-weight:900;transition:.2s}
+    .zone-tab:nth-child(1){background:#ffe5df}.zone-tab:nth-child(2){background:#fff0c8}.zone-tab:nth-child(3){background:#dcf4e6}.zone-tab:nth-child(4){background:#e8f1f7}.zone-tab:nth-child(5){background:#eee9ff}
+    .zone-tab.is-active{border-color:var(--coral);box-shadow:0 8px 0 rgba(239,129,125,.18);transform:translateY(-3px)}
+    .zone-tab:disabled{opacity:.45;cursor:not-allowed}
+    .prompt-card{position:relative;overflow:hidden;border-radius:1.35rem;background:#e8f1f7;padding:1.2rem;text-align:center}
+    .prompt-card:after{content:"";position:absolute;width:110px;height:110px;right:-28px;top:-32px;border-radius:50%;background:rgba(255,255,255,.36)}
+    .question-tag{display:inline-flex;align-items:center;gap:.35rem;margin-bottom:.7rem;border-radius:999px;background:rgba(255,255,255,.68);padding:.45rem .75rem;color:#2f4054;font-weight:900}
+    .prompt-text{position:relative;z-index:1;margin:0;font-size:clamp(1.25rem,2.4vw,1.55rem);font-weight:900;line-height:1.22}
+    .prompt-read-row{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:.75rem;max-width:52rem;margin:0 auto}
+    .prompt-read-row .speak-button{flex:0 0 auto;padding:.58rem .82rem}
+    .prompt-read-row .prompt-text{text-align:left}
+    .story-title{position:relative;z-index:1;margin:.15rem 0 .25rem;font-size:clamp(1.35rem,2.8vw,1.9rem);font-weight:900}
+    .story-directions{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:.6rem;flex-wrap:wrap;max-width:42rem;margin:.15rem auto .4rem;color:var(--muted);font-size:clamp(.9rem,1.7vw,1.02rem);font-weight:800;line-height:1.35}
+    .story-directions p{margin:0;text-align:left}.story-directions .speak-button{padding:.48rem .72rem;font-size:.92rem}
+    .passage{position:relative;z-index:1;margin:1rem auto 0;max-width:46rem;border-radius:1rem;background:rgba(255,255,255,.82);padding:1rem;color:var(--muted);font-size:clamp(1.05rem,2vw,1.28rem);font-weight:800;line-height:1.55;text-align:left}
+    .team-demo{display:flex;align-items:center;justify-content:center;gap:.45rem;flex-wrap:wrap;margin:1.2rem auto}
+    .target-audio-row{display:flex;justify-content:center;margin:-.35rem 0 1rem}
+    .letter-box{display:grid;place-items:center;width:3.4rem;height:3.6rem;border:3px solid var(--line);border-radius:1rem;background:#fff;box-shadow:0 5px 0 rgba(73,52,22,.1);font-size:1.45rem;font-weight:900}
+    .letter-box.vowel{background:#fff0c8;border-color:#e2a500}.letter-box.final-e{background:#dcf4e6;border-color:#59b978}
+    .team-bridge{height:12px;min-width:64px;border-top:4px dashed var(--coral);border-radius:999px}
+    .answer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin-top:1rem}
+    .choice-wrap{position:relative;display:grid}
+    .answer-btn{min-height:4.4rem;width:100%;border-radius:1.15rem;background:#fffaf0;padding:.75rem;color:var(--ink);font-weight:900;transition:.2s}
+    .answer-btn:disabled{cursor:not-allowed;opacity:.48}.answer-btn.is-selected{background:#e8f1f7!important;border-color:var(--blue);transform:translateY(-3px)}.answer-btn.is-correct{background:#dcf4e6!important;border-color:#59b978}.answer-btn.is-wrong{background:#ffe5df!important;border-color:var(--coral)}
+    .speak-button{display:inline-grid;place-items:center;border-radius:999px;background:#fff0c8;color:var(--ink);padding:.68rem 1rem;font-weight:900}
+    .primary-action{border-radius:999px;background:var(--coral);color:#fff;padding:.75rem 1.4rem;font-weight:900;transition:.2s}
+    .primary-action.secondary{background:var(--blue)}.primary-action.success{background:var(--mint);color:var(--ink)}.primary-action.warning{background:var(--orange)}
+    .primary-action:disabled{opacity:.45;cursor:not-allowed}.hidden{display:none!important}
+    .feedback{display:none;margin-top:1rem;border-radius:1rem;padding:.85rem 1rem;font-weight:900;line-height:1.35}
+    .feedback.is-visible{display:flex;align-items:center;justify-content:space-between;gap:.8rem;background:#fff0c8;color:#6a4e00}
+    .feedback.is-good{background:#dcf4e6;color:#1d6d4f}
+    .map-panel{position:sticky;top:1rem}
+    .progress-zones{display:grid;gap:.75rem;margin-top:1rem}
+    .progress-zone{display:flex;align-items:center;gap:.7rem;opacity:.55;transition:.3s}
+    .progress-zone.is-earned{opacity:1}
+    .zone-icon-circle{display:grid;place-items:center;width:3rem;height:3rem;border:3px solid var(--line);border-radius:1rem;background:#e8f1f7;box-shadow:0 5px 0 rgba(73,52,22,.09)}
+    .progress-zone.is-earned .zone-icon-circle{background:var(--yellow);transform:scale(1.05)}
+    .badge-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.45rem;margin-top:.6rem}
+    .vowel-badge{border:2px solid rgba(123,95,53,.14);border-radius:.8rem;background:#e8f1f7;color:#71889a;padding:.55rem .25rem;text-align:center;font-weight:900}
+    .vowel-badge.is-earned{background:#fff0c8;color:var(--ink);transform:translateY(-2px)}
+    .results-panel{display:none}.results-panel.is-active{display:block;animation:pop-in .45s ease both}
+    .score-ring{width:9.5rem;height:9.5rem;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--mint) calc(var(--score-pct)*1%),rgba(45,45,47,.1) 0);position:relative}
+    .score-ring:before{content:"";position:absolute;inset:.75rem;border-radius:50%;background:#fffdf7}.score-ring-content{position:relative;z-index:1;text-align:center}
+    .review-chip{display:inline-flex;border:2px solid rgba(123,95,53,.14);border-radius:999px;background:#fff0c8;color:#5e4700;padding:.42rem .75rem;font:inherit;font-weight:900}
+    .result-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.3rem}.print-results-button{background:var(--orange)}
+    .assign-overlay{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(47,64,84,.68);backdrop-filter:blur(5px)}
+    .assign-overlay.is-open{display:flex}.assign-panel{width:min(94vw,620px);padding:1.3rem;border:5px solid #fff;border-radius:1.6rem;background:var(--card);box-shadow:0 28px 80px rgba(0,0,0,.28)}.assign-panel h2{margin:0;font-size:1.8rem;font-weight:900}.assign-panel p{margin:.6rem 0 0;color:var(--muted);font-weight:800;line-height:1.4}
+    .initials-entry{display:grid;gap:.45rem;margin-top:1rem;color:var(--ink);font-weight:900}.initials-entry input{width:100%;border:3px solid rgba(123,95,53,.16);border-radius:1rem;padding:.95rem 1rem;background:#fff;color:var(--ink);font:inherit;font-size:1.4rem;text-transform:uppercase;text-align:center}
+    .assign-actions{display:grid;gap:.75rem;margin-top:.9rem}.assign-status,.start-error,.result-save-status{margin:.8rem 0 0;color:#9f1f18;font-weight:900}.assign-status.is-saved,.result-save-status.is-saved{color:#1d6d4f}
+    @keyframes pop-in{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+    @media(max-width:1023px){.map-panel{position:relative;top:auto}}
+    @media(max-width:700px){.answer-grid{grid-template-columns:1fr}.panel{border-width:2px}.choice-wrap .answer-btn{min-height:4rem}.team-bridge{min-width:45px}.letter-box{width:2.9rem;height:3.1rem}}
+    @media print{body{background:#fff!important;color:#000!important}.dot-field,.game-shell:before,.game-shell:after,header,#zone-nav,#play-layout,footer,.start-panel,.assign-overlay,#restart-button,#print-results-button{display:none!important}.game-shell{min-height:auto!important;background:#fff!important}main{padding:0!important}.results-panel{display:block!important;width:100%!important;max-width:none!important;border:0!important;box-shadow:none!important;padding:0!important;background:#fff!important}.score-ring{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+  <div class="game-shell">
+    <div class="dot-field" aria-hidden="true"></div>
+    <header class="w-full px-4 pt-5 sm:px-8 sm:pt-7">
+      <div class="mx-auto flex w-full max-w-[1450px] flex-wrap items-center justify-between gap-4">
+        <a class="game-home-link" href="/skills">Back to Skills</a>
+        <div class="max-w-2xl">
+          <p class="mb-1" style="color:var(--coral);font-weight:900;letter-spacing:.12rem">CKLA UNIT 2</p>
+          <h1 class="leading-tight" style="font-size:clamp(2rem,4vw,2.55rem);font-weight:900">Long Vowel Quest</h1>
+          <p class="mt-1" style="color:var(--muted);font-weight:800">Use vowel teams to read and spell long-vowel words.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="status-pill rounded-full px-5 py-3">
+            <p class="leading-none" style="color:var(--coral);font-size:13px;font-weight:900;letter-spacing:.1rem">QUEST</p>
+            <p id="question-progress" class="mt-1 leading-none" aria-live="polite">Quest 1 of 34</p>
+          </div>
+          <div class="status-pill rounded-full px-5 py-3">
+            <p class="leading-none" style="color:var(--blue);font-size:13px;font-weight:900;letter-spacing:.1rem">FIRST TRY</p>
+            <p id="live-score" class="mt-1 leading-none" aria-live="polite">0 correct</p>
+          </div>
+          <button id="sound-toggle" type="button" class="status-pill flex items-center gap-2 rounded-full px-4 py-3" aria-pressed="false">
+            <i data-lucide="volume-2" class="h-5 w-5" aria-hidden="true"></i>
+            <span class="sound-on" style="font-weight:900">Sound on</span>
+            <span class="sound-off hidden" style="font-weight:900">Sound off</span>
+          </button>
+        </div>
+      </div>
+    </header>
+    <main id="game-main" class="w-full px-4 py-5 sm:px-8 sm:py-7 is-locked">
+      <section id="scholar-start-panel" class="start-panel" aria-labelledby="start-title">
+        <h2 id="start-title">Ready to play?</h2>
+        <p id="start-directions">Type your first name, then start the game. Your teacher can see your score after you finish.</p>
+        <button id="read-start-directions" class="speak-button mt-3" type="button">Read directions</button>
+        <div class="start-options">
+          <label>
+            First name
+            <input id="scholar-first-name" autocomplete="given-name" maxlength="30" type="text">
+          </label>
+          <div class="start-buttons">
+            <button id="start-game-button" type="button" class="primary-action">Start Game</button>
+          </div>
+          <p id="start-error" class="start-error" aria-live="polite"></p>
+        </div>
+      </section>
+      <p id="class-mode-pill" class="class-mode-pill" aria-live="polite">Whole Class Mode is on</p>
+      <nav id="zone-nav" class="quest-nav mx-auto mb-5 flex w-full max-w-[1450px] gap-3" aria-label="Quest zones"></nav>
+      <div id="play-layout" class="mx-auto grid w-full max-w-[1450px] gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
+        <section class="panel p-4 sm:p-6 lg:p-7" aria-labelledby="game-heading">
+          <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p id="zone-kicker" class="font-bold uppercase tracking-[.12em] text-[#ff6b5f]">ZONE 1</p>
+              <h2 id="game-heading" class="mt-1" style="font-size:clamp(1.5rem,2.6vw,1.8rem);font-weight:900">Sound Safari</h2>
+              <p id="zone-name" class="mt-1 text-[#55728b]">Hear long-vowel sounds</p>
+            </div>
+            <div class="w-full max-w-sm">
+              <div class="h-3 overflow-hidden rounded-full bg-[#17324d]/10">
+                <div id="game-progress-fill" class="h-full rounded-full transition-all duration-500" style="width:0;background:linear-gradient(90deg,var(--coral),var(--yellow),var(--mint))"></div>
+              </div>
+            </div>
+          </div>
+          <div id="question-card"></div>
+          <div id="feedback" class="feedback" aria-live="polite"></div>
+          <div class="mt-5 flex flex-wrap justify-end gap-3">
+            <button id="skip-question-button" type="button" class="primary-action secondary hidden" disabled>Skip question</button>
+            <button id="check-button" type="button" class="primary-action" disabled>Check answer</button>
+            <button id="next-button" type="button" class="primary-action success hidden">Next quest</button>
+          </div>
+        </section>
+        <aside class="panel map-panel p-5" aria-labelledby="map-heading">
+          <p class="text-center" style="color:var(--coral);font-weight:900;letter-spacing:.12rem">ADVENTURE MAP</p>
+          <h2 id="map-heading" class="mt-1 text-center" style="font-size:1.65rem;font-weight:900">Climb to Story Summit</h2>
+          <p class="mt-1 text-center" style="color:var(--muted);font-weight:800">Each correct answer moves your reading team along the trail.</p>
+          <div id="progress-zones" class="progress-zones" aria-label="Quest progress zones"></div>
+          <div class="mt-4 rounded-2xl bg-[#fff0bb] px-4 py-3">
+            <div class="flex items-center justify-between">
+              <span style="font-weight:900">Trail stars</span><strong id="star-count" aria-live="polite">0</strong>
+            </div>
+          </div>
+          <p class="mt-4 text-center" style="font-weight:900">Vowel-team badges</p>
+          <div class="badge-grid">
+            <span class="vowel-badge" data-pattern-badge="ee">ee</span>
+            <span class="vowel-badge" data-pattern-badge="a_e">a_e</span>
+            <span class="vowel-badge" data-pattern-badge="i_e">i_e</span>
+            <span class="vowel-badge" data-pattern-badge="o_e">o_e</span>
+            <span class="vowel-badge" data-pattern-badge="u_e">u_e</span>
+          </div>
+        </aside>
+      </div>
+      <section id="results-panel" class="panel results-panel mx-auto w-full max-w-[1200px] p-4 sm:p-7" aria-labelledby="results-heading">
+        <div class="grid items-center gap-7 md:grid-cols-[.9fr_1.1fr]">
+          <div class="rounded-[1.8rem] bg-[#ffe5df] p-6 text-center">
+            <p style="color:var(--coral);font-weight:900;letter-spacing:.12rem">STORY SUMMIT REACHED</p>
+            <h2 class="mt-2" style="font-size:clamp(2rem,4vw,3rem);font-weight:900">Long-vowel quest complete!</h2>
+            <p class="mt-3" style="color:var(--muted);font-weight:800">You practiced ee, a_e, i_e, o_e, u_e, Tricky Words, nouns, and story meaning.</p>
+          </div>
+          <div>
+            <h2 id="results-heading" style="font-size:clamp(1.8rem,3vw,2.25rem);font-weight:900">Your results</h2>
+            <div class="mt-5 flex flex-wrap items-center gap-5">
+              <div id="score-ring" class="score-ring" style="--score-pct:0">
+                <div class="score-ring-content">
+                  <span id="result-percent" class="block">0%</span>
+                  <span class="block" style="color:var(--muted);font-size:14px;font-weight:800">first try</span>
+                </div>
+              </div>
+              <div class="flex-1 rounded-2xl bg-[#dcf4e6] p-5 text-center">
+                <span id="result-correct" class="block" style="font-size:2rem;font-weight:900">0 / 34</span>
+                <span style="color:#17684f;font-weight:900">Correct on the first try</span>
+              </div>
+            </div>
+            <div class="mt-5 rounded-2xl bg-[#fff0bb] p-4">
+              <p style="font-weight:900">Unit 2 vowel-pattern check</p>
+              <p id="benchmark-result" class="mt-1" aria-live="polite" style="color:var(--muted);font-weight:800"></p>
+            </div>
+            <div class="mt-5">
+              <p style="font-weight:900">Words and ideas to revisit</p>
+              <div id="review-list" class="mt-2 flex flex-wrap gap-2"></div>
+              <p id="review-clear" class="mt-2 hidden" style="color:#17684f;font-weight:900">No review stops today. Every counted quest was correct on the first try!</p>
+            </div>
+            <p id="result-save-status" class="result-save-status" aria-live="polite"></p>
+            <div class="result-actions">
+              <button id="print-results-button" type="button" class="primary-action print-results-button">Print Results</button>
+              <button id="restart-button" type="button" class="primary-action">Travel the quest again</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="w-full px-5 pb-6 text-center">
+      <p style="color:var(--muted);font-weight:800">Remember: the letters in a_e, i_e, o_e, and u_e work as separated vowel teams.</p>
+    </footer>
+  </div>
+  <div id="assign-overlay" class="assign-overlay" role="dialog" aria-modal="true" aria-labelledby="assign-title">
+    <div class="assign-panel">
+      <h2 id="assign-title">Who answered?</h2>
+      <p id="assign-summary">Enter the scholar's initials, or skip if it was an accident.</p>
+      <label class="initials-entry">
+        Scholar initials
+        <input id="assign-initials" autocomplete="off" maxlength="3" type="text" inputmode="text">
+      </label>
+      <div class="assign-actions">
+        <button id="save-assign-initials-button" type="button" class="primary-action success">Save Initials</button>
+        <button id="skip-assign-button" type="button" class="primary-action secondary">Skip / No Scholar</button>
+      </div>
+      <p id="assign-status" class="assign-status" aria-live="polite"></p>
+    </div>
+  </div>
+  <script>
+document.addEventListener("DOMContentLoaded", async () => {
+  if (window.lucide) lucide.createIcons();
+
+  let UNIT_2_PASSAGE = "Maya and Lee ride bikes to Pine Lake. They see three green trees by the gate. A cute mule stands by a rope. Maya has a cube in her bag. Lee can make a rose with the cube blocks. They hope to get home before it is late.";
+  let UNIT_2_STORY_TITLE = "A Ride to Pine Lake";
+  let ZONE_ENCOURAGEMENTS = [
+    "Nice work. Keep climbing.",
+    "Great blending. Let's keep going.",
+    "Super work. Try the next trail.",
+    "You are working hard. Keep going.",
+    "You made it to Story Summit."
+  ];
+  const NUMBER_SPEECH = [
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+    "seventeen", "eighteen", "nineteen", "twenty", "twenty one", "twenty two",
+    "twenty three", "twenty four", "twenty five", "twenty six", "twenty seven",
+    "twenty eight", "twenty nine", "thirty", "thirty one", "thirty two",
+    "thirty three", "thirty four"
+  ];
+
+  let QUESTIONS = [
+    { zone:0, type:"sound", pattern:"ee", word:"SEED", speak:"seed", prompt:"Listen to this word. Which long-vowel sound do you hear?", answer:"ee", hint:"Stretch seed: s, eee, d. The two e letters work as a team.", choices:[["ee","/ee/"],["ae","/ae/"],["ie","/ie/"]] },
+    { zone:0, type:"sound", pattern:"ee", word:"FEET", speak:"feet", prompt:"Listen to this word. Which spelling makes the long e sound?", answer:"ee", hint:"Feet uses ee to spell the long e sound.", choices:[["ee","ee"],["ae","a_e"],["ue","u_e"]] },
+    { zone:0, type:"sound", pattern:"ee", word:"GREEN", speak:"green", prompt:"Listen to this word. Which spelling makes the long e sound?", answer:"ee", hint:"Green uses ee, the same vowel team as seed and feet.", choices:[["ee","ee"],["ie","i_e"],["oe","o_e"]] },
+    { zone:0, type:"sound", pattern:"a_e", word:"CAKE", speak:"cake", prompt:"Listen to this word. Which long-vowel sound do you hear?", answer:"ae", hint:"The a says its name in cake because a and final e work together.", choices:[["oe","/oe/"],["ae","/ae/"],["ue","/ue/"]] },
+    { zone:0, type:"sound", pattern:"i_e", word:"BIKE", speak:"bike", prompt:"Listen to this word. Which long-vowel sound do you hear?", answer:"ie", hint:"Bike has the long i sound. The i and final e are a separated team.", choices:[["ie","/ie/"],["ee","/ee/"],["oe","/oe/"]] },
+    { zone:0, type:"sound", pattern:"o_e", word:"ROSE", speak:"rose", prompt:"Listen to this word. Which long-vowel sound do you hear?", answer:"oe", hint:"Rose has the same long o sound as home and hope.", choices:[["ae","/ae/"],["ue","/ue/"],["oe","/oe/"]] },
+    { zone:0, type:"sound", pattern:"u_e", word:"CUBE", speak:"cube", prompt:"Listen to this word. Which long-vowel sound do you hear?", answer:"ue", hint:"Cube starts with the long u sound. The u and final e are a team.", choices:[["ue","/ue/"],["ie","/ie/"],["ee","/ee/"]] },
+    { zone:1, type:"contrast", pattern:"a_e", word:"CAPE", speak:"cape", prompt:"Listen to the word. Choose the word you hear.", answer:"cape", hint:"Cap has short a. Add e and the a says its name: cape.", choices:[["cap","cap"],["cape","cape"],["cup","cup"]] },
+    { zone:1, type:"contrast", pattern:"a_e", word:"TAPE", speak:"tape", prompt:"Listen to the word. Choose the word you hear.", answer:"tape", hint:"Tap has short a. Tape uses the separated vowel team a_e.", choices:[["tap","tap"],["tape","tape"],["top","top"]] },
+    { zone:1, type:"contrast", pattern:"i_e", word:"KITE", speak:"kite", prompt:"Listen to the word. Choose the word you hear.", answer:"kite", hint:"Kit has short i. In kite, final e works with i.", choices:[["kit","kit"],["kite","kite"],["kate","kate"]] },
+    { zone:1, type:"contrast", pattern:"i_e", word:"RIDE", speak:"ride", prompt:"Listen to the word. Choose the word you hear.", answer:"ride", hint:"Rid has short i. Ride uses i_e for long i.", choices:[["rid","rid"],["red","red"],["ride","ride"]] },
+    { zone:1, type:"contrast", pattern:"o_e", word:"HOPE", speak:"hope", prompt:"Listen to the word. Choose the word you hear.", answer:"hope", hint:"Hop has short o. Hope uses o_e for long o.", choices:[["hop","hop"],["hope","hope"],["hip","hip"]] },
+    { zone:1, type:"contrast", pattern:"o_e", word:"ROBE", speak:"robe", prompt:"Listen to the word. Choose the word you hear.", answer:"robe", hint:"Rob has short o. Robe uses o_e for long o.", choices:[["rob","rob"],["rub","rub"],["robe","robe"]] },
+    { zone:1, type:"contrast", pattern:"u_e", word:"CUBE", speak:"cube", prompt:"Listen to the word. Choose the word you hear.", answer:"cube", hint:"Cub has short u. Cube uses u_e for long u.", choices:[["cub","cub"],["cab","cab"],["cube","cube"]] },
+    { zone:1, type:"contrast", pattern:"u_e", word:"CUTE", speak:"cute", prompt:"Listen to the word. Choose the word you hear.", answer:"cute", hint:"Cut has short u. Cute uses u_e for long u.", choices:[["cut","cut"],["cute","cute"],["cat","cat"]] },
+    { zone:2, type:"build", pattern:"a_e", word:"CAKE", speak:"cake", prompt:"Listen to the word. Choose the vowel that completes it.", build:["c","_","k","e"], answer:"a", hint:"Cake uses a_e. The a and e work as a separated vowel team.", choices:[["a","a"],["i","i"],["o","o"]] },
+    { zone:2, type:"build", pattern:"i_e", word:"BIKE", speak:"bike", prompt:"Listen to the word. Choose the vowel that completes it.", build:["b","_","k","e"], answer:"i", hint:"Bike uses i_e. The i and e work together.", choices:[["a","a"],["i","i"],["u","u"]] },
+    { zone:2, type:"build", pattern:"o_e", word:"HOME", speak:"home", prompt:"Listen to the word. Choose the vowel that completes it.", build:["h","_","m","e"], answer:"o", hint:"Home uses o_e, just like hope and rose.", choices:[["a","a"],["o","o"],["u","u"]] },
+    { zone:2, type:"build", pattern:"u_e", word:"CUBE", speak:"cube", prompt:"Listen to the word. Choose the vowel that completes it.", build:["c","_","b","e"], answer:"u", hint:"Cube uses u_e. The u and e work as a separated team.", choices:[["a","a"],["u","u"],["i","i"]] },
+    { zone:2, type:"build", pattern:"ee", word:"SEED", speak:"seed", prompt:"Listen to the word. Choose the vowel team that completes it.", build:["s","__","d"], answer:"ee", hint:"Seed has two e letters side by side: ee.", choices:[["a","a"],["ee","ee"],["ie","i_e"]] },
+    { zone:2, type:"team", pattern:"a_e", word:"NAME", speak:"name", prompt:"Listen to the word. Which letters are the separated vowel team?", team:["n","a","m","e"], answer:"ae", hint:"In name, a and e work together even though m is between them.", choices:[["ae","a and e"],["nm","n and m"],["me","m and e"]] },
+    { zone:2, type:"team", pattern:"i_e", word:"SHINE", speak:"shine", prompt:"Listen to the word. Which letters work together for long i?", team:["sh","i","n","e"], answer:"ie", hint:"In shine, i and final e work together for long i.", choices:[["ie","i and e"],["she","sh and e"],["ne","n and e"]] },
+    { zone:3, type:"tricky", pattern:"tricky", word:"WE", speak:"we", prompt:"Which Tricky Word completes this sentence? Maya and Lee said, ___ can ride bikes together.", answer:"we", hint:"We means more than one person, including the speaker.", choices:[["by","by"],["your","your"],["we","we"]] },
+    { zone:3, type:"tricky", pattern:"tricky", word:"YOUR", speak:"your", prompt:"Which Tricky Word completes this sentence? Is this ___ cube?", answer:"your", hint:"Your shows who owns or has something.", choices:[["you","you"],["by","by"],["your","your"]] },
+    { zone:3, type:"tricky", pattern:"tricky", word:"THEIR", speak:"their", prompt:"Which Tricky Word completes this sentence? Maya and Lee ride ___ bikes.", answer:"their", hint:"Their shows that something belongs to them.", choices:[["they","they"],["their","their"],["there","there"]] },
+    { zone:3, type:"tricky", pattern:"tricky", word:"YOU", speak:"you", prompt:"Which Tricky Word completes this sentence? Can ___ see me?", answer:"you", hint:"You names the person being spoken to.", choices:[["you","you"],["your","your"],["by","by"]] },
+    { zone:3, type:"tricky", pattern:"tricky", word:"BY", speak:"by", prompt:"Which Tricky Word completes this sentence? The mule is ___ the gate.", answer:"by", hint:"By can mean beside or near.", choices:[["be","be"],["me","me"],["by","by"]] },
+    { zone:3, type:"noun", pattern:"noun", word:"MAYA", speak:"Maya", prompt:"Maya is a name. Does Maya name a person, place, or thing?", answer:"person", hint:"A person's name is a noun. Maya names a person.", choices:[["person","person"],["place","place"],["thing","thing"]] },
+    { zone:3, type:"noun", pattern:"noun", word:"ROSEPARK", speak:"Rose Park", prompt:"Rose Park names one special place. What kind of noun is it?", answer:"proper", hint:"A special name begins with capital letters. Rose Park is a proper noun.", choices:[["common","common noun"],["proper","proper noun"],["notnoun","not a noun"]] },
+    { zone:3, type:"noun", pattern:"noun", word:"CUBE", speak:"cube", prompt:"Which word is a noun that names a thing?", answer:"cube", hint:"Cube names a thing, so it is a noun.", choices:[["green","green"],["cube","cube"],["ride","ride"]] },
+    { zone:3, type:"noun", pattern:"noun", word:"HOME", speak:"home", prompt:"Which word is a noun that names a place?", answer:"home", hint:"Home names a place.", choices:[["cute","cute"],["late","late"],["home","home"]] },
+    { zone:4, type:"reading", pattern:"reading", word:"BIKES", speak:"bikes", prompt:"What do Maya and Lee ride?", storyTitle:UNIT_2_STORY_TITLE, passage:UNIT_2_PASSAGE, answer:"bikes", hint:"Look back at the first sentence: Maya and Lee ride bikes.", choices:[["bikes","bikes"],["mules","mules"],["cubes","cubes"]] },
+    { zone:4, type:"reading", pattern:"reading", word:"LAKE", speak:"Pine Lake", prompt:"Where do Maya and Lee go?", storyTitle:UNIT_2_STORY_TITLE, passage:UNIT_2_PASSAGE, answer:"lake", hint:"The first sentence tells the place: Pine Lake.", choices:[["home","home"],["lake","Pine Lake"],["shop","a shop"]] },
+    { zone:4, type:"reading", pattern:"reading", word:"MULE", speak:"mule", prompt:"What stands by a rope?", storyTitle:UNIT_2_STORY_TITLE, passage:UNIT_2_PASSAGE, answer:"mule", hint:"The story says a cute mule stands by a rope.", choices:[["mule","a mule"],["rose","a rose"],["bike","a bike"]] }
+  ];
+
+  let ZONES = [
+    { name:"Sound Safari", detail:"Hear long-vowel sounds", icon:"ear" },
+    { name:"Team Trail", detail:"Choose the written word", icon:"link" },
+    { name:"Word Workshop", detail:"Build separated vowel teams", icon:"puzzle" },
+    { name:"Word Village", detail:"Tricky Words and nouns", icon:"building-2" },
+    { name:"Story Summit", detail:"Read and understand", icon:"flag" }
+  ];
+  const VOWEL_PATTERNS = ["ee","a_e","i_e","o_e","u_e"];
+  const GAME_ID = "ckla-unit-2-long-vowel-quest";
+  const GAME_TITLE = "CKLA Unit 2 Long Vowel Quest";
+  const CLASS_MODE_CODE = "2213";
+  const RESULT_COLLECTION = "gameHubResultSubmissions";
+  const PROGRESS_COLLECTION = "gameHubProgressSubmissions";
+  const AUTHORIZED_TEACHERS = [
+    { email: "davisg230@gmail.com", label: "Mr. Davis" },
+    { email: "lvest1@crossroadsschoolskc.org", label: "Ms. Vest" }
+  ];
+  const firebaseConfig = {
+    apiKey: "AIzaSyDKzxn9EHkjRTEAYNBuFtoIRH4ZB2r8vi8",
+    authDomain: "stgradelearninggames.firebaseapp.com",
+    projectId: "stgradelearninggames",
+    storageBucket: "stgradelearninggames.firebasestorage.app",
+    messagingSenderId: "794898732231",
+    appId: "1:794898732231:web:07dace393137990eef5ae2",
+    measurementId: "G-NBW471V655"
+  };
+
+  let states = [];
+  let zoneViews = [];
+  function rebuildQuestionState() {
+    states = QUESTIONS.map(() => ({ selected:null, firstChecked:false, scored:false, complete:false, skipped:false, attempts:0, incorrectSelections:[] }));
+    zoneViews = ZONES.map((_, zone) => QUESTIONS.map((q, index) => ({...q, index})).filter(q => q.zone === zone));
+  }
+  async function loadEditableGameContent() {
+    const savedContent = await window.EditableGameContent?.loadPublishedGameContent({
+      firebaseConfig,
+      gameId: GAME_ID
+    });
+    if (!savedContent) return;
+    ZONES = savedContent.levels;
+    QUESTIONS = savedContent.questions;
+    if (savedContent.zoneEncouragements?.length) ZONE_ENCOURAGEMENTS = savedContent.zoneEncouragements;
+    const firstStory = QUESTIONS.find(question => question.passage && question.storyTitle);
+    if (firstStory) {
+      UNIT_2_PASSAGE = firstStory.passage;
+      UNIT_2_STORY_TITLE = firstStory.storyTitle;
+    }
+  }
+  const gameMain = document.getElementById("game-main");
+  const startPanel = document.getElementById("scholar-start-panel");
+  const firstNameInput = document.getElementById("scholar-first-name");
+  const startError = document.getElementById("start-error");
+  const classModePill = document.getElementById("class-mode-pill");
+  const questionCard = document.getElementById("question-card");
+  const feedback = document.getElementById("feedback");
+  const checkButton = document.getElementById("check-button");
+  const nextButton = document.getElementById("next-button");
+  const skipQuestionButton = document.getElementById("skip-question-button");
+  const playLayout = document.getElementById("play-layout");
+  const resultsPanel = document.getElementById("results-panel");
+  const resultSaveStatus = document.getElementById("result-save-status");
+  const soundToggle = document.getElementById("sound-toggle");
+  const assignOverlay = document.getElementById("assign-overlay");
+  const assignSummary = document.getElementById("assign-summary");
+  const assignInitialsInput = document.getElementById("assign-initials");
+  const assignStatus = document.getElementById("assign-status");
+
+  let current = 0;
+  let unlockedZone = 0;
+  let score = 0;
+  let muted = false;
+  let audioContext = null;
+  let scholarFirstName = "";
+  let scholarFirstNameKey = "";
+  let wholeClassMode = false;
+  let activeTeacherEmail = "";
+  let pendingClassMiss = null;
+  let sessionActive = false;
+  let sessionCompleted = false;
+  let progressStarted = false;
+  let sessionId = createSessionId();
+  const AUDIO_MANIFEST_URL = "/audio/manifest.json";
+  const AUDIO_MANIFEST_VERSION = "2026-07-15-story-directions";
+  const PRELOAD_SPEECH_TEXTS = [
+    "Type your first name, then start the game. Your teacher can see your score after you finish.",
+    "Read the story A Ride to Pine Lake and answer the questions.",
+    "Trail star earned! Great reading.",
+    "Whole Class Mode is on. Pick any zone or question together.",
+    "Great job. Let's play.",
+    ...ZONE_ENCOURAGEMENTS
+  ];
+  let speechManifest = null;
+  let audioManifestPromise = null;
+  let currentSpeechAudio = null;
+  let currentSpeechResolve = null;
+  const speechAudioCache = new Map();
+
+  function createSessionId() {
+    return `ckla-unit-2-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[char]));
+  }
+
+  function normalizeNameKey(value) {
+    return value.trim().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 30);
+  }
+
+  function getFirebaseServices() {
+    if (!window.firebase) return null;
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    return { auth: firebase.auth(), db: firebase.firestore(), firebase };
+  }
+
+  function serverTimestamp() {
+    const services = getFirebaseServices();
+    return services ? services.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString();
+  }
+
+  function currentTeacherEmail() {
+    const services = getFirebaseServices();
+    return (services?.auth.currentUser?.email || "").trim().toLowerCase();
+  }
+
+  function teacherForClassCode() {
+    const signedInEmail = currentTeacherEmail();
+    return AUTHORIZED_TEACHERS.find(option => option.email === signedInEmail) || { email: "unassigned", label: "Whole Class" };
+  }
+
+  function validClassMissTeacherEmail(email) {
+    return email === "unassigned" || AUTHORIZED_TEACHERS.some(teacher => teacher.email === email);
+  }
+
+  function speechText(text) {
+    return (text || "")
+      .replace(/_+/g, " blank ")
+      .replace(/\/ee\//gi, "long e")
+      .replace(/\/ae\//gi, "long a")
+      .replace(/\/ie\//gi, "long i")
+      .replace(/\/oe\//gi, "long o")
+      .replace(/\/ue\//gi, "long u")
+      .replace(/\bee\b/gi, "e e vowel team")
+      .replace(/\ba_e\b/gi, "a blank e separated vowel team")
+      .replace(/\bi_e\b/gi, "i blank e separated vowel team")
+      .replace(/\bo_e\b/gi, "o blank e separated vowel team")
+      .replace(/\bu_e\b/gi, "u blank e separated vowel team")
+      .replace(/\bsh\b(?! sound)/gi, "sh sound")
+      .replace(/\bch\b(?! sound)/gi, "ch sound")
+      .replace(/\bth\b(?! sound)/gi, "th sound")
+      .replace(/\bng\b(?! sound)/gi, "n g")
+      .replace(/\bck\b(?! sound)/gi, "c k")
+      .replace(/\bqu\b(?! sound)/gi, "q u")
+      .replace(/\bss\b/gi, "double s")
+      .replace(/\bzz\b/gi, "double z")
+      .replace(/\b[A-Z]{2,}\b/g, word => word.toLowerCase())
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function stopSpeechAudio() {
+    if (currentSpeechAudio) {
+      currentSpeechAudio.pause();
+      currentSpeechAudio.currentTime = 0;
+    }
+    if (currentSpeechResolve) currentSpeechResolve(false);
+    currentSpeechAudio = null;
+    currentSpeechResolve = null;
+  }
+
+  function loadAudioManifest() {
+    if (!audioManifestPromise) {
+      audioManifestPromise = fetch(`${AUDIO_MANIFEST_URL}?v=${encodeURIComponent(AUDIO_MANIFEST_VERSION)}`, { cache:"no-store" })
+        .then(response => response.ok ? response.json() : { items:{} })
+        .then(data => {
+          speechManifest = data.items || {};
+          preloadImportantSpeech();
+          return speechManifest;
+        })
+        .catch(() => {
+          speechManifest = {};
+          return speechManifest;
+        });
+    }
+    return audioManifestPromise;
+  }
+
+  function preloadSpeechText(text) {
+    if (!speechManifest) return;
+    const source = speechManifest[speechText(text)];
+    if (!source || speechAudioCache.has(source)) return;
+    const audio = new Audio(source);
+    audio.preload = "auto";
+    speechAudioCache.set(source, audio);
+    audio.load();
+  }
+
+  function preloadImportantSpeech() {
+    PRELOAD_SPEECH_TEXTS.forEach(preloadSpeechText);
+    const firstQuestion = QUESTIONS[0];
+    if (!firstQuestion) return;
+    preloadSpeechText(storyPrompt(firstQuestion));
+  }
+
+  async function playSpeech(text) {
+    if (muted) return;
+    const readable = speechText(text);
+    if (!readable) return;
+    const manifest = speechManifest || await loadAudioManifest();
+    if (muted) return;
+    const source = manifest[readable];
+    if (!source) return;
+    stopSpeechAudio();
+    let audio = speechAudioCache.get(source);
+    if (!audio) {
+      audio = new Audio(source);
+      audio.preload = "auto";
+      speechAudioCache.set(source, audio);
+    }
+    audio.currentTime = 0;
+    currentSpeechAudio = audio;
+    return new Promise(resolve => {
+      currentSpeechResolve = resolve;
+      audio.onended = () => {
+        if (currentSpeechAudio === audio) currentSpeechAudio = null;
+        if (currentSpeechResolve === resolve) currentSpeechResolve = null;
+        resolve(true);
+      };
+      audio.onerror = () => {
+        if (currentSpeechAudio === audio) currentSpeechAudio = null;
+        if (currentSpeechResolve === resolve) currentSpeechResolve = null;
+        resolve(false);
+      };
+      audio.play().catch(() => {
+        if (currentSpeechAudio === audio) currentSpeechAudio = null;
+        if (currentSpeechResolve === resolve) currentSpeechResolve = null;
+        resolve(false);
+      });
+    });
+  }
+
+  async function playAudioSource(source) {
+    if (muted || !source) return;
+    stopSpeechAudio();
+    let audio = speechAudioCache.get(source);
+    if (!audio) {
+      audio = new Audio(source);
+      audio.preload = "auto";
+      speechAudioCache.set(source, audio);
+    }
+    audio.currentTime = 0;
+    currentSpeechAudio = audio;
+    return new Promise(resolve => {
+      currentSpeechResolve = resolve;
+      audio.onended = () => {
+        if (currentSpeechAudio === audio) currentSpeechAudio = null;
+        if (currentSpeechResolve === resolve) currentSpeechResolve = null;
+        resolve(true);
+      };
+      audio.onerror = () => {
+        if (currentSpeechAudio === audio) currentSpeechAudio = null;
+        if (currentSpeechResolve === resolve) currentSpeechResolve = null;
+        resolve(false);
+      };
+      audio.play().catch(() => {
+        if (currentSpeechAudio === audio) currentSpeechAudio = null;
+        if (currentSpeechResolve === resolve) currentSpeechResolve = null;
+        resolve(false);
+      });
+    });
+  }
+
+  function speak(text) {
+    void playSpeech(text);
+  }
+
+  async function speakSequence(parts) {
+    for (const part of parts) {
+      if (muted) return;
+      const played = await playSpeech(part);
+      if (!played) return;
+    }
+  }
+
+  function numberSpeech(value) {
+    return NUMBER_SPEECH[value] || String(value);
+  }
+
+  function speakScore(resultScore, totalQuestions, percent) {
+    const opener = percent >= 70 ? "Great job for working hard." : "Keep practicing. You can do it!";
+    void speakSequence([opener, "You got", numberSpeech(resultScore), "out of", numberSpeech(totalQuestions), "correct."]);
+  }
+
+  function speakZoneEncouragement(zoneIndex) {
+    const text = ZONE_ENCOURAGEMENTS[zoneIndex];
+    if (text) speak(text);
+  }
+
+  function tone(kind, position = 0) {
+    if (muted) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    audioContext = audioContext || new AudioCtx();
+    if (audioContext.state === "suspended") audioContext.resume();
+    const notes = kind === "correct" ? [523,659,784] : kind === "zone" ? [392,523,659,784] : [280 + position * 85];
+    notes.forEach((frequency, index) => {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = kind === "wrong" ? "triangle" : "sine";
+      oscillator.frequency.value = kind === "wrong" ? 210 : frequency;
+      const start = audioContext.currentTime + index * .09;
+      gain.gain.setValueAtTime(.0001, start);
+      gain.gain.exponentialRampToValueAtTime(.11, start + .015);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + .2);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(start);
+      oscillator.stop(start + .22);
+    });
+  }
+
+  function setupStaticUI() {
+    const zoneNav = document.getElementById("zone-nav");
+    zoneNav.innerHTML = ZONES.map((zone, index) => `<button class="zone-tab" type="button" data-zone="${index}">${index + 1} · ${escapeHtml(zone.name)}</button>`).join("");
+    document.getElementById("progress-zones").innerHTML = ZONES
+      .map((zone, index) => ({ zone, index }))
+      .reverse()
+      .map(({ zone, index }) => `
+      <div class="progress-zone" data-progress-zone="${index}">
+        <div class="zone-icon-circle"><i data-lucide="${zone.icon}"></i></div>
+        <div><strong>${escapeHtml(zone.name)}</strong><br><small>${escapeHtml(zone.detail)}</small></div>
+      </div>
+    `).join("");
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function renderWordBuild(q) {
+    if (!q.build && !q.team) return "";
+    const letters = q.build || q.team;
+    return `<div class="team-demo" aria-label="${escapeHtml(q.word)} letters">
+      ${letters.map((letter, index) => {
+        const isFinalE = letter === "e" && index === letters.length - 1;
+        const isVowel = ["a","e","i","o","u","ee","__","_"].includes(letter);
+        return `<span class="letter-box ${isVowel ? "vowel" : ""} ${isFinalE ? "final-e" : ""}">${escapeHtml(letter)}</span>`;
+      }).join("")}
+      ${q.type === "team" ? '<span class="team-bridge" aria-hidden="true"></span>' : ""}
+    </div>`;
+  }
+
+  function storyPrompt(q) {
+    return (q.prompt || "").replace(/^Read the story\.\s*/i, "");
+  }
+
+  function storyReadPrompt(q) {
+    return `Read the story ${q.storyTitle || "Story Summit"} and answer the questions.`;
+  }
+
+  function hasCustomSpeakerButtons(q) {
+    return Array.isArray(q.speakerButtons);
+  }
+
+  function speakerButtonMarkup(button) {
+    if (!button || button.enabled === false) return "";
+    const label = button.label || "Read";
+    const text = button.text || "";
+    const audioSource = button.audioUrl || "";
+    if (!text && !audioSource) return "";
+    const audioAttribute = audioSource
+      ? `data-audio-src="${escapeHtml(audioSource)}"`
+      : `data-speak="${escapeHtml(text)}"`;
+    return `<button class="speak-button" type="button" ${audioAttribute}>${escapeHtml(label)}</button>`;
+  }
+
+  function renderSpeakerButtons(q, position) {
+    if (!hasCustomSpeakerButtons(q)) return "";
+    return q.speakerButtons
+      .filter(button => button.position === position)
+      .map(speakerButtonMarkup)
+      .join("");
+  }
+
+  function renderPromptCard(q, promptRead) {
+    const prompt = storyPrompt(q);
+    const customSpeakers = hasCustomSpeakerButtons(q);
+    const defaultReadButton = customSpeakers ? "" : `<button class="speak-button" type="button" data-speak="${escapeHtml(promptRead)}" aria-label="Read question">Read</button>`;
+    const defaultStoryButton = customSpeakers ? "" : `<button class="speak-button" type="button" data-speak="${escapeHtml(storyReadPrompt(q))}" aria-label="Read directions">Read</button>`;
+    if (q.passage) {
+      return `<div class="prompt-card">
+        <span class="question-tag">${escapeHtml(labelForQuestion(q))}</span>
+        <h3 class="story-title">${escapeHtml(q.storyTitle || "Story Summit")}</h3>
+        <div class="story-directions">
+          ${renderSpeakerButtons(q, "above")}
+          ${renderSpeakerButtons(q, "left")}
+          ${defaultStoryButton}
+          <p>${escapeHtml(storyReadPrompt(q))}</p>
+          ${renderSpeakerButtons(q, "right")}
+        </div>
+        <p class="passage">${escapeHtml(q.passage)}</p>
+        <div class="prompt-read-row mt-4">
+          <p class="prompt-text">${escapeHtml(prompt)}</p>
+          ${renderSpeakerButtons(q, "below")}
+        </div>
+      </div>`;
+    }
+    return `<div class="prompt-card">
+      <span class="question-tag">${escapeHtml(labelForQuestion(q))}</span>
+      ${renderSpeakerButtons(q, "above")}
+      <div class="prompt-read-row">
+        ${renderSpeakerButtons(q, "left")}
+        ${defaultReadButton}
+        <p class="prompt-text">${escapeHtml(prompt)}</p>
+        ${renderSpeakerButtons(q, "right")}
+      </div>
+      ${renderSpeakerButtons(q, "below")}
+    </div>`;
+  }
+
+  function renderTargetAudio(q) {
+    if (hasCustomSpeakerButtons(q)) return "";
+    if (!q.speak || q.type === "reading" || q.zone === 3) return "";
+    return `<div class="target-audio-row">
+      <button class="speak-button" type="button" data-speak="${escapeHtml(q.speak)}">Hear the word</button>
+    </div>`;
+  }
+
+  function renderQuestion() {
+    const q = QUESTIONS[current];
+    const state = states[current];
+    const promptRead = storyPrompt(q);
+    questionCard.innerHTML = `
+      <article>
+        ${renderPromptCard(q, promptRead)}
+        ${renderWordBuild(q)}
+        ${renderTargetAudio(q)}
+        <div class="answer-grid">
+          ${q.choices.map(choice => `
+            <div class="choice-wrap">
+              <button class="answer-btn ${state.selected === choice[0] ? "is-selected" : ""} ${state.complete && choice[0] === q.answer ? "is-correct" : ""}" type="button" data-choice="${escapeHtml(choice[0])}" ${state.complete ? "disabled" : ""}>${escapeHtml(choice[1])}</button>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function labelForQuestion(q) {
+    if (q.type === "sound") return "Hear the long-vowel sound";
+    if (q.type === "contrast") return "Short vowel or long vowel";
+    if (q.type === "build") return "Build and decode";
+    if (q.type === "team") return "Find the separated vowel team";
+    if (q.type === "tricky") return "Tricky Word";
+    if (q.type === "noun") return "Noun practice";
+    return "Story question";
+  }
+
+  function countedResultIndexes() {
+    if (!wholeClassMode) return QUESTIONS.map((_, index) => index);
+    return states.flatMap((state, index) => state.complete && !state.skipped ? [index] : []);
+  }
+
+  function progressPayload(status) {
+    const q = QUESTIONS[current] || QUESTIONS[0];
+    const completed = states.filter(state => state.complete && !state.skipped).length;
+    const payload = {
+      completedAt: status === "completed" ? serverTimestamp() : null,
+      currentQuestionIndex: current + 1,
+      currentQuestionLabel: q.prompt.slice(0, 100),
+      currentWord: q.word,
+      gameId: GAME_ID,
+      gameTitle: GAME_TITLE,
+      mode: "session-progress",
+      percentComplete: Math.round((completed / QUESTIONS.length) * 100),
+      questionsCompleted: completed,
+      schemaVersion: 1,
+      scholarFirstName,
+      scholarFirstNameKey,
+      scholarId: null,
+      score,
+      sessionId,
+      status,
+      teacherEmail: wholeClassMode ? activeTeacherEmail : "unassigned",
+      totalQuestions: QUESTIONS.length,
+      updatedAt: serverTimestamp()
+    };
+    if (!progressStarted) payload.createdAt = serverTimestamp();
+    return payload;
+  }
+
+  function saveProgress(status = "in-progress") {
+    if (!sessionActive || !scholarFirstNameKey) return;
+    const services = getFirebaseServices();
+    if (!services) return;
+    const doc = services.db.collection(PROGRESS_COLLECTION).doc(sessionId);
+    doc.set(progressPayload(status), { merge: true })
+      .then(() => {
+        progressStarted = true;
+      })
+      .catch(() => {});
+  }
+
+  function refreshUI() {
+    const q = QUESTIONS[current];
+    const zone = q.zone;
+    document.getElementById("question-progress").textContent = `Quest ${current + 1} of ${QUESTIONS.length}`;
+    document.getElementById("live-score").textContent = `${score} correct`;
+    document.getElementById("star-count").textContent = `${states.filter(state => state.complete && !state.skipped).length}`;
+    document.getElementById("zone-kicker").textContent = `ZONE ${zone + 1}`;
+    document.getElementById("game-heading").textContent = ZONES[zone].name;
+    document.getElementById("zone-name").textContent = ZONES[zone].detail;
+    document.getElementById("game-progress-fill").style.width = `${(states.filter(state => state.complete).length / QUESTIONS.length) * 100}%`;
+    document.querySelectorAll(".zone-tab").forEach((tab, index) => {
+      tab.disabled = !wholeClassMode && index > unlockedZone;
+      tab.classList.toggle("is-active", index === zone);
+    });
+    document.querySelectorAll("[data-progress-zone]").forEach((zoneEl, index) => {
+      const zoneDone = zoneViews[index].every(item => states[item.index].complete);
+      zoneEl.classList.toggle("is-earned", zoneDone);
+    });
+    const earnedPatterns = new Set(QUESTIONS.filter((question, index) => states[index].scored && VOWEL_PATTERNS.includes(question.pattern)).map(question => question.pattern));
+    document.querySelectorAll("[data-pattern-badge]").forEach(badge => {
+      badge.classList.toggle("is-earned", earnedPatterns.has(badge.dataset.patternBadge));
+    });
+    checkButton.disabled = !states[current].selected || states[current].complete;
+    checkButton.classList.toggle("hidden", states[current].complete);
+    nextButton.classList.toggle("hidden", !states[current].complete);
+    skipQuestionButton.classList.toggle("hidden", !wholeClassMode || states[current].complete);
+    skipQuestionButton.disabled = !wholeClassMode || states[current].complete;
+  }
+
+  function showQuestion(index) {
+    current = Number(index);
+    feedback.className = "feedback";
+    feedback.textContent = "";
+    renderQuestion();
+    refreshUI();
+    saveProgress(progressStarted ? "in-progress" : "started");
+  }
+
+  function selectChoice(choice) {
+    const state = states[current];
+    if (state.complete) return;
+    state.selected = choice;
+    tone("tap", 1);
+    renderQuestion();
+    refreshUI();
+  }
+
+  function showFeedback(text, good) {
+    feedback.className = `feedback is-visible ${good ? "is-good" : ""}`;
+    feedback.innerHTML = `<span>${escapeHtml(text)}</span><button class="speak-button" type="button" data-speak="${escapeHtml(text)}">Read</button>`;
+  }
+
+  function checkAnswer() {
+    const q = QUESTIONS[current];
+    const state = states[current];
+    if (!state.selected || state.complete) return;
+    const correct = state.selected === q.answer;
+    state.attempts++;
+    if (!state.firstChecked) {
+      state.firstChecked = true;
+      state.scored = correct;
+      if (correct) score++;
+    }
+    if (correct) {
+      state.complete = true;
+      showFeedback("Trail star earned! Great reading.", true);
+      tone("correct");
+    } else {
+      state.incorrectSelections.push(state.selected);
+      showFeedback(q.hint, false);
+      tone("wrong");
+      if (wholeClassMode) {
+        openAssignMiss({
+          correctAnswer: q.answer,
+          incorrectSelection: state.selected,
+          questionIndex: current + 1,
+          word: q.word
+        });
+      }
+      state.selected = null;
+    }
+    renderQuestion();
+    refreshUI();
+    saveProgress("in-progress");
+  }
+
+  function advance() {
+    if (current >= QUESTIONS.length - 1) {
+      showResults();
+      return;
+    }
+    const previousZone = QUESTIONS[current].zone;
+    const nextZone = QUESTIONS[current + 1].zone;
+    unlockedZone = Math.max(unlockedZone, nextZone);
+    showQuestion(current + 1);
+    if (nextZone > previousZone) speakZoneEncouragement(previousZone);
+  }
+
+  function skipCurrentQuestion() {
+    if (!wholeClassMode || states[current].complete) return;
+    states[current].skipped = true;
+    states[current].complete = true;
+    states[current].selected = null;
+    tone("tap", 2);
+    saveProgress("in-progress");
+    advance();
+  }
+
+  function missedQuestionDetails() {
+    return QUESTIONS.flatMap((q, index) => {
+      const state = states[index];
+      if (state.scored) return [];
+      return [{
+        correctAnswer: q.answer,
+        incorrectSelections: state.incorrectSelections,
+        questionIndex: index + 1,
+        word: q.word
+      }];
+    });
+  }
+
+  function incorrectSelectionDetails() {
+    return states.flatMap((state, index) => state.incorrectSelections.map(choice => ({
+      correctAnswer: QUESTIONS[index].answer,
+      incorrectSelection: choice,
+      questionIndex: index + 1,
+      word: QUESTIONS[index].word
+    })));
+  }
+
+  async function submitIndividualResult(percent) {
+    if (wholeClassMode) {
+      resultSaveStatus.textContent = "Whole Class Mode does not save one class score.";
+      resultSaveStatus.classList.add("is-saved");
+      return;
+    }
+    const services = getFirebaseServices();
+    if (!services) {
+      resultSaveStatus.textContent = "Result could not save because Firebase did not load.";
+      return;
+    }
+    try {
+      const missedQuestions = missedQuestionDetails();
+      await services.db.collection(RESULT_COLLECTION).add({
+        attempts: states.reduce((total, state) => total + state.attempts, 0),
+        completedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        gameId: GAME_ID,
+        gameTitle: GAME_TITLE,
+        incorrectSelections: incorrectSelectionDetails(),
+        missedCount: missedQuestions.length,
+        missedQuestions,
+        mode: "individual-complete",
+        percent,
+        schemaVersion: 1,
+        scholarFirstName,
+        scholarFirstNameKey,
+        scholarId: null,
+        score,
+        teacherEmail: "unassigned",
+        totalQuestions: QUESTIONS.length
+      });
+      resultSaveStatus.textContent = "Your result was saved for your teacher.";
+      resultSaveStatus.classList.add("is-saved");
+    } catch {
+      resultSaveStatus.textContent = "The result could not save yet. Please tell your teacher.";
+      resultSaveStatus.classList.remove("is-saved");
+    }
+  }
+
+  function showResults() {
+    sessionCompleted = true;
+    playLayout.classList.add("hidden");
+    document.getElementById("zone-nav").classList.add("hidden");
+    resultsPanel.classList.add("is-active");
+    const counted = countedResultIndexes();
+    const totalQuestions = counted.length;
+    const resultScore = wholeClassMode ? counted.filter(index => states[index].scored).length : score;
+    const percent = totalQuestions ? Math.round(resultScore / totalQuestions * 100) : 0;
+    const vowelIndexes = counted.filter(index => VOWEL_PATTERNS.includes(QUESTIONS[index].pattern));
+    const vowelScore = vowelIndexes.filter(index => states[index].scored).length;
+    document.getElementById("result-percent").textContent = `${percent}%`;
+    document.getElementById("result-correct").textContent = `${resultScore} / ${totalQuestions}`;
+    document.getElementById("score-ring").style.setProperty("--score-pct", percent);
+    document.getElementById("benchmark-result").textContent = vowelIndexes.length
+      ? `${vowelScore} of ${vowelIndexes.length} vowel-pattern quests correct on the first try. Target is about 80%, like 12 of 15.`
+      : "No vowel-pattern quests were counted because they were skipped.";
+    const review = document.getElementById("review-list");
+    review.replaceChildren();
+    const missed = counted.filter(index => !states[index].scored);
+    document.getElementById("review-clear").classList.toggle("hidden", missed.length > 0);
+    missed.forEach(index => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "review-chip";
+      chip.textContent = QUESTIONS[index].word;
+      chip.setAttribute("aria-label", `Read ${QUESTIONS[index].word}`);
+      chip.addEventListener("click", () => speak(QUESTIONS[index].speak || QUESTIONS[index].word));
+      review.appendChild(chip);
+    });
+    tone("zone");
+    speakScore(resultScore, totalQuestions, percent);
+    saveProgress("completed");
+    void submitIndividualResult(percent);
+  }
+
+  function resetGame() {
+    current = 0;
+    unlockedZone = 0;
+    score = 0;
+    states.forEach(state => Object.assign(state, { selected:null, firstChecked:false, scored:false, complete:false, skipped:false, attempts:0, incorrectSelections:[] }));
+    resultsPanel.classList.remove("is-active");
+    playLayout.classList.remove("hidden");
+    document.getElementById("zone-nav").classList.remove("hidden");
+    resultSaveStatus.textContent = "";
+    resultSaveStatus.classList.remove("is-saved");
+    sessionId = createSessionId();
+    progressStarted = false;
+    sessionCompleted = false;
+    sessionActive = true;
+    showQuestion(0);
+  }
+
+  function openAssignMiss(miss) {
+    pendingClassMiss = miss;
+    assignStatus.textContent = "";
+    assignStatus.classList.remove("is-saved");
+    assignSummary.textContent = `${miss.word}: chose ${miss.incorrectSelection}; correct answer ${miss.correctAnswer}.`;
+    assignInitialsInput.value = "";
+    assignOverlay.classList.add("is-open");
+    assignInitialsInput.focus();
+  }
+
+  function closeAssignMiss() {
+    assignOverlay.classList.remove("is-open");
+    pendingClassMiss = null;
+  }
+
+  async function saveWholeClassMiss() {
+    if (!pendingClassMiss) return;
+    const services = getFirebaseServices();
+    const initials = assignInitialsInput.value.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+    if (!initials) {
+      assignStatus.textContent = "Type the scholar's initials first.";
+      assignInitialsInput.focus();
+      return;
+    }
+    if (!services || !validClassMissTeacherEmail(activeTeacherEmail)) {
+      assignStatus.textContent = "This miss could not save yet.";
+      return;
+    }
+    try {
+      await services.db.collection(RESULT_COLLECTION).add({
+        attempts: 1,
+        completedAt: serverTimestamp(),
+        correctAnswer: pendingClassMiss.correctAnswer,
+        createdAt: serverTimestamp(),
+        gameId: GAME_ID,
+        gameTitle: GAME_TITLE,
+        incorrectSelection: pendingClassMiss.incorrectSelection,
+        incorrectSelections: [{
+          correctAnswer: pendingClassMiss.correctAnswer,
+          incorrectSelection: pendingClassMiss.incorrectSelection,
+          questionIndex: pendingClassMiss.questionIndex,
+          word: pendingClassMiss.word
+        }],
+        missedCount: 1,
+        missedQuestions: [{
+          correctAnswer: pendingClassMiss.correctAnswer,
+          incorrectSelections: [pendingClassMiss.incorrectSelection],
+          questionIndex: pendingClassMiss.questionIndex,
+          word: pendingClassMiss.word
+        }],
+        mode: "whole-class-miss",
+        questionIndex: pendingClassMiss.questionIndex,
+        schemaVersion: 1,
+        scholarDisplayName: initials,
+        scholarFirstName: "Class Miss",
+        scholarFirstNameKey: "classmiss",
+        scholarId: null,
+        score: 0,
+        teacherEmail: activeTeacherEmail,
+        totalQuestions: 1,
+        word: pendingClassMiss.word
+      });
+      assignStatus.textContent = "Saved.";
+      assignStatus.classList.add("is-saved");
+      setTimeout(closeAssignMiss, 350);
+    } catch {
+      assignStatus.textContent = "This miss could not save yet.";
+    }
+  }
+
+  function beginGame(mode) {
+    wholeClassMode = mode === "class";
+    startError.textContent = "";
+    startPanel.classList.add("is-hidden");
+    gameMain.classList.remove("is-locked");
+    classModePill.classList.toggle("is-active", wholeClassMode);
+    sessionActive = true;
+    sessionCompleted = false;
+    progressStarted = false;
+    sessionId = createSessionId();
+    speak(wholeClassMode ? "Whole Class Mode is on. Pick any zone or question together." : "Great job. Let's play.");
+    showQuestion(0);
+  }
+
+  function startGame() {
+    const cleanName = firstNameInput.value.trim().replace(/\s+/g, " ");
+    if (cleanName.replace(/\D/g, "") === CLASS_MODE_CODE) {
+      const teacher = teacherForClassCode();
+      activeTeacherEmail = teacher.email;
+      scholarFirstName = "Whole Class";
+      scholarFirstNameKey = "wholeclass";
+      beginGame("class");
+      return;
+    }
+    const nameKey = normalizeNameKey(cleanName);
+    if (!nameKey) {
+      startError.textContent = "Type your first name first.";
+      firstNameInput.focus();
+      return;
+    }
+    scholarFirstName = cleanName;
+    scholarFirstNameKey = nameKey;
+    beginGame("individual");
+  }
+
+  function watchTeacherSignIn() {
+    const services = getFirebaseServices();
+    if (!services) return;
+    services.auth.onAuthStateChanged(() => {});
+  }
+
+  await loadEditableGameContent();
+  rebuildQuestionState();
+  setupStaticUI();
+  showQuestion(0);
+  watchTeacherSignIn();
+  loadAudioManifest();
+
+  questionCard.addEventListener("click", event => {
+    const speakButton = event.target.closest("[data-speak],[data-audio-src]");
+    if (speakButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (speakButton.dataset.audioSrc) playAudioSource(speakButton.dataset.audioSrc);
+      else speak(speakButton.dataset.speak);
+      tone("tap", 2);
+      return;
+    }
+    const answer = event.target.closest("[data-choice]");
+    if (answer) selectChoice(answer.dataset.choice);
+  });
+  feedback.addEventListener("click", event => {
+    const button = event.target.closest("[data-speak],[data-audio-src]");
+    if (button?.dataset.audioSrc) playAudioSource(button.dataset.audioSrc);
+    else if (button) speak(button.dataset.speak);
+  });
+  document.getElementById("zone-nav").addEventListener("click", event => {
+    const tab = event.target.closest("[data-zone]");
+    if (!tab) return;
+    const zone = Number(tab.dataset.zone);
+    if (wholeClassMode || zone <= unlockedZone) {
+      const nextIncomplete = zoneViews[zone].find(item => !states[item.index].complete) || zoneViews[zone][0];
+      showQuestion(nextIncomplete.index);
+    }
+  });
+  document.getElementById("start-game-button").addEventListener("click", startGame);
+  firstNameInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") startGame();
+  });
+  document.getElementById("read-start-directions").addEventListener("click", () => speak(document.getElementById("start-directions").textContent));
+  checkButton.addEventListener("click", checkAnswer);
+  nextButton.addEventListener("click", advance);
+  skipQuestionButton.addEventListener("click", skipCurrentQuestion);
+  document.getElementById("restart-button").addEventListener("click", resetGame);
+  document.getElementById("print-results-button").addEventListener("click", () => window.print());
+  document.getElementById("save-assign-initials-button").addEventListener("click", saveWholeClassMiss);
+  document.getElementById("skip-assign-button").addEventListener("click", closeAssignMiss);
+  assignInitialsInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") saveWholeClassMiss();
+  });
+  soundToggle.addEventListener("click", () => {
+    muted = !muted;
+    if (muted) stopSpeechAudio();
+    soundToggle.setAttribute("aria-pressed", String(muted));
+    soundToggle.querySelector(".sound-on").classList.toggle("hidden", muted);
+    soundToggle.querySelector(".sound-off").classList.toggle("hidden", !muted);
+    const svg = soundToggle.querySelector("svg");
+    if (svg) svg.remove();
+    const icon = document.createElement("i");
+    icon.dataset.lucide = muted ? "volume-x" : "volume-2";
+    icon.className = "h-5 w-5";
+    soundToggle.prepend(icon);
+    if (window.lucide) lucide.createIcons();
+    if (!muted) tone("tap", 2);
+  });
+  window.addEventListener("pagehide", () => {
+    if (sessionActive && !sessionCompleted) saveProgress("left-early");
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && sessionActive && !sessionCompleted) saveProgress("left-early");
+  });
+});
+  </script>
+</body>
+</html>
