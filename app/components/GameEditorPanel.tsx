@@ -1405,6 +1405,7 @@ function MathVisualPreview({
     };
     const symbol = symbols[object] ?? "";
     const isCube = object === "cubes";
+    const showTotals = question.mathVisualShowTotals !== false;
 
     const group = (
       amount: number,
@@ -1480,17 +1481,19 @@ function MathVisualPreview({
           {group(count, colorOne, "Part 1")}
           {group(secondCount, colorTwo, "Part 2")}
         </div>
-        <p
-          style={{
-            color: "#354b63",
-            fontSize: "22px",
-            fontWeight: 900,
-            margin: "20px 0 0",
-            textAlign: "center",
-          }}
-        >
-          {count} + {secondCount} = {count + secondCount}
-        </p>
+        {showTotals ? (
+          <p
+            style={{
+              color: "#354b63",
+              fontSize: "22px",
+              fontWeight: 900,
+              margin: "20px 0 0",
+              textAlign: "center",
+            }}
+          >
+            {count} + {secondCount} = {count + secondCount}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -4290,6 +4293,18 @@ export function GameEditorPanel({
                                     </select>
                                   </label>
                                 </div>
+                              ) : null}
+
+                              {selectedQuestion.mathVisualType
+                                === "two-groups" ? (
+                                <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                  <input
+                                    checked={selectedQuestion.mathVisualShowTotals !== false}
+                                    onChange={(event) => updateQuestion("mathVisualShowTotals", event.target.checked)}
+                                    type="checkbox"
+                                  />
+                                  Show sum/equation
+                                </label>
                               ) : null}
 
                               {selectedQuestion.mathVisualType
