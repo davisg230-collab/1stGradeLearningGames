@@ -166,6 +166,10 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualGraphTotalLabel?: string;
   mathVisualGraphTitle?: string;
   mathVisualLayout?: string;
+  mathVisualCubeShowPartOne?: boolean;
+  mathVisualCubeShowPartTwo?: boolean;
+  mathVisualCubeShowWhole?: boolean;
+  mathVisualCubeSecondSentence?: string;
   mathVisualLabels?: string;
   mathVisualValues?: string;
   mathVisualShadeCount?: number;
@@ -1600,6 +1604,10 @@ function MathVisualPreview({
         : "#ffc857";
     const vertical =
       question.mathVisualLayout === "vertical";
+    const partOneText = question.mathVisualCubeShowPartOne === false ? "" : String(count);
+    const partTwoText = question.mathVisualCubeShowPartTwo === false ? "" : String(secondCount);
+    const wholeText = question.mathVisualCubeShowWhole === false ? "" : String(count + secondCount);
+    const secondSentence = typeof question.mathVisualCubeSecondSentence === "string" ? question.mathVisualCubeSecondSentence.trim() : "";
     const cubes = [
       ...Array.from({length: count}, () => colorOne),
       ...Array.from({length: secondCount}, () => colorTwo),
@@ -1652,8 +1660,21 @@ function MathVisualPreview({
             textAlign: "center",
           }}
         >
-          {count} + {secondCount} = {count + secondCount}
+          {partOneText} + {partTwoText} = {wholeText}
         </p>
+        {secondSentence ? (
+          <p
+            style={{
+              color: "#354b63",
+              fontSize: "20px",
+              fontWeight: 800,
+              margin: "6px 0 0",
+              textAlign: "center",
+            }}
+          >
+            {secondSentence}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -4355,6 +4376,54 @@ export function GameEditorPanel({
                                       Vertical
                                     </option>
                                   </select>
+                                </label>
+                              ) : null}
+                              {selectedQuestion.mathVisualType
+                                === "cube-train" ? (
+                                <div style={{display: "grid", gap: "8px"}}>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualCubeShowPartOne !== false}
+                                      onChange={(event) => updateQuestion("mathVisualCubeShowPartOne", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show Part 1 in equation
+                                  </label>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualCubeShowPartTwo !== false}
+                                      onChange={(event) => updateQuestion("mathVisualCubeShowPartTwo", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show Part 2 in equation
+                                  </label>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualCubeShowWhole !== false}
+                                      onChange={(event) => updateQuestion("mathVisualCubeShowWhole", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show whole in equation
+                                  </label>
+                                </div>
+                              ) : null}
+                              {selectedQuestion.mathVisualType
+                                === "cube-train" ? (
+                                <label>
+                                  Second number sentence (optional)
+                                  <input
+                                    placeholder="Example: 7 - 3 = 4"
+                                    value={
+                                      selectedQuestion.mathVisualCubeSecondSentence
+                                      ?? ""
+                                    }
+                                    onChange={(event) =>
+                                      updateQuestion(
+                                        "mathVisualCubeSecondSentence",
+                                        event.target.value,
+                                      )
+                                    }
+                                  />
                                 </label>
                               ) : null}
                               {(selectedQuestion.mathVisualType

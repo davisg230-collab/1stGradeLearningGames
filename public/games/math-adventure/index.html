@@ -1920,6 +1920,10 @@ ${showLandingNumber && number === finish ? "" : number}
           ? q.mathVisualColorTwo
           : "#ffc857";
       const vertical = q.mathVisualLayout === "vertical";
+      const partOneText = q.mathVisualCubeShowPartOne === false ? "" : String(count);
+      const partTwoText = q.mathVisualCubeShowPartTwo === false ? "" : String(secondCount);
+      const wholeText = q.mathVisualCubeShowWhole === false ? "" : String(count + secondCount);
+      const secondSentence = typeof q.mathVisualCubeSecondSentence === "string" ? q.mathVisualCubeSecondSentence.trim() : "";
       const colors = [
         ...Array.from({length: count}, () => colorOne),
         ...Array.from({length: secondCount}, () => colorTwo),
@@ -1966,8 +1970,13 @@ ${showLandingNumber && number === finish ? "" : number}
             ${cubes}
           </div>
           <p style="color:#354b63;font-size:22px;font-weight:900;margin:18px 0 0;text-align:center">
-            ${count} + ${secondCount} = ${count + secondCount}
+            ${partOneText} + ${partTwoText} = ${wholeText}
           </p>
+          ${secondSentence
+            ? "<p style=\"color:#354b63;font-size:20px;font-weight:800;margin:6px 0 0;text-align:center\">" +
+              escapeHtml(secondSentence) +
+              "</p>"
+            : ""}
         </div>
       `;
     }
