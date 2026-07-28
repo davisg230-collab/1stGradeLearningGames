@@ -1702,33 +1702,38 @@ ${showLandingNumber && number === finish ? "" : number}
     }
 
     if (type === "number-bond") {
-      const partOne = safeNumber(
-        q.mathVisualPartOne,
-        Math.max(0, count - 2),
-      );
-      const partTwo = safeNumber(
-        q.mathVisualPartTwo,
-        Math.max(0, count - partOne),
-      );
+      const whole = q.mathVisualWholeMissing ? null : count;
+      const partOne = q.mathVisualPartOneMissing
+        ? null
+        : safeNumber(
+          q.mathVisualPartOne,
+          Math.max(0, count - 2),
+        );
+      const partTwo = q.mathVisualPartTwoMissing
+        ? null
+        : safeNumber(
+          q.mathVisualPartTwo,
+          Math.max(0, count - (partOne || 0)),
+        );
 
       return `
         <div
-          aria-label="Number bond with whole ${count}, parts ${partOne} and ${partTwo}"
+          aria-label="Number bond with whole ${whole ?? "missing"}, parts ${partOne ?? "missing"} and ${partTwo ?? "missing"}"
           class="math-visual math-number-bond"
           role="img"
           style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px"
         >
           <div style="align-items:center;display:flex;flex-direction:column;gap:12px">
             <div style="align-items:center;background:#ffe59a;border:3px solid #354b63;border-radius:50%;display:flex;font-size:28px;font-weight:900;height:78px;justify-content:center;width:78px">
-              ${count}
+              ${whole ?? ""}
             </div>
             <div aria-hidden="true" style="font-size:30px;font-weight:900">↙ ↘</div>
             <div style="display:flex;gap:64px">
               <div style="align-items:center;background:#bde4ff;border:3px solid #354b63;border-radius:50%;display:flex;font-size:24px;font-weight:900;height:68px;justify-content:center;width:68px">
-                ${partOne}
+                ${partOne ?? ""}
               </div>
               <div style="align-items:center;background:#ffd1dc;border:3px solid #354b63;border-radius:50%;display:flex;font-size:24px;font-weight:900;height:68px;justify-content:center;width:68px">
-                ${partTwo}
+                ${partTwo ?? ""}
               </div>
             </div>
           </div>

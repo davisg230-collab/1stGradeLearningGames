@@ -139,6 +139,9 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualCount?: number;
   mathVisualEnd?: number;
   mathVisualHopCount?: number;
+  mathVisualWholeMissing?: boolean;
+  mathVisualPartOneMissing?: boolean;
+  mathVisualPartTwoMissing?: boolean;
   mathVisualShowLandingNumber?: boolean;
   mathVisualShowPathSentence?: boolean;
   mathVisualObject?: string;
@@ -1286,20 +1289,25 @@ function MathVisualPreview({
   }
 
   if (visualType === "number-bond") {
-    const partOne = mathVisualNumber(
-      question.mathVisualPartOne,
-      Math.max(0, count - 2),
-      100,
-    );
-    const partTwo = mathVisualNumber(
-      question.mathVisualPartTwo,
-      Math.max(0, count - partOne),
-      100,
-    );
+    const whole = question.mathVisualWholeMissing ? null : count;
+    const partOne = question.mathVisualPartOneMissing
+      ? null
+      : mathVisualNumber(
+        question.mathVisualPartOne,
+        Math.max(0, count - 2),
+        100,
+      );
+    const partTwo = question.mathVisualPartTwoMissing
+      ? null
+      : mathVisualNumber(
+        question.mathVisualPartTwo,
+        Math.max(0, count - (partOne ?? 0)),
+        100,
+      );
 
     return (
       <div
-        aria-label={`Number bond with whole ${count}, parts ${partOne} and ${partTwo}`}
+        aria-label={`Number bond with whole ${whole ?? "missing"}, parts ${partOne ?? "missing"} and ${partTwo ?? "missing"}`}
         role="img"
         style={shellStyle}
       >
@@ -1325,8 +1333,7 @@ function MathVisualPreview({
               width: "78px",
             }}
           >
-            {count}
-          </div>
+            {whole ?? \          </div>
 
           <div
             aria-hidden="true"
@@ -1346,7 +1353,7 @@ function MathVisualPreview({
           >
             {[partOne, partTwo].map((part, index) => (
               <div
-                key={`${part}-${index}`}
+                key={`${part ?? "missing"}-${index}`}
                 style={{
                   alignItems: "center",
                   background:
@@ -1361,8 +1368,7 @@ function MathVisualPreview({
                   width: "68px",
                 }}
               >
-                {part}
-              </div>
+                {part ?? \              </div>
             ))}
           </div>
         </div>
@@ -3981,15 +3987,26 @@ export function GameEditorPanel({
                                   min={0}
                                   type="number"
                                   value={
-                                    selectedQuestion.mathVisualCount
-                                    ?? 5
+                                    selectedQuestion.mathVisualType === "number-bond"
+                                    && selectedQuestion.mathVisualWholeMissing
+                                      ? ""
+                                      : selectedQuestion.mathVisualCount
+                                        ?? 5
                                   }
-                                  onChange={(event) =>
-                                    updateQuestion(
-                                      "mathVisualCount",
-                                      Number(event.target.value),
-                                    )
-                                  }
+                                  onChange={(event) => {
+                                    const rawValue = event.target.value;
+                                    if (
+                                      selectedQuestion.mathVisualType === "number-bond"
+                                      && rawValue === ""
+                                    ) {
+                                      updateQuestion("mathVisualWholeMissing", true);
+                                      return;
+                                    }
+                                    if (selectedQuestion.mathVisualType === "number-bond") {
+                                      updateQuestion("mathVisualWholeMissing", false);
+                                    }
+                                    updateQuestion("mathVisualCount", Number(rawValue));
+                                  }}
                                 />
                               </label>
                               ) : null}
@@ -4488,16 +4505,21 @@ export function GameEditorPanel({
                                       min={0}
                                       type="number"
                                       value={
-                                        selectedQuestion
-                                          .mathVisualPartOne
-                                        ?? 3
+                                        selectedQuestion.mathVisualPartOneMissing
+                                          ? ""
+                                          : selectedQuestion
+                                            .mathVisualPartOne
+                                            ?? 3
                                       }
-                                      onChange={(event) =>
-                                        updateQuestion(
-                                          "mathVisualPartOne",
-                                          Number(event.target.value),
-                                        )
-                                      }
+                                      onChange={(event) => {
+                                        const rawValue = event.target.value;
+                                        if (rawValue === "") {
+                                          updateQuestion("mathVisualPartOneMissing", true);
+                                          return;
+                                        }
+                                        updateQuestion("mathVisualPartOneMissing", false);
+                                        updateQuestion("mathVisualPartOne", Number(rawValue));
+                                      }}
                                     />
                                   </label>
 
@@ -4508,16 +4530,21 @@ export function GameEditorPanel({
                                       min={0}
                                       type="number"
                                       value={
-                                        selectedQuestion
-                                          .mathVisualPartTwo
-                                        ?? 2
+                                        selectedQuestion.mathVisualPartTwoMissing
+                                          ? ""
+                                          : selectedQuestion
+                                            .mathVisualPartTwo
+                                            ?? 2
                                       }
-                                      onChange={(event) =>
-                                        updateQuestion(
-                                          "mathVisualPartTwo",
-                                          Number(event.target.value),
-                                        )
-                                      }
+                                      onChange={(event) => {
+                                        const rawValue = event.target.value;
+                                        if (rawValue === "") {
+                                          updateQuestion("mathVisualPartTwoMissing", true);
+                                          return;
+                                        }
+                                        updateQuestion("mathVisualPartTwoMissing", false);
+                                        updateQuestion("mathVisualPartTwo", Number(rawValue));
+                                      }}
                                     />
                                   </label>
                                 </div>
