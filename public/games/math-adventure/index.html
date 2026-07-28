@@ -1782,38 +1782,53 @@ ${showLandingNumber && number === finish ? "" : number}
       };
       const symbol = symbols[object] || "";
       const cube = object === "cubes";
+      const showGroupLabels = q.mathVisualShowGroupLabels !== false;
       const showTotals = q.mathVisualShowTotals !== false;
+      const parseCircleNumbers = value =>
+        typeof value === "string"
+          ? value.split(/[,\n]+/).map(item => item.trim()).filter(Boolean)
+          : [];
+      const partOneNumbers = parseCircleNumbers(q.mathVisualPartOneNumbers);
+      const partTwoNumbers = parseCircleNumbers(q.mathVisualPartTwoNumbers);
 
-      const groupMarkup = (amount, color, label) => {
+      const groupMarkup = (amount, color, label, numbers) => {
         const objects = Array.from(
           {length: amount},
-          () => `
+          (_, index) => {
+            const circleNumber = numbers.length === 1
+              ? numbers[0]
+              : numbers[index] || "";
+            const hasNumber = Boolean(circleNumber);
+
+            return `
             <span
               aria-hidden="true"
               style="
                 align-items:center;
-                background:${symbol ? "transparent" : color};
-                border:${symbol ? "none" : "3px solid #354b63"};
+                background:${hasNumber || !symbol ? color : "transparent"};
+                border:${hasNumber || !symbol ? "3px solid #354b63" : "none"};
                 border-radius:${cube ? "9px" : "50%"};
                 box-shadow:${cube
                   ? "inset -6px -6px 0 rgba(0,0,0,.12)"
                   : "none"};
-                color:${color};
+                color:${hasNumber ? "#ffffff" : color};
                 display:flex;
-                font-size:${symbol ? "42px" : "0"};
+                font-size:${hasNumber ? "22px" : symbol ? "42px" : "0"};
+                font-weight:${hasNumber ? "900" : "normal"};
                 height:52px;
                 justify-content:center;
                 width:52px;
               "
-            >${symbol}</span>
-          `,
+            >${escapeHtml(circleNumber || symbol)}</span>
+          `;
+          },
         ).join("");
 
         return `
           <div style="flex:1 1 220px">
-            <p style="color:#596b7d;font-weight:900;text-align:center">
+            ${showGroupLabels ? `<p style="color:#596b7d;font-weight:900;text-align:center">
               ${label}: ${amount}
-            </p>
+            </p>` : ""}
             <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
               ${objects}
             </div>
@@ -1829,8 +1844,8 @@ ${showLandingNumber && number === finish ? "" : number}
           style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px"
         >
           <div style="display:flex;flex-wrap:wrap;gap:28px;justify-content:center">
-            ${groupMarkup(count, colorOne, "Part 1")}
-            ${groupMarkup(secondCount, colorTwo, "Part 2")}
+            ${groupMarkup(count, colorOne, "Part 1", partOneNumbers)}
+            ${groupMarkup(secondCount, colorTwo, "Part 2", partTwoNumbers)}
           </div>
           ${showTotals ? `<p style="color:#354b63;font-size:22px;font-weight:900;margin:20px 0 0;text-align:center">
             ${count} + ${secondCount} = ${count + secondCount}

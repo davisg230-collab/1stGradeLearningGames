@@ -152,6 +152,9 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualColorOne?: string;
   mathVisualColorTwo?: string;
   mathVisualColorThree?: string;
+  mathVisualShowGroupLabels?: boolean;
+  mathVisualPartOneNumbers?: string;
+  mathVisualPartTwoNumbers?: string;
   mathVisualEquationLeft?: string;
   mathVisualEquationLeftColor?: string;
   mathVisualEquationLeftCount?: number;
@@ -1423,15 +1426,30 @@ function MathVisualPreview({
     };
     const symbol = symbols[object] ?? "";
     const isCube = object === "cubes";
+    const showGroupLabels = question.mathVisualShowGroupLabels !== false;
     const showTotals = question.mathVisualShowTotals !== false;
+    const parseCircleNumbers = (value: unknown) =>
+      typeof value === "string"
+        ? value
+          .split(/[,\n]+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+        : [];
+    const partOneNumbers = parseCircleNumbers(
+      question.mathVisualPartOneNumbers,
+    );
+    const partTwoNumbers = parseCircleNumbers(
+      question.mathVisualPartTwoNumbers,
+    );
 
     const group = (
       amount: number,
       color: string,
       label: string,
+      numbers: string[],
     ) => (
       <div style={{flex: "1 1 220px"}}>
-        <p
+        {showGroupLabels ? (<p
           style={{
             color: "#596b7d",
             fontWeight: 900,
@@ -1439,7 +1457,7 @@ function MathVisualPreview({
           }}
         >
           {label}: {amount}
-        </p>
+        </p>) : null}
         <div
           style={{
             display: "flex",
@@ -1448,24 +1466,34 @@ function MathVisualPreview({
             justifyContent: "center",
           }}
         >
-          {Array.from({length: amount}, (_, index) => (
+          {Array.from({length: amount}, (_, index) => {
+            const circleNumber =
+              numbers.length === 1
+                ? numbers[0]
+                : numbers[index] ?? "";
+            const hasNumber = Boolean(circleNumber);
+
+            return (
             <span
               aria-hidden="true"
               key={index}
               style={{
                 alignItems: "center",
                 background:
-                  symbol ? "transparent" : color,
+                  hasNumber || !symbol ? color : "transparent",
                 border:
-                  symbol ? "none" : "3px solid #354b63",
+                  hasNumber || !symbol
+                    ? "3px solid #354b63"
+                    : "none",
                 borderRadius: isCube ? "9px" : "50%",
                 boxShadow:
                   isCube
                     ? "inset -6px -6px 0 rgba(0,0,0,.12)"
                     : "none",
-                color,
+                color: hasNumber ? "#ffffff" : color,
                 display: "flex",
-                fontSize: symbol ? "42px" : "0",
+                fontSize: hasNumber ? "22px" : symbol ? "42px" : "0",
+                fontWeight: hasNumber ? 900 : undefined,
                 height: "52px",
                 justifyContent: "center",
                 textShadow:
@@ -1475,9 +1503,10 @@ function MathVisualPreview({
                 width: "52px",
               }}
             >
-              {symbol}
+              {circleNumber || symbol}
             </span>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -1496,8 +1525,8 @@ function MathVisualPreview({
             justifyContent: "center",
           }}
         >
-          {group(count, colorOne, "Part 1")}
-          {group(secondCount, colorTwo, "Part 2")}
+          {group(count, colorOne, "Part 1", partOneNumbers)}
+          {group(secondCount, colorTwo, "Part 2", partTwoNumbers)}
         </div>
         {showTotals ? (
           <p
@@ -4351,6 +4380,36 @@ export function GameEditorPanel({
                                   />
                                   Show sum/equation
                                 </label>
+                              ) : null}
+
+                              {selectedQuestion.mathVisualType
+                                === "two-groups" ? (
+                                <div style={{display: "grid", gap: "8px"}}>
+                                  <label style={{alignItems: "center", display: "flex", gap: "10px"}}>
+                                    <input
+                                      checked={selectedQuestion.mathVisualShowGroupLabels !== false}
+                                      onChange={(event) => updateQuestion("mathVisualShowGroupLabels", event.target.checked)}
+                                      type="checkbox"
+                                    />
+                                    Show Part 1 and Part 2 labels/counts
+                                  </label>
+                                  <label>
+                                    Part 1 numbers inside circles (optional)
+                                    <input
+                                      placeholder="1, 2, 3 or one number to repeat"
+                                      value={selectedQuestion.mathVisualPartOneNumbers ?? ""}
+                                      onChange={(event) => updateQuestion("mathVisualPartOneNumbers", event.target.value)}
+                                    />
+                                  </label>
+                                  <label>
+                                    Part 2 numbers inside circles (optional)
+                                    <input
+                                      placeholder="1, 2, 3 or one number to repeat"
+                                      value={selectedQuestion.mathVisualPartTwoNumbers ?? ""}
+                                      onChange={(event) => updateQuestion("mathVisualPartTwoNumbers", event.target.value)}
+                                    />
+                                  </label>
+                                </div>
                               ) : null}
 
                               {selectedQuestion.mathVisualType
