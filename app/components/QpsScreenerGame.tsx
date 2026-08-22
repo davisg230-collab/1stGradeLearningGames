@@ -118,6 +118,52 @@ type QpsScholarSlideProfile = {
   firstNameKey: string;
 };
 
+type QpsCallOnStatus = "mastered" | "needs-review" | "unassessed";
+
+type QpsCallOnRecord = {
+  completedAt?: unknown;
+  correctAnswer?: string;
+  gameId: string;
+  gameTitle: string;
+  id: string;
+  incorrectSelection?: string;
+  incorrectSelections: unknown[];
+  levelName?: string;
+  missedQuestions: unknown[];
+  mode: string;
+  questionResponses: unknown[];
+  scholarDisplayName?: string;
+  scholarFirstNameKey: string;
+  scholarId?: string;
+  status?: string;
+  teacherEmail: string;
+  updatedAt?: unknown;
+  word?: string;
+};
+
+type QpsSkillsOverride = {
+  createdAt?: unknown;
+  id: string;
+  reportId: "letter-sounds" | "digraphs";
+  scholarFirstNameKey: string;
+  scholarId: string;
+  status: Exclude<QpsCallOnStatus, "unassessed">;
+  target: string;
+  teacherEmail: string;
+  updatedAt?: unknown;
+};
+
+type QpsCallOnEvidence = {
+  dateMs: number;
+  status: Exclude<QpsCallOnStatus, "unassessed">;
+  source: string;
+};
+
+type QpsCallOnScholar = QpsScholar & {
+  reason: string;
+  status: QpsCallOnStatus;
+};
+
 declare global {
   interface Window {
     firebase?: FirebaseNamespace;
@@ -131,12 +177,16 @@ const FIREBASE_SCRIPTS = [
 ];
 const SCHOLAR_COLLECTION = "gameHubScholars";
 const RESULT_COLLECTION = "gameHubResultSubmissions";
+const PROGRESS_COLLECTION = "gameHubProgressSubmissions";
+const SKILLS_DATA_OVERRIDE_COLLECTION = "gameHubSkillsDataOverrides";
 const GAME_DEFINITION_COLLECTION = "gameHubGameDefinitions";
 const QPS_LIVE_SESSION_COLLECTION = "gameHubQpsLiveSessions";
 const QPS_GAME_ID = "qps-screener";
 const QPS_GAME_TITLE = "QPS Screener";
 const QPS_WHOLE_CLASS_MODE = "whole-class";
 const QPS_DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ck", "ng", "qu"];
+const QPS_CHART_DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ph", "ng", "ck"];
+const QPS_CHART_LETTER_TARGETS = "abcdefghijklmnopqrstuvwxyz".split("");
 const QPS_FORM_RAW = {
   A: {
     letterNames: "m t a s i r d f o g l h u c n b j k y e w p v q x z",
@@ -337,8 +387,30 @@ function asText(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function asArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function evidenceDateMs(value: unknown) {
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    const date = value.toDate() as Date;
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }
+
+  return 0;
 }
 
 function normalizeNameKey(value: string) {
@@ -362,6 +434,63 @@ function automaticInitials(firstName: string, lastName: string) {
 
 function qpsFormIdFor(value: unknown): QpsFormId {
   return value === "B" || value === "C" ? value : "A";
+}
+
+function qpsOverrideReportId(value: unknown): QpsSkillsOverride["reportId"] {
+  return value === "digraphs" ? "digraphs" : "letter-sounds";
+}
+
+function normalizeQpsSkillTarget(value: unknown) {
+  const raw = asText(value).trim().toLowerCase();
+
+  if (!raw) {
+    return "";
+  }
+
+  const slashSound = raw.match(/^\/([a-z]{1,3})\/$/);
+  if (slashSound?.[1]) {
+    return slashSound[1];
+  }
+
+  const namedTarget = raw.match(/^(?:letter|sound|target|pattern)\s+([a-z]{1,3})$/);
+  if (namedTarget?.[1]) {
+    return namedTarget[1];
+  }
+
+  const cleaned = raw
+    .replace(/^letter\s+/, "")
+    .replace(/^sound\s+/, "")
+    .replace(/^pattern\s+/, "")
+    .replace(/[^a-z]/g, "");
+
+  return cleaned.length >= 1 && cleaned.length <= 3 ? cleaned : "";
+}
+
+function qpsChartReportIdForTarget(target: string): QpsSkillsOverride["reportId"] | "" {
+  if (QPS_CHART_DIGRAPH_TARGETS.includes(target)) {
+    return "digraphs";
+  }
+
+  if (QPS_CHART_LETTER_TARGETS.includes(target)) {
+    return "letter-sounds";
+  }
+
+  return "";
+}
+
+function qpsChartTargetForItem(item: QpsItem | undefined) {
+  if (!item) return null;
+
+  const target =
+    normalizeQpsSkillTarget(item.target)
+    || normalizeQpsSkillTarget(item.display);
+  const reportId = qpsChartReportIdForTarget(target);
+
+  if (!target || !reportId) {
+    return null;
+  }
+
+  return { reportId, target };
 }
 
 function boundedQpsIndex(value: unknown, itemCount: number) {
@@ -408,6 +537,80 @@ function mapScholar(doc: FirestoreDocSnapshot): QpsScholar | null {
     teacherEmail,
     trackingInitials,
   };
+}
+
+function mapQpsCallOnRecord(doc: FirestoreDocSnapshot): QpsCallOnRecord {
+  const data = asRecord(doc.data()) ?? {};
+
+  return {
+    completedAt: data.completedAt,
+    correctAnswer: asText(data.correctAnswer),
+    gameId: asText(data.gameId),
+    gameTitle: asText(data.gameTitle),
+    id: doc.id,
+    incorrectSelection: asText(data.incorrectSelection),
+    incorrectSelections: asArray(data.incorrectSelections),
+    levelName: asText(data.levelName),
+    missedQuestions: asArray(data.missedQuestions),
+    mode: asText(data.mode),
+    questionResponses: asArray(data.questionResponses),
+    scholarDisplayName: asText(data.scholarDisplayName),
+    scholarFirstNameKey: asText(data.scholarFirstNameKey),
+    scholarId: asText(data.scholarId),
+    status: asText(data.status),
+    teacherEmail: asText(data.teacherEmail),
+    updatedAt: data.updatedAt,
+    word: asText(data.word),
+  };
+}
+
+function mapQpsSkillsOverride(doc: FirestoreDocSnapshot): QpsSkillsOverride | null {
+  const data = asRecord(doc.data()) ?? {};
+  const reportId = qpsOverrideReportId(data.reportId);
+  const target = normalizeQpsSkillTarget(data.target);
+
+  if (!target || qpsChartReportIdForTarget(target) !== reportId) {
+    return null;
+  }
+
+  return {
+    createdAt: data.createdAt,
+    id: doc.id,
+    reportId,
+    scholarFirstNameKey: asText(data.scholarFirstNameKey),
+    scholarId: asText(data.scholarId),
+    status: data.status === "needs-review" ? "needs-review" : "mastered",
+    target,
+    teacherEmail: asText(data.teacherEmail),
+    updatedAt: data.updatedAt,
+  };
+}
+
+function qpsRosterScopedEmail(email: string) {
+  return rosterTeacherEmailForEmail(email) || email;
+}
+
+function qpsRecordScholar(record: QpsCallOnRecord, scholars: QpsScholar[]) {
+  if (record.scholarId) {
+    const scholar = scholars.find((nextScholar) => nextScholar.id === record.scholarId);
+    if (scholar) return scholar;
+  }
+
+  if (record.mode === "whole-class-miss" && record.scholarDisplayName) {
+    const initials = cleanTrackingInitials(record.scholarDisplayName.replace(/-[0-9]+$/, ""));
+    const recordTeacherEmail = qpsRosterScopedEmail(record.teacherEmail);
+    const matches = scholars.filter((scholar) => {
+      const teacherMatches = recordTeacherEmail === "unassigned" || scholar.teacherEmail === recordTeacherEmail;
+      return teacherMatches && scholar.trackingInitials === initials;
+    });
+
+    if (matches.length === 1) {
+      return matches[0];
+    }
+  }
+
+  const matches = scholars.filter((scholar) => scholar.firstNameKey === record.scholarFirstNameKey);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function mapQpsLiveSession(doc: FirestoreDocSnapshot): QpsLiveSession | null {
@@ -466,7 +669,264 @@ function statusLabel(status: QpsItemScore["status"]) {
 }
 
 function primaryQpsDisplay(value: string) {
-  return value.replace(/a/g, "ɑ");
+  return value.replace(/a/g, "ɑ").replace(/g/g, "ɡ");
+}
+
+function safeQpsProgressText(value: string, fallback = "QPS item") {
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  return (cleaned || fallback).slice(0, 120);
+}
+
+function qpsProgressSessionId(formId: QpsFormId, scholar: QpsScholar) {
+  return `qps-${formId.toLowerCase()}-${scholar.firstNameKey}-progress`;
+}
+
+function qpsQuestionResponse(item: QpsItem, itemIndex: number, score: QpsItemScore) {
+  const correct = score.status === "correct";
+  const selected = correct ? "Correct" : score.said.trim() || "Needs review";
+
+  return {
+    attempts: [{
+      correct,
+      selected,
+      timestamp: Date.now(),
+    }],
+    category: item.skill,
+    correct,
+    correctAnswer: item.display,
+    firstAttemptCorrect: correct,
+    itemId: item.id,
+    itemType: item.type,
+    note: score.note.trim(),
+    prompt: item.prompt,
+    questionIndex: itemIndex + 1,
+    section: item.section,
+    selected,
+    skill: item.skill,
+    target: item.target,
+    word: item.display,
+  };
+}
+
+function qpsMissedQuestion(item: QpsItem, itemIndex: number, score: QpsItemScore) {
+  return {
+    category: item.skill,
+    correctAnswer: item.display,
+    gameId: QPS_GAME_ID,
+    gameTitle: QPS_GAME_TITLE,
+    incorrectSelections: [score.said.trim() || "Needs review"],
+    itemId: item.id,
+    levelName: item.section,
+    note: score.note.trim(),
+    questionIndex: itemIndex + 1,
+    word: item.display,
+  };
+}
+
+function qpsScoresFromProgress(data: Record<string, unknown>, items: QpsItem[]) {
+  const nextScores = qpsItemScoreDefaults(items);
+  const responses = Array.isArray(data.questionResponses) ? data.questionResponses : [];
+
+  responses.forEach((response) => {
+    const raw = asRecord(response);
+    if (!raw) return;
+
+    const itemId = asText(raw.itemId).trim();
+    const questionIndex = Math.trunc(asNumber(raw.questionIndex)) - 1;
+    const item =
+      (itemId ? items.find((nextItem) => nextItem.id === itemId) : null)
+      ?? (questionIndex >= 0 ? items[questionIndex] : undefined);
+
+    if (!item) return;
+
+    const selected = asText(raw.selected).trim();
+    const correct = raw.correct === true || raw.firstAttemptCorrect === true || selected === "Correct";
+    nextScores[item.id] = {
+      note: asText(raw.note).trim(),
+      said: correct ? "" : selected,
+      status: correct ? "correct" : "missed",
+    };
+  });
+
+  return nextScores;
+}
+
+function qpsFirstText(...values: unknown[]) {
+  for (const value of values) {
+    const next = asText(value).trim();
+    if (next) return next;
+  }
+
+  return "";
+}
+
+function qpsTargetEvidenceFromResponse(
+  record: QpsCallOnRecord,
+  response: unknown,
+  chartTarget: { reportId: QpsSkillsOverride["reportId"]; target: string },
+): QpsCallOnEvidence | null {
+  const raw = asRecord(response);
+  if (!raw) return null;
+
+  const target = normalizeQpsSkillTarget(
+    raw.target
+    || raw.letter
+    || raw.sound
+    || raw.answer
+    || raw.correctAnswer
+    || raw.word
+    || raw.display,
+  );
+
+  if (target !== chartTarget.target || qpsChartReportIdForTarget(target) !== chartTarget.reportId) {
+    return null;
+  }
+
+  const attempts = asArray(raw.attempts).map(asRecord).filter((attempt): attempt is Record<string, unknown> => Boolean(attempt));
+  const firstAttempt = attempts[0];
+  const firstAttemptCorrect =
+    typeof raw.firstAttemptCorrect === "boolean"
+      ? raw.firstAttemptCorrect
+      : typeof firstAttempt?.correct === "boolean"
+        ? firstAttempt.correct
+        : undefined;
+  const selected = qpsFirstText(
+    firstAttempt?.selected,
+    raw.selected,
+    raw.selectedAnswer,
+    raw.incorrectSelection,
+    asArray(raw.incorrectSelections)[0],
+  );
+  const correct =
+    firstAttemptCorrect
+    ?? (typeof raw.correct === "boolean" ? raw.correct : undefined)
+    ?? (typeof raw.eventuallyCorrect === "boolean" ? raw.eventuallyCorrect : undefined)
+    ?? (selected ? normalizeQpsSkillTarget(selected) === target : false);
+  const dateMs =
+    evidenceDateMs(firstAttempt?.timestamp)
+    || evidenceDateMs(raw.timestamp)
+    || evidenceDateMs(record.updatedAt)
+    || evidenceDateMs(record.completedAt)
+    || 0;
+
+  return {
+    dateMs,
+    source: record.gameTitle || QPS_GAME_TITLE,
+    status: correct ? "mastered" : "needs-review",
+  };
+}
+
+function qpsTargetEvidenceFromMiss(
+  record: QpsCallOnRecord,
+  missed: unknown,
+  chartTarget: { reportId: QpsSkillsOverride["reportId"]; target: string },
+): QpsCallOnEvidence | null {
+  const raw = asRecord(missed);
+  if (!raw) return null;
+
+  const target = normalizeQpsSkillTarget(
+    raw.correctAnswer
+    || raw.word
+    || record.correctAnswer
+    || record.word,
+  );
+
+  if (target !== chartTarget.target || qpsChartReportIdForTarget(target) !== chartTarget.reportId) {
+    return null;
+  }
+
+  return {
+    dateMs: evidenceDateMs(record.updatedAt) || evidenceDateMs(record.completedAt) || 0,
+    source: record.gameTitle || QPS_GAME_TITLE,
+    status: "needs-review",
+  };
+}
+
+function qpsCallOnScholarsForTarget(
+  scholars: QpsScholar[],
+  records: QpsCallOnRecord[],
+  progressRecords: QpsCallOnRecord[],
+  overrides: QpsSkillsOverride[],
+  chartTarget: { reportId: QpsSkillsOverride["reportId"]; target: string } | null,
+) {
+  if (!chartTarget) {
+    return [];
+  }
+
+  const evidenceByScholar = new Map<string, QpsCallOnEvidence[]>();
+
+  [...records, ...progressRecords.filter((record) => record.status !== "completed")].forEach((record) => {
+    const scholar = qpsRecordScholar(record, scholars);
+    if (!scholar) return;
+
+    const evidence = [
+      ...record.questionResponses
+        .map((response) => qpsTargetEvidenceFromResponse(record, response, chartTarget))
+        .filter((nextEvidence): nextEvidence is QpsCallOnEvidence => Boolean(nextEvidence)),
+      ...record.missedQuestions
+        .map((missed) => qpsTargetEvidenceFromMiss(record, missed, chartTarget))
+        .filter((nextEvidence): nextEvidence is QpsCallOnEvidence => Boolean(nextEvidence)),
+    ];
+
+    if (!evidence.length) return;
+
+    evidenceByScholar.set(scholar.id, [
+      ...(evidenceByScholar.get(scholar.id) ?? []),
+      ...evidence,
+    ]);
+  });
+
+  overrides.forEach((override) => {
+    if (override.reportId !== chartTarget.reportId || override.target !== chartTarget.target) {
+      return;
+    }
+
+    const scholar = scholars.find((nextScholar) =>
+      nextScholar.id === override.scholarId
+      || (
+        nextScholar.firstNameKey === override.scholarFirstNameKey
+        && (
+          !override.teacherEmail
+          || qpsRosterScopedEmail(override.teacherEmail) === qpsRosterScopedEmail(nextScholar.teacherEmail)
+        )
+      ),
+    );
+
+    if (!scholar) return;
+
+    evidenceByScholar.set(scholar.id, [
+      ...(evidenceByScholar.get(scholar.id) ?? []),
+      {
+        dateMs: evidenceDateMs(override.updatedAt) || evidenceDateMs(override.createdAt) || 0,
+        source: "Teacher observation",
+        status: override.status,
+      },
+    ]);
+  });
+
+  return scholars
+    .map((scholar) => {
+      const evidence = [...(evidenceByScholar.get(scholar.id) ?? [])]
+        .sort((a, b) => b.dateMs - a.dateMs);
+      const latest = evidence[0];
+      const status: QpsCallOnStatus = latest?.status ?? "unassessed";
+
+      return {
+        ...scholar,
+        reason: latest
+          ? `${latest.status === "mastered" ? "Mastered" : "Needs review"} from ${latest.source}`
+          : "No chart evidence yet",
+        status,
+      };
+    })
+    .filter((scholar) => scholar.status !== "mastered")
+    .sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === "needs-review" ? -1 : 1;
+      }
+
+      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+    });
 }
 
 function qpsItemTypeFor(value: unknown, display: string, section: string): QpsItem["type"] {
@@ -691,6 +1151,10 @@ export function QpsScreenerGame() {
   const [isSavingWholeClassMiss, setIsSavingWholeClassMiss] = useState(false);
   const [liveSessionActive, setLiveSessionActive] = useState(false);
   const [liveSessionStatus, setLiveSessionStatus] = useState("");
+  const [loadedProgressKey, setLoadedProgressKey] = useState("");
+  const [qpsCallOnRecords, setQpsCallOnRecords] = useState<QpsCallOnRecord[]>([]);
+  const [qpsCallOnProgressRecords, setQpsCallOnProgressRecords] = useState<QpsCallOnRecord[]>([]);
+  const [qpsSkillsOverrides, setQpsSkillsOverrides] = useState<QpsSkillsOverride[]>([]);
   const [forms, setForms] = useState<Record<QpsFormId, QpsForm>>(QPS_FORMS);
   const [scores, setScores] = useState<Record<string, QpsItemScore>>(() => qpsItemScoreDefaults(QPS_FORMS.A.items));
   const [scholars, setScholars] = useState<QpsScholar[]>([]);
@@ -721,6 +1185,7 @@ export function QpsScreenerGame() {
     [isWholeClassMode, teacherEmail],
   );
   const selectedLiveTarget = selectedScholar ?? wholeClassLiveTarget;
+  const progressSessionId = selectedScholar ? qpsProgressSessionId(formId, selectedScholar) : "";
   const scoredItems = useMemo(
     () => qpsItems.filter((item) => scores[item.id]?.status !== "unscored"),
     [qpsItems, scores],
@@ -728,6 +1193,17 @@ export function QpsScreenerGame() {
   const correctCount = scoredItems.filter((item) => scores[item.id]?.status === "correct").length;
   const missedCount = scoredItems.filter((item) => scores[item.id]?.status === "missed").length;
   const percent = scoredItems.length ? Math.round((correctCount / scoredItems.length) * 100) : 0;
+  const currentChartTarget = qpsChartTargetForItem(currentItem);
+  const qpsCallOnScholars = useMemo(
+    () => qpsCallOnScholarsForTarget(
+      scholars,
+      qpsCallOnRecords,
+      qpsCallOnProgressRecords,
+      qpsSkillsOverrides,
+      currentChartTarget,
+    ),
+    [currentChartTarget, qpsCallOnProgressRecords, qpsCallOnRecords, qpsSkillsOverrides, scholars],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -761,10 +1237,18 @@ export function QpsScreenerGame() {
 
       if (!isAuthorizedTeacherEmail(signedInEmail)) {
         setScholars([]);
+        setQpsCallOnRecords([]);
+        setQpsCallOnProgressRecords([]);
+        setQpsSkillsOverrides([]);
         return;
       }
 
-      const snapshot = await db.collection(SCHOLAR_COLLECTION).get();
+      const [snapshot, resultSnapshot, progressSnapshot, overrideSnapshot] = await Promise.all([
+        db.collection(SCHOLAR_COLLECTION).get(),
+        db.collection(RESULT_COLLECTION).get(),
+        db.collection(PROGRESS_COLLECTION).get(),
+        db.collection(SKILLS_DATA_OVERRIDE_COLLECTION).get(),
+      ]);
       setScholars(
         snapshot.docs
           .map(mapScholar)
@@ -774,6 +1258,13 @@ export function QpsScreenerGame() {
               `${teacherLabelForEmail(b.teacherEmail)} ${b.firstName} ${b.lastName}`,
             ),
           ),
+      );
+      setQpsCallOnRecords(resultSnapshot.docs.map(mapQpsCallOnRecord));
+      setQpsCallOnProgressRecords(progressSnapshot.docs.map(mapQpsCallOnRecord));
+      setQpsSkillsOverrides(
+        overrideSnapshot.docs
+          .map(mapQpsSkillsOverride)
+          .filter((override): override is QpsSkillsOverride => Boolean(override)),
       );
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "QPS could not load.");
@@ -808,10 +1299,63 @@ export function QpsScreenerGame() {
   }, [hasCheckedScholarMode, scholarSlideProfile]);
 
   useEffect(() => {
+    if (selectedScholar) return;
+
+    setScores(qpsItemScoreDefaults(qpsItems));
+    setCurrentIndex(0);
+    setLoadedProgressKey("");
+    setStatus("");
+  }, [qpsItems, selectedScholar]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedScholar || !isAuthorizedTeacherEmail(teacherEmail)) {
+      setLoadedProgressKey("");
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const nextProgressSessionId = qpsProgressSessionId(formId, selectedScholar);
+    setLoadedProgressKey("");
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
     setStatus("");
-  }, [qpsItems]);
+
+    loadFirebase()
+      .then(async ({ db }) => {
+        const snapshot = await db.collection(PROGRESS_COLLECTION).doc(nextProgressSessionId).get();
+        if (cancelled) return;
+
+        const data = asRecord(snapshot.data());
+        const statusValue = asText(data?.status);
+        const isMatchingQpsDraft =
+          snapshot.exists !== false
+          && data
+          && asText(data.gameId) === QPS_GAME_ID
+          && asText(data.scholarFirstNameKey) === selectedScholar.firstNameKey
+          && statusValue !== "completed";
+
+        if (isMatchingQpsDraft) {
+          const restoredIndex = boundedQpsIndex(asNumber(data.currentQuestionIndex) - 1, qpsItems.length);
+          setScores(qpsScoresFromProgress(data, qpsItems));
+          setCurrentIndex(restoredIndex);
+          setStatus(`Resumed ${selectedScholar.firstName}'s QPS at item ${restoredIndex + 1}.`);
+        }
+
+        setLoadedProgressKey(nextProgressSessionId);
+      })
+      .catch((nextError) => {
+        if (cancelled) return;
+        setLoadedProgressKey(nextProgressSessionId);
+        setError(nextError instanceof Error ? nextError.message : "QPS progress could not load.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formId, progressSessionId, qpsItems, selectedScholar, teacherEmail]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -924,6 +1468,102 @@ export function QpsScreenerGame() {
     }
   };
 
+  const saveQpsProgress = async (progressStatus: "started" | "in-progress" | "left-early" | "completed" = "in-progress") => {
+    if (!selectedScholar || !progressSessionId || !qpsItems.length) {
+      return;
+    }
+
+    try {
+      const { auth, db, firebase } = await loadFirebase();
+      const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
+
+      if (!isAuthorizedTeacherEmail(signedInEmail)) {
+        return;
+      }
+
+      const serverTime = firebase.firestore.FieldValue.serverTimestamp();
+      const missedItems = scoredItems.filter((item) => scores[item.id]?.status === "missed");
+      const progressMissedItems = missedItems.slice(0, 100);
+      const currentDisplay = safeQpsProgressText(currentItem?.display ?? "", "QPS item");
+      const currentLabel = safeQpsProgressText(currentItem?.prompt || currentItem?.section || "QPS item", "QPS item").slice(0, 100);
+      const reachedCount = Math.min(qpsItems.length, Math.max(currentIndex + 1, scoredItems.length, 1));
+
+      await db.collection(PROGRESS_COLLECTION).doc(progressSessionId).set({
+        assessmentId: QPS_GAME_ID,
+        assessmentVersion: selectedForm.version,
+        categoryScores: sectionTotals(scores, qpsItems),
+        completedAt: progressStatus === "completed" ? serverTime : null,
+        createdAt: serverTime,
+        currentQuestionIndex: Math.min(qpsItems.length, currentIndex + 1),
+        currentQuestionLabel: currentLabel,
+        currentWord: currentDisplay,
+        gameId: QPS_GAME_ID,
+        gameTitle: QPS_GAME_TITLE,
+        incorrectSelections: progressMissedItems.map((item) => scores[item.id]?.said.trim() || item.display),
+        learningLocation: "school",
+        levelId: "qps-full-screener",
+        levelIndex: 0,
+        levelName: "QPS Screener",
+        missedCount: progressMissedItems.length,
+        missedQuestions: progressMissedItems.map((item) => {
+          const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
+          return qpsMissedQuestion(item, itemIndex >= 0 ? itemIndex : 0, scores[item.id] ?? { note: "", said: "", status: "missed" });
+        }),
+        mode: "session-progress",
+        percentComplete: Math.round((reachedCount / qpsItems.length) * 100),
+        questionResponses: scoredItems.map((item) => {
+          const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
+          return qpsQuestionResponse(item, itemIndex >= 0 ? itemIndex : 0, scores[item.id] ?? { note: "", said: "", status: "unscored" });
+        }),
+        questionsCompleted: reachedCount,
+        responseTimesMs: [],
+        schemaVersion: 1,
+        scholarFirstName: selectedScholar.firstName,
+        scholarFirstNameKey: selectedScholar.firstNameKey,
+        scholarId: null,
+        score: correctCount,
+        sessionId: progressSessionId,
+        status: progressStatus,
+        teacherEmail: selectedScholar.teacherEmail,
+        totalQuestions: qpsItems.length,
+        updatedAt: serverTime,
+      }, { merge: true });
+    } catch {
+      // Draft progress should never block live scoring or final QPS saving.
+    }
+  };
+
+  useEffect(() => {
+    if (
+      !selectedScholar
+      || !progressSessionId
+      || loadedProgressKey !== progressSessionId
+      || !isAuthorizedTeacherEmail(teacherEmail)
+    ) {
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      void saveQpsProgress("in-progress");
+    }, 600);
+
+    return () => window.clearTimeout(handle);
+  }, [
+    correctCount,
+    currentIndex,
+    currentItem,
+    formId,
+    loadedProgressKey,
+    missedCount,
+    progressSessionId,
+    qpsItems,
+    scoredItems,
+    scores,
+    selectedForm.version,
+    selectedScholar,
+    teacherEmail,
+  ]);
+
   useEffect(() => {
     if (!liveSessionActive || !selectedLiveTarget || scholarSlideProfile) {
       return;
@@ -991,10 +1631,11 @@ export function QpsScreenerGame() {
         rosterTeacherEmailForEmail(teacherEmail)
         || selectedScholar?.teacherEmail
         || "unassigned";
+      const localCompletedAt = Date.now();
 
       updateCurrentScore({ said: selected, status: "missed" });
 
-      await db.collection(RESULT_COLLECTION).add({
+      const missPayload = {
         attempts: 1,
         completedAt: serverTime,
         correctAnswer: currentItem.display,
@@ -1038,7 +1679,22 @@ export function QpsScreenerGame() {
         teacherEmail: teacherForMiss,
         totalQuestions: 1,
         word: currentItem.display,
-      });
+      };
+
+      await db.collection(RESULT_COLLECTION).add(missPayload);
+      setQpsCallOnRecords((currentRecords) => [
+        {
+          ...mapQpsCallOnRecord({
+            data: () => ({
+              ...missPayload,
+              completedAt: localCompletedAt,
+              updatedAt: localCompletedAt,
+            }),
+            id: `local-${localCompletedAt}`,
+          }),
+        },
+        ...currentRecords,
+      ]);
 
       setWholeClassMissStatus(`Saved ${currentItem.display} for ${initials}.`);
       setWholeClassInitials("");
@@ -1095,7 +1751,7 @@ export function QpsScreenerGame() {
         <tr>
           <td>${index + 1}</td>
           <td>${escapeHtml(item.section)}</td>
-          <td>${escapeHtml(item.display)}</td>
+          <td>${escapeHtml(primaryQpsDisplay(item.display))}</td>
           <td>${escapeHtml(score.said.trim() || "Needs review")}</td>
           <td>${escapeHtml(score.note)}</td>
         </tr>
@@ -1107,7 +1763,7 @@ export function QpsScreenerGame() {
         <tr class="${score.status}">
           <td>${index + 1}</td>
           <td>${escapeHtml(item.section)}</td>
-          <td>${escapeHtml(item.display)}</td>
+          <td>${escapeHtml(primaryQpsDisplay(item.display))}</td>
           <td>${escapeHtml(statusLabel(score.status))}</td>
           <td>${escapeHtml(score.said)}</td>
           <td>${escapeHtml(score.note)}</td>
@@ -1216,43 +1872,13 @@ export function QpsScreenerGame() {
       const missedItems = scoredItems.filter((item) => scores[item.id]?.status === "missed");
       const questionResponses = scoredItems.map((item, index) => {
         const score = scores[item.id] ?? { note: "", said: "", status: "unscored" as const };
-        const correct = score.status === "correct";
-        const selected = correct ? "Correct" : score.said.trim() || "Needs review";
-
-        return {
-          attempts: [{
-            correct,
-            selected,
-            timestamp: Date.now(),
-          }],
-          category: item.skill,
-          correct,
-          correctAnswer: item.display,
-          firstAttemptCorrect: correct,
-          itemType: item.type,
-          note: score.note.trim(),
-          prompt: item.prompt,
-          section: item.section,
-          selected,
-          skill: item.skill,
-          target: item.target,
-          word: item.display,
-          questionIndex: index + 1,
-        };
+        const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
+        return qpsQuestionResponse(item, itemIndex >= 0 ? itemIndex : index, score);
       });
       const missedQuestions = missedItems.map((item) => {
         const score = scores[item.id] ?? { note: "", said: "", status: "missed" as const };
-        return {
-          category: item.skill,
-          correctAnswer: item.display,
-          gameId: QPS_GAME_ID,
-          gameTitle: QPS_GAME_TITLE,
-          incorrectSelections: [score.said.trim() || "Needs review"],
-          levelName: item.section,
-          note: score.note.trim(),
-          questionIndex: qpsItems.findIndex((nextItem) => nextItem.id === item.id) + 1,
-          word: item.display,
-        };
+        const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
+        return qpsMissedQuestion(item, itemIndex >= 0 ? itemIndex : 0, score);
       });
 
       await db.collection(RESULT_COLLECTION).add({
@@ -1284,7 +1910,9 @@ export function QpsScreenerGame() {
         totalQuestions: scoredItems.length,
       });
 
+      await saveQpsProgress("completed");
       setStatus(`QPS saved for ${selectedScholar.firstName}.`);
+      void loadTeacherData();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "QPS could not be saved.");
     } finally {
@@ -1469,6 +2097,42 @@ export function QpsScreenerGame() {
                 </button>
                 <p>{wholeClassMissStatus || "Use the scholar's gray tracking initials when this item needs review."}</p>
               </div>
+            ) : null}
+
+            {isWholeClassMode ? (
+              <section className="qps-call-on-panel">
+                <div className="qps-call-on-head">
+                  <div>
+                    <strong>Suggested Call-On List</strong>
+                    <span>
+                      {currentChartTarget
+                        ? `${currentChartTarget.reportId === "digraphs" ? "Digraphs" : "Letter Sounds"} chart: ${primaryQpsDisplay(currentChartTarget.target)}`
+                        : "Letter and digraph chart targets"}
+                    </span>
+                  </div>
+                  {currentChartTarget ? <em>{qpsCallOnScholars.length}</em> : null}
+                </div>
+                {!isAuthorizedTeacherEmail(teacherEmail) ? (
+                  <p className="pin-helper">Sign in with a teacher account to use chart-based call-on suggestions.</p>
+                ) : !currentChartTarget ? (
+                  <p className="pin-helper">This slide is not tied to the current Letter Sounds or Digraphs chart yet.</p>
+                ) : qpsCallOnScholars.length ? (
+                  <div className="qps-call-on-list">
+                    {qpsCallOnScholars.slice(0, 10).map((scholar) => (
+                      <span className={scholar.status === "needs-review" ? "needs-review" : "unassessed"} key={scholar.id}>
+                        <strong>{scholar.firstName}</strong>
+                        <em>{scholar.trackingInitials}</em>
+                        <small>{scholar.status === "needs-review" ? "Needs review" : "No evidence"}</small>
+                      </span>
+                    ))}
+                    {qpsCallOnScholars.length > 10 ? (
+                      <span className="qps-call-on-more">+{qpsCallOnScholars.length - 10} more</span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="pin-helper">Everyone currently shows mastered for this chart target.</p>
+                )}
+              </section>
             ) : null}
 
             <div className="qps-notes-grid">

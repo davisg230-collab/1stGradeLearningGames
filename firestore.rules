@@ -400,6 +400,23 @@ service cloud.firestore {
         && request.resource.data.currentQuestionIndex <= request.resource.data.totalQuestions;
     }
 
+    function isQpsProgressTotalsValid() {
+      return request.resource.data.keys().hasAll([
+          'levelId',
+          'levelIndex',
+          'levelName'
+        ])
+        && request.resource.data.levelId == 'qps-full-screener'
+        && request.resource.data.levelIndex == 0
+        && request.resource.data.levelName == 'QPS Screener'
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions > 0
+        && request.resource.data.totalQuestions <= 220
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.questionsCompleted <= request.resource.data.totalQuestions
+        && request.resource.data.currentQuestionIndex <= request.resource.data.totalQuestions;
+    }
+
     function isSoundSafariProgressTotalsValid() {
       return isSoundSafariLevelFieldsValid()
         && request.resource.data.totalQuestions is int
@@ -1027,6 +1044,10 @@ service cloud.firestore {
           || (
             isSharedCklaUnitGame()
             && isSharedCklaProgressTotalsValid()
+          )
+          || (
+            request.resource.data.gameId == 'qps-screener'
+            && isQpsProgressTotalsValid()
           )
         )
         && request.resource.data.percentComplete is int

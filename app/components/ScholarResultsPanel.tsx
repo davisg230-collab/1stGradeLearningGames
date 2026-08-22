@@ -80,6 +80,7 @@ type MissedQuestion = {
   gameTitle?: string;
   incorrectSelections?: string[];
   levelName?: string;
+  note?: string;
   questionIndex?: number;
   word?: string;
 };
@@ -321,7 +322,23 @@ type CurriculumRecommendationResponse = {
   recommendations?: CurriculumRecommendation[];
 };
 type CurriculumRecommendationStatus = "idle" | "loading" | "success" | "error";
+type SmallGroupLessonAnalysis = {
+  dataCheckItems: string[];
+  familyLookFor: string;
+  familyPrompt: string;
+  familySteps: string[];
+  guidedPractice: string;
+  independentPractice: string;
+  materials: string[];
+  model: string;
+  notes: string[];
+  summary: string;
+  target: string;
+  words: string[];
+};
 type SmallGroupLessonSource = {
+  analysis?: SmallGroupLessonAnalysis;
+  analysisStatus?: "none" | "needs-text" | "ready";
   fileName: string;
   text: string;
 };
@@ -498,6 +515,13 @@ const MANAGED_GAMES: ManagedGame[] = [
       {id: "lowercase-letter-identification", name: "Lowercase Letter Identification"},
       {id: "capital-letter-identification", name: "Capital Letter Identification"},
       {id: "digraph-search", name: "Digraph Search"},
+    ],
+  },
+  {
+    gameId: QPS_SCREENER_GAME_ID,
+    title: "QPS Screener",
+    levels: [
+      {id: "qps-full-screener", name: "QPS Screener"},
     ],
   },
   {
@@ -870,6 +894,38 @@ function toDateInputValue(value: unknown) {
   return `${year}-${month}-${day}`;
 }
 
+function dateToDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputToLocalDate(value: string, endOfDay = false) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map((part) => Number(part));
+  const date = new Date(year, month - 1, day);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date;
+}
+
+function addLocalDays(date: Date, days: number) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
 function startOfLocalDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -880,6 +936,54 @@ function startOfSchoolWeek(date: Date) {
   const daysSinceMonday = day === 0 ? 6 : day - 1;
   start.setDate(start.getDate() - daysSinceMonday);
   return start;
+}
+
+function qpsCurrentWeekRange() {
+  const start = startOfSchoolWeek(new Date());
+  return {
+    end: dateToDateInputValue(addLocalDays(start, 4)),
+    start: dateToDateInputValue(start),
+  };
+}
+
+function resultIsWithinDateInputs(result: ResultSubmission, startInput: string, endInput: string) {
+  const completedAt = formatDate(result.completedAt);
+
+  if (!completedAt) {
+    return false;
+  }
+
+  const start = dateInputToLocalDate(startInput);
+  const end = dateInputToLocalDate(endInput, true);
+
+  if (start && completedAt < start) {
+    return false;
+  }
+
+  if (end && completedAt > end) {
+    return false;
+  }
+
+  return true;
+}
+
+function qpsDateRangeLabel(startInput: string, endInput: string) {
+  const start = dateInputToLocalDate(startInput);
+  const end = dateInputToLocalDate(endInput);
+
+  if (start && end) {
+    return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+  }
+
+  if (start) {
+    return `From ${start.toLocaleDateString()}`;
+  }
+
+  if (end) {
+    return `Through ${end.toLocaleDateString()}`;
+  }
+
+  return "All saved QPS sessions";
 }
 
 function isWithinActivityWindow(value: unknown, activityWindow: ActivityWindow) {
@@ -1476,6 +1580,46 @@ function visualSearchAttemptRows(record: ResultSubmission | ProgressSubmission) 
       };
     })
     .filter((row): row is { attempts: { correct: boolean; selected: string }[]; firstAttemptCorrect: boolean; target: string } => Boolean(row));
+}
+
+function qpsResponseNoteForMiss(
+  record: ResultSubmission | ProgressSubmission,
+  missed: MissedQuestion,
+  index: number,
+) {
+  if (record.gameId !== QPS_SCREENER_GAME_ID) {
+    return "";
+  }
+
+  const missedQuestionIndex = missed.questionIndex ?? index + 1;
+  const missedWord = asText(missed.word || missed.correctAnswer).trim();
+  const missedSection = asText(missed.levelName || missed.category).trim();
+  const response = (record.questionResponses ?? [])
+    .map(asRecord)
+    .find((rawResponse) => {
+      if (!rawResponse) {
+        return false;
+      }
+
+      const responseIndex = asNumber(rawResponse.questionIndex);
+      const responseWord = asText(rawResponse.word || rawResponse.correctAnswer).trim();
+      const responseSection = asText(rawResponse.section).trim();
+
+      return (
+        responseIndex === missedQuestionIndex
+        || (Boolean(missedWord) && responseWord === missedWord && (!missedSection || responseSection === missedSection))
+      );
+    });
+
+  return asText(response?.note).trim();
+}
+
+function missedQuestionNote(
+  record: ResultSubmission | ProgressSubmission,
+  missed: MissedQuestion,
+  index: number,
+) {
+  return asText(missed.note).trim() || qpsResponseNoteForMiss(record, missed, index);
 }
 
 function VisualSearchAttemptList({
@@ -3007,6 +3151,186 @@ function smallGroupDataCheckItems(
   ];
 }
 
+const SMALL_GROUP_SOURCE_WORD_STOPWORDS = new Set([
+  "about",
+  "after",
+  "again",
+  "also",
+  "before",
+  "during",
+  "each",
+  "from",
+  "have",
+  "lesson",
+  "page",
+  "scholar",
+  "scholars",
+  "student",
+  "students",
+  "teacher",
+  "their",
+  "there",
+  "these",
+  "they",
+  "this",
+  "will",
+  "with",
+  "word",
+  "words",
+  "work",
+  "write",
+]);
+
+function smallGroupSourceLessonWords(
+  sourceText: string,
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+) {
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const words = cleanSmallGroupSourceText(sourceText)
+    .match(/\b[A-Za-z]{2,14}\b/g) ?? [];
+  const uniqueWords = Array.from(new Set(words.map((word) => word.toLowerCase())));
+
+  if (subject === "math") {
+    return uniqueWords
+      .filter((word) => /add|subtract|total|part|whole|number|story|equation|draw|count/.test(word))
+      .slice(0, 8);
+  }
+
+  if (letterNeed) {
+    const targetWords = uniqueWords
+      .filter((word) =>
+        word.includes(letterNeed)
+        && word.length <= 8
+        && !SMALL_GROUP_SOURCE_WORD_STOPWORDS.has(word),
+      )
+      .slice(0, 8);
+
+    if (targetWords.length) {
+      return targetWords;
+    }
+  }
+
+  return uniqueWords
+    .filter((word) => word.length >= 3 && !SMALL_GROUP_SOURCE_WORD_STOPWORDS.has(word))
+    .slice(0, 8);
+}
+
+function buildSmallGroupLessonAnalysis(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  sourceText: string,
+): SmallGroupLessonAnalysis {
+  const target = smallGroupTeachingTarget(candidate, subject);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const lessonLabel = recommendation
+    ? `${curriculumRecommendationLessonLabel(recommendation)} - ${recommendation.lessonTitle}`
+    : "the uploaded lesson";
+  const notes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation).slice(0, 4);
+  const words = smallGroupSourceLessonWords(sourceText, candidate, subject);
+  const sourceFeatures = smallGroupSourceFeatures(sourceText);
+  const exampleWords = words.length ? words.slice(0, 5).join(", ") : "two lesson examples";
+  const dataCheckItems = smallGroupDataCheckItems(candidate, subject);
+  const materials = smallGroupMaterials(candidate, recommendation, subject, sourceText);
+
+  if (subject === "math") {
+    return {
+      dataCheckItems,
+      familyLookFor: "Your child can show the math idea with a drawing or objects and explain how they know.",
+      familyPrompt: "Show it, say it, write it, and explain how you know.",
+      familySteps: [
+        "Use small objects, fingers, or a quick drawing to make one math story.",
+        "Ask your child to say what is happening in the story before writing numbers.",
+        "Have your child write or say the matching number sentence and explain the answer.",
+      ],
+      guidedPractice: `Use ${lessonLabel} to solve one parallel problem together. Scholars build or draw the story, say the math sentence, then write the equation or total.`,
+      independentPractice: "Give each scholar one fresh but similar story problem. Have them draw it, solve it, and explain the answer in one sentence.",
+      materials,
+      model: `Model the target from ${lessonLabel}: show the story with objects or a drawing, think aloud, then connect it to the number sentence.`,
+      notes,
+      summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+      target,
+      words,
+    };
+  }
+
+  if (subject === "listening") {
+    return {
+      dataCheckItems,
+      familyLookFor: "Your child can answer with a detail from the story or topic instead of guessing.",
+      familyPrompt: "Tell me one detail. What happened, and how do you know?",
+      familySteps: [
+        "Reread or retell a short part of the story/topic.",
+        "Ask one who, what, where, why, or how question.",
+        "Have your child answer in a complete sentence using one lesson detail.",
+      ],
+      guidedPractice: `Use ${lessonLabel} to revisit one important text moment. Scholars answer together using a sentence frame, then add one text detail.`,
+      independentPractice: "Have each scholar say or draw one response using a lesson detail or vocabulary word.",
+      materials,
+      model: `Model one complete response from ${lessonLabel}. Think aloud: name the detail, explain why it matters, then say the sentence clearly.`,
+      notes,
+      summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+      target,
+      words,
+    };
+  }
+
+  if (letterNeed) {
+    return {
+      dataCheckItems,
+      familyLookFor: `Your child can find ${letterNeed}, name it or say the sound, and write it without guessing.`,
+      familyPrompt: `Find ${letterNeed}, say it, write it, and read it in a word.`,
+      familySteps: [
+        `Write ${letterNeed} with two other known letters and ask your child to point to ${letterNeed}.`,
+        `Have your child say the letter name or sound, then write ${letterNeed}.`,
+        words.length
+          ? `Read or say these quick lesson words together: ${words.slice(0, 4).join(", ")}.`
+          : `Find ${letterNeed} in one short word and say the word together.`,
+      ],
+      guidedPractice: `Use ${lessonLabel} with ${exampleWords}. Scholars find ${letterNeed}, say the letter/sound, trace or write it, and read it in a short lesson word.`,
+      independentPractice: `Scholars complete three quick checks: circle ${letterNeed}, write ${letterNeed}, and read or point to ${letterNeed} in one lesson word.`,
+      materials,
+      model: `Show lowercase ${letterNeed}. Say, "This is ${letterNeed}." Point to ${letterNeed} in ${words[0] || "a lesson word"}, say the sound/name, then write ${letterNeed}.`,
+      notes,
+      summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+      target,
+      words,
+    };
+  }
+
+  return {
+    dataCheckItems,
+    familyLookFor: "Your child can practice the skill accurately and explain their thinking without guessing.",
+    familyPrompt: "Show me how you know, then try one more.",
+    familySteps: [
+      `Practice the target skill for 5 to 10 minutes: ${target}`,
+      words.length ? `Use these lesson examples if helpful: ${words.slice(0, 5).join(", ")}.` : "Use one example from class and one fresh example.",
+      "Have your child explain how they know before moving on.",
+    ],
+    guidedPractice: sourceFeatures.hasReader || sourceFeatures.hasCards
+      ? `Use the lesson cards, reader, or word work from ${lessonLabel}. Model one example, practice two together, then have scholars read, build, or write one matching example.`
+      : `Use ${lessonLabel} to model one lesson example, practice two guided examples, then have scholars try one matching example independently.`,
+    independentPractice: "Scholars complete one matching lesson task independently, then read or explain the answer back to the teacher.",
+    materials,
+    model: `Model the exact target from ${lessonLabel}. Say the thinking out loud, show the response, then have scholars echo the key step.`,
+    notes,
+    summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+    target,
+    words,
+  };
+}
+
+function smallGroupTeacherPlanRowsFromAnalysis(analysis: SmallGroupLessonAnalysis) {
+  return [
+    ["1-2 min", "Name the Need", analysis.summary],
+    ["3 min", "Teacher Model", analysis.model],
+    ["5 min", "Guided Lesson Practice", analysis.guidedPractice],
+    ["4 min", "Independent Evidence", analysis.independentPractice],
+    ["1-2 min", "Record Next Step", analysis.dataCheckItems.join(" ")],
+  ];
+}
+
 function smallGroupTeacherPlanRows(
   candidate: CurriculumNeedCandidate,
   recommendation: CurriculumRecommendation | undefined,
@@ -3014,11 +3338,8 @@ function smallGroupTeacherPlanRows(
   sourceText: string,
 ) {
   const target = smallGroupTeachingTarget(candidate, subject);
-  const sourceNotes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation);
   const lessonTitle = recommendation?.lessonTitle || "the connected lesson";
-  const sourcePractice = sourceNotes[0]
-    ? `Use this lesson source moment: ${sourceNotes[0]}`
-    : smallGroupGuidedPracticeStep(candidate, recommendation, subject);
+  const sourcePractice = smallGroupAnalyzedSourcePractice(candidate, recommendation, subject, sourceText);
 
   if (subject === "math") {
     return [
@@ -3070,6 +3391,71 @@ function smallGroupGuidedPracticeStep(
   }
 
   return `Use ${lessonTitle} as the connected classroom lesson. Revisit a short text/detail, model one response, then have scholars answer with a complete sentence.`;
+}
+
+function smallGroupSourceFeatures(sourceText: string) {
+  const lowerSource = sourceText.toLowerCase();
+
+  return {
+    hasBlendSegment: /blend|segment|phoneme|sound/.test(lowerSource),
+    hasCards: /card|pocket chart|letter/.test(lowerSource),
+    hasPictureWork: /picture|image|illustration/.test(lowerSource),
+    hasReader: /reader|decodable|story|sentence/.test(lowerSource),
+    hasWriting: /write|copy|trace|worksheet|recording page|pencil/.test(lowerSource),
+  };
+}
+
+function smallGroupAnalyzedSourcePractice(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  sourceText: string,
+) {
+  const hasUsableSource = isReadableLessonSourceText(sourceText, 8, 40);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const lessonTitle = recommendation?.lessonTitle || "the uploaded lesson";
+
+  if (!hasUsableSource) {
+    return smallGroupGuidedPracticeStep(candidate, recommendation, subject);
+  }
+
+  const features = smallGroupSourceFeatures(sourceText);
+
+  if (subject === "skills" && letterNeed) {
+    const sourceActivity = [
+      features.hasCards ? `use the lesson letter/word cards to find lowercase ${letterNeed}` : `show lowercase ${letterNeed} beside 3 known letters`,
+      features.hasBlendSegment ? `say the sound and blend or segment one short lesson word with ${letterNeed}` : `say the letter name/sound and read it in one short word`,
+      features.hasWriting ? `write ${letterNeed} and one lesson word on whiteboards` : `trace ${letterNeed} in the air, then point to it again`,
+    ].join("; ");
+
+    return `Use the uploaded ${lessonTitle} routine as the source: ${sourceActivity}. Keep the practice focused on the small-group need instead of rereading the whole lesson.`;
+  }
+
+  if (subject === "skills") {
+    return `Use the uploaded ${lessonTitle} routine to model the target, practice two lesson examples together, then have scholars read, build, or write one matching example independently.`;
+  }
+
+  if (subject === "math") {
+    return `Use the uploaded ${lessonTitle} routine to model one lesson problem with objects or drawings, solve one together, then have scholars try one parallel problem and explain their thinking.`;
+  }
+
+  return `Use the uploaded ${lessonTitle} routine to revisit one important text moment, model a complete response, then have scholars practice with one lesson detail or vocabulary word.`;
+}
+
+function smallGroupUploadedLessonSummary(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  sourceText: string,
+) {
+  if (!isReadableLessonSourceText(sourceText, 8, 40)) {
+    return "";
+  }
+
+  const target = smallGroupTeachingTarget(candidate, subject);
+  const lessonTitle = recommendation?.lessonTitle || "the selected lesson";
+
+  return `Uploaded source analyzed: this plan uses ${lessonTitle} as the classroom routine and narrows it to this target: ${target}`;
 }
 
 function smallGroupFamilyPractice(
@@ -3455,6 +3841,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     useState<ProgressSubmission[]>([]);
   const [preassessmentControls, setPreassessmentControls] =
     useState<PreassessmentControl[]>([]);
+  const [qpsPrintEndDate, setQpsPrintEndDate] = useState(() => qpsCurrentWeekRange().end);
+  const [qpsPrintStartDate, setQpsPrintStartDate] = useState(() => qpsCurrentWeekRange().start);
+  const [qpsShowCurrentWeekOnly, setQpsShowCurrentWeekOnly] = useState(true);
   const [results, setResults] = useState<ResultSubmission[]>([]);
   const [scholarFilter, setScholarFilter] = useState("all");
   const [scholars, setScholars] = useState<Scholar[]>([]);
@@ -4303,8 +4692,18 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         result.gameId === QPS_SCREENER_GAME_ID
         && matchResult(result, reportScholars).scholar,
       )
-      .slice(0, 12);
+      .sort((a, b) =>
+        (formatDate(b.completedAt)?.getTime() ?? 0) - (formatDate(a.completedAt)?.getTime() ?? 0),
+      );
   }, [results, reportScholars]);
+  const currentWeekQpsRange = qpsCurrentWeekRange();
+  const qpsPanelResults = (qpsShowCurrentWeekOnly
+    ? qpsResults.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end))
+    : qpsResults
+  ).slice(0, 5);
+  const qpsPanelTotalCount = qpsShowCurrentWeekOnly
+    ? qpsResults.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end)).length
+    : qpsResults.length;
   const curriculumNeedCandidates = useMemo(() => {
     const candidates = new Map<string, CurriculumNeedCandidate>();
 
@@ -4529,7 +4928,46 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     });
   };
 
+  const analyzeSmallGroupLessonSource = (
+    candidate: CurriculumNeedCandidate,
+    recommendation: CurriculumRecommendation,
+    sourceTextOverride?: string,
+    fileNameOverride?: string,
+  ) => {
+    const currentSource = smallGroupLessonSources[recommendation.id] ?? { fileName: "", text: "" };
+    const text = (sourceTextOverride ?? currentSource.text).trim();
+    const fileName = fileNameOverride ?? currentSource.fileName;
+
+    if (!isReadableLessonSourceText(text, 8, 40)) {
+      updateSmallGroupLessonSource(recommendation.id, {
+        analysis: undefined,
+        analysisStatus: "needs-text",
+        fileName,
+        text,
+      });
+      setStatus("The uploaded source was attached, but it needs readable lesson text before it can make a stronger plan.");
+      return null;
+    }
+
+    const analysis = buildSmallGroupLessonAnalysis(
+      candidate,
+      recommendation,
+      curriculumRecommendationSubject,
+      text,
+    );
+
+    updateSmallGroupLessonSource(recommendation.id, {
+      analysis,
+      analysisStatus: "ready",
+      fileName,
+      text,
+    });
+    setStatus(`Analyzed ${fileName || recommendation.lessonTitle}. Teacher and family print plans will use the lesson routine.`);
+    return analysis;
+  };
+
   const attachSmallGroupLessonSourceFile = async (
+    candidate: CurriculumNeedCandidate,
     recommendation: CurriculumRecommendation,
     file: File | null,
   ) => {
@@ -4538,6 +4976,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     }
 
     updateSmallGroupLessonSource(recommendation.id, {
+      analysis: undefined,
+      analysisStatus: "none",
       fileName: file.name,
     });
 
@@ -4546,19 +4986,28 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
       if (text) {
         updateSmallGroupLessonSource(recommendation.id, {
+          analysis: undefined,
+          analysisStatus: "none",
           fileName: file.name,
           text,
         });
-        setStatus(`Read ${file.name}. Teacher and family print plans will use this lesson source.`);
+        analyzeSmallGroupLessonSource(candidate, recommendation, text, file.name);
         return;
       }
 
       updateSmallGroupLessonSource(recommendation.id, {
+        analysis: undefined,
+        analysisStatus: "needs-text",
         fileName: file.name,
         text: "",
       });
       setStatus(`Attached ${file.name}, but the text could not be read automatically. Try a text-based PDF or paste the lesson notes in the source box.`);
     } catch {
+      updateSmallGroupLessonSource(recommendation.id, {
+        analysis: undefined,
+        analysisStatus: "needs-text",
+        fileName: file.name,
+      });
       setStatus(`Attached ${file.name}, but the text could not be read automatically. Try a text-based PDF or paste the lesson notes in the source box.`);
     }
   };
@@ -4919,9 +5368,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
   const printQpsSummaryReport = () => {
     const reportWindow = window.open("", "_blank");
-    const qpsResultsForPrint = qpsResults.slice().sort((a, b) =>
-      (formatDate(b.completedAt)?.getTime() ?? 0) - (formatDate(a.completedAt)?.getTime() ?? 0),
+    const qpsResultsForPrint = qpsResults.filter((result) =>
+      resultIsWithinDateInputs(result, qpsPrintStartDate, qpsPrintEndDate),
     );
+    const rangeLabel = qpsDateRangeLabel(qpsPrintStartDate, qpsPrintEndDate);
     const rowsHtml = qpsResultsForPrint.map((result) => {
       const match = matchResult(result, reportScholars);
       const completedAt = formatDate(result.completedAt);
@@ -4932,9 +5382,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           <td>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")}</td>
           <td>${result.score}/${result.totalQuestions} (${resultPercent}%)</td>
           <td>${result.missedCount}</td>
-          <td>${escapeReportHtml(result.missedQuestions.slice(0, 8).map((missed) =>
-            `${missed.word || missed.correctAnswer || missed.category}: ${missed.incorrectSelections?.join(", ") || "needs review"}`
-          ).join("; "))}</td>
+          <td>${escapeReportHtml(result.missedQuestions.slice(0, 8).map((missed, index) => {
+            const note = missedQuestionNote(result, missed, index);
+            return `${missed.word || missed.correctAnswer || missed.category}: ${missed.incorrectSelections?.join(", ") || "needs review"}${note ? ` (Note: ${note})` : ""}`;
+          }).join("; "))}</td>
         </tr>
       `;
     }).join("");
@@ -4954,13 +5405,17 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         `;
       }).join("");
       const needsHtml = result.missedQuestions.length
-        ? `<ul>${result.missedQuestions.map((missed, index) => `
+        ? `<ul>${result.missedQuestions.map((missed, index) => {
+            const note = missedQuestionNote(result, missed, index);
+            return `
             <li>
               <strong>${escapeReportHtml(missed.levelName || missed.category || `Item ${missed.questionIndex ?? index + 1}`)}</strong>:
               ${escapeReportHtml(missed.word || missed.correctAnswer || "QPS item")}
               <span>said ${escapeReportHtml(missed.incorrectSelections?.join(", ") || "needs review")}</span>
+              ${note ? `<em>Note: ${escapeReportHtml(note)}</em>` : ""}
             </li>
-          `).join("")}</ul>`
+          `;
+          }).join("")}</ul>`
         : `<p class="empty-note">No missed QPS items recorded.</p>`;
 
       return `
@@ -5023,14 +5478,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         <main class="report">
         <header class="report-header">
           <h1>QPS Screener Results</h1>
-          <p>${escapeReportHtml(new Date().toLocaleDateString())} - ${qpsResultsForPrint.length} saved session${qpsResultsForPrint.length === 1 ? "" : "s"}</p>
+          <p>${escapeReportHtml(rangeLabel)} - Printed ${escapeReportHtml(new Date().toLocaleDateString())} - ${qpsResultsForPrint.length} saved session${qpsResultsForPrint.length === 1 ? "" : "s"}</p>
         </header>
         <h2>Class Summary</h2>
         <table>
           <thead>
             <tr><th>Scholar</th><th>Date</th><th>Score</th><th>Needs</th><th>Notes</th></tr>
           </thead>
-          <tbody>${rowsHtml || `<tr><td colspan="5">No QPS sessions saved yet.</td></tr>`}</tbody>
+          <tbody>${rowsHtml || `<tr><td colspan="5">No QPS sessions saved for this date range.</td></tr>`}</tbody>
         </table>
         ${detailCardsHtml || ""}
         </main>
@@ -5480,7 +5935,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           .map((progress) => {
             const updatedAt = formatDate(progress.updatedAt);
             const practiceHtml = progress.missedQuestions.length
-              ? `<strong>Needs practice so far</strong><ul>${progress.missedQuestions.map((missed, index) => `<li>${escapeReportHtml(formatMissedContext(missed))}${escapeReportHtml(formatMissedText(missed.word || `Question ${missed.questionIndex ?? index + 1}`, missed.incorrectSelections?.join(", "), missed.correctAnswer))}</li>`).join("")}</ul>`
+              ? `<strong>Needs practice so far</strong><ul>${progress.missedQuestions.map((missed, index) => {
+                const note = missedQuestionNote(progress, missed, index);
+                return `<li>${escapeReportHtml(formatMissedContext(missed))}${escapeReportHtml(formatMissedText(missed.word || `Question ${missed.questionIndex ?? index + 1}`, missed.incorrectSelections?.join(", "), missed.correctAnswer))}${note ? `<br><em>Note: ${escapeReportHtml(note)}</em>` : ""}</li>`;
+              }).join("")}</ul>`
               : "No missed questions recorded so far.";
             return `
               <li>
@@ -5502,8 +5960,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             const completedAt = formatDate(result.completedAt);
             const missedHtml = result.missedQuestions.length
               ? result.missedQuestions
-                  .map(
-                    (missed, index) => `
+                  .map((missed, index) => {
+                    const note = missedQuestionNote(result, missed, index);
+                    return `
                       <li>
                         ${escapeReportHtml(formatMissedContext(missed))}
                         ${escapeReportHtml(
@@ -5513,9 +5972,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                             missed.correctAnswer,
                           ),
                         )}
+                        ${note ? `<br><em>Note: ${escapeReportHtml(note)}</em>` : ""}
                       </li>
-                    `,
-                  )
+                    `;
+                  })
                   .join("")
               : "<li>No missed questions recorded.</li>";
 
@@ -5597,12 +6057,25 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const reportWindow = window.open("", "_blank");
     const sourceText = lessonSource?.text.trim() ?? "";
     const sourceTitle = lessonSource?.fileName.trim() ?? "";
+    const sourceAnalysis = lessonSource?.analysis;
     const bestLesson = recommendations[0];
     const objective = smallGroupPlanObjective(candidate, bestLesson, curriculumRecommendationSubject);
-    const materials = smallGroupMaterials(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
-    const planRows = smallGroupTeacherPlanRows(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
-    const dataCheckItems = smallGroupDataCheckItems(candidate, curriculumRecommendationSubject);
-    const sourceNotes = sourceText ? relevantSmallGroupSourceNotes(sourceText, candidate, bestLesson) : [];
+    const materials = sourceAnalysis?.materials ?? smallGroupMaterials(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
+    const planRows = sourceAnalysis
+      ? smallGroupTeacherPlanRowsFromAnalysis(sourceAnalysis)
+      : smallGroupTeacherPlanRows(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
+    const dataCheckItems = sourceAnalysis?.dataCheckItems ?? smallGroupDataCheckItems(candidate, curriculumRecommendationSubject);
+    const sourceSummary = sourceAnalysis?.summary || (sourceText
+      ? smallGroupUploadedLessonSummary(candidate, bestLesson, curriculumRecommendationSubject, sourceText)
+      : "");
+    const analyzedNotes = sourceAnalysis?.notes?.length
+      ? `
+        <section class="box">
+          <h2>Lesson Source Highlights</h2>
+          <ul>${sourceAnalysis.notes.map((note) => `<li>${escapeReportHtml(note)}</li>`).join("")}</ul>
+        </section>
+      `
+      : "";
     const scholarItems = candidate.scholars.length
       ? candidate.scholars.map((scholar) => `<li>${escapeReportHtml(scholar)}</li>`).join("")
       : "<li>No roster names were attached to this need yet.</li>";
@@ -5663,6 +6136,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               <p>${escapeReportHtml(objective)}</p>
             </section>
             ${connectedLessonHtml}
+            ${sourceSummary ? `
+              <section class="box">
+                <h2>Uploaded Lesson Alignment</h2>
+                <p>${escapeReportHtml(sourceSummary)}</p>
+              </section>
+            ` : ""}
+            ${analyzedNotes}
             <h2>Materials</h2>
             <ul>${materials.map((material) => `<li>${escapeReportHtml(material)}</li>`).join("")}</ul>
             <h2>Teach It</h2>
@@ -5682,10 +6162,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             </table>
             <h2>Quick Data Check</h2>
             <ul class="checklist">${dataCheckItems.map((item) => `<li>${escapeReportHtml(item)}</li>`).join("")}</ul>
-            ${sourceNotes.length ? `
-              <h2>Lesson Source Notes</h2>
-              <ul>${sourceNotes.map((note) => `<li>${escapeReportHtml(note)}</li>`).join("")}</ul>
-            ` : ""}
             ${sourceText && sourceTitle ? `<p class="meta">Source used: ${escapeReportHtml(sourceTitle)}</p>` : ""}
           </main>
         </div>
@@ -5705,8 +6181,18 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const reportWindow = window.open("", "_blank");
     const bestLesson = recommendations[0];
     const sourceText = lessonSource?.text.trim() ?? "";
-    const practice = smallGroupFamilyPractice(candidate, bestLesson, curriculumRecommendationSubject);
-    const sourceNotes = sourceText ? relevantSmallGroupSourceNotes(sourceText, candidate, bestLesson).slice(0, 2) : [];
+    const sourceAnalysis = lessonSource?.analysis;
+    const practice = sourceAnalysis
+      ? {
+        focus: sourceAnalysis.target,
+        lookFor: sourceAnalysis.familyLookFor,
+        prompt: sourceAnalysis.familyPrompt,
+        steps: sourceAnalysis.familySteps,
+      }
+      : smallGroupFamilyPractice(candidate, bestLesson, curriculumRecommendationSubject);
+    const sourceSummary = sourceAnalysis?.summary || (sourceText
+      ? smallGroupUploadedLessonSummary(candidate, bestLesson, curriculumRecommendationSubject, sourceText)
+      : "");
 
     if (!reportWindow) {
       window.print();
@@ -5758,10 +6244,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             <p class="prompt">${escapeReportHtml(practice.prompt)}</p>
           </section>
 
-          ${sourceNotes.length ? `
+          ${sourceSummary ? `
             <section>
               <h2>Classroom Connection</h2>
-              <ul>${sourceNotes.map((note) => `<li>${escapeReportHtml(note)}</li>`).join("")}</ul>
+              <p>${escapeReportHtml(sourceSummary.replace(/^Uploaded source analyzed[:.]?\s*/i, ""))}</p>
             </section>
           ` : ""}
 
@@ -6153,51 +6639,66 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </article>
                 </div>
 
-                <div className="dashboard-sort-row">
-                  <label>
-                    Sort student tiles
-                    <select
-                      onChange={(event) => setDashboardFocus(event.target.value as DashboardFocus)}
-                      value={dashboardFocus}
-                    >
-                      <option value="mostWrong">Most wrong answers</option>
-                      <option value="repeatMisses">Same question missed repeatedly</option>
-                      <option value="unfinished">Unfinished or skipped</option>
-                      <option value="name">Name</option>
-                    </select>
-                  </label>
-                </div>
+                <details className="dashboard-collapsible-section">
+                  <summary>
+                    <span>
+                      <strong>Scholar Activity Cards</strong>
+                      <em>Open when you want to review individual work from these filters.</em>
+                    </span>
+                    <span>{dashboardStudentSummaries.length} scholar{dashboardStudentSummaries.length === 1 ? "" : "s"}</span>
+                  </summary>
+                  <div className="dashboard-sort-row">
+                    <label>
+                      Sort student tiles
+                      <select
+                        onChange={(event) => setDashboardFocus(event.target.value as DashboardFocus)}
+                        value={dashboardFocus}
+                      >
+                        <option value="mostWrong">Most wrong answers</option>
+                        <option value="repeatMisses">Same question missed repeatedly</option>
+                        <option value="unfinished">Unfinished or skipped</option>
+                        <option value="name">Name</option>
+                      </select>
+                    </label>
+                  </div>
 
-                <div className="student-struggle-grid">
-                  {dashboardStudentSummaries.map((summary) => (
-                    <button
-                      className={`student-struggle-tile ${summary.repeatWrongCount >= 3 || summary.unfinishedCount ? "needs-attention" : ""}`}
-                      disabled={!summary.scholarId}
-                      key={summary.id}
-                      onClick={() => {
-                        if (summary.scholarId) {
-                          setSelectedScholarId(summary.scholarId);
-                        }
-                      }}
-                      type="button"
-                    >
-                      <span className={`match-pill ${summary.tone}`}>{summary.tone === "matched" ? "Student match" : summary.label}</span>
-                      <strong>{summary.label}</strong>
-                      <span>{summary.wrongCount} wrong</span>
-                      {summary.repeatWrongCount >= 3 ? (
-                        <em>Same question missed {summary.repeatWrongCount} times</em>
-                      ) : summary.unfinishedCount ? (
-                        <em>{summary.unfinishedCount} unfinished or skipped</em>
-                      ) : (
-                        <em>{summary.sessions} session{summary.sessions === 1 ? "" : "s"}</em>
-                      )}
-                      <small>{summary.topIssue}</small>
-                    </button>
-                  ))}
-                </div>
+                  <div className="student-struggle-grid">
+                    {dashboardStudentSummaries.map((summary) => (
+                      <button
+                        className={`student-struggle-tile ${summary.repeatWrongCount >= 3 || summary.unfinishedCount ? "needs-attention" : ""}`}
+                        disabled={!summary.scholarId}
+                        key={summary.id}
+                        onClick={() => {
+                          if (summary.scholarId) {
+                            setSelectedScholarId(summary.scholarId);
+                          }
+                        }}
+                        type="button"
+                      >
+                        <span className={`match-pill ${summary.tone}`}>{summary.tone === "matched" ? "Student match" : summary.label}</span>
+                        <strong>{summary.label}</strong>
+                        <span>{summary.wrongCount} wrong</span>
+                        {summary.repeatWrongCount >= 3 ? (
+                          <em>Same question missed {summary.repeatWrongCount} times</em>
+                        ) : summary.unfinishedCount ? (
+                          <em>{summary.unfinishedCount} unfinished or skipped</em>
+                        ) : (
+                          <em>{summary.sessions} session{summary.sessions === 1 ? "" : "s"}</em>
+                        )}
+                        <small>{summary.topIssue}</small>
+                      </button>
+                    ))}
+                  </div>
+                </details>
 
-                <div className="struggle-board">
-                  <h4>Small-Group Needs</h4>
+                <details className="dashboard-collapsible-section struggle-board">
+                  <summary>
+                    <span>
+                      <strong>Small-Group Needs</strong>
+                      <em>Open to find lessons and make group plans.</em>
+                    </span>
+                    <span>{curriculumNeedCandidates.length} need{curriculumNeedCandidates.length === 1 ? "" : "s"}</span>
+                  </summary>
                   {curriculumNeedCandidates.length ? (
                     <div className="small-group-need-grid">
                       {curriculumNeedCandidates.slice(0, 6).map((candidate) => (
@@ -6218,7 +6719,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   ) : (
                     <p className="empty-results-message">No chart or game needs were recorded for this view.</p>
                   )}
-                </div>
+                </details>
 
                 {selectedSmallGroupNeed ? (
                   <div className="small-group-popup-backdrop" role="presentation">
@@ -6313,6 +6814,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                       accept=".txt,.md,.csv,.pdf,application/pdf,text/*"
                                       onChange={(event) => {
                                         void attachSmallGroupLessonSourceFile(
+                                          selectedSmallGroupNeed,
                                           recommendation,
                                           event.currentTarget.files?.[0] ?? null,
                                         );
@@ -6321,12 +6823,31 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                       type="file"
                                     />
                                   </label>
+                                  <button
+                                    className="teacher-text-button"
+                                    disabled={!lessonSource.text.trim()}
+                                    onClick={() => analyzeSmallGroupLessonSource(selectedSmallGroupNeed, recommendation)}
+                                    type="button"
+                                  >
+                                    Analyze Source
+                                  </button>
                                 </div>
                                 {lessonSource.fileName || lessonSource.text ? (
                                   <div className="small-group-source-box">
                                     {lessonSource.fileName ? <small>Source: {lessonSource.fileName}</small> : null}
+                                    {lessonSource.analysisStatus === "ready" ? (
+                                      <small className="source-analysis-status ready">Analyzed source will shape the teacher and family print plans.</small>
+                                    ) : lessonSource.analysisStatus === "needs-text" ? (
+                                      <small className="source-analysis-status warning">Readable lesson text is needed before this can make a stronger plan.</small>
+                                    ) : (
+                                      <small className="source-analysis-status">Click Analyze Source after uploading or editing source text.</small>
+                                    )}
                                     <textarea
-                                      onChange={(event) => updateSmallGroupLessonSource(recommendation.id, { text: event.target.value })}
+                                      onChange={(event) => updateSmallGroupLessonSource(recommendation.id, {
+                                        analysis: undefined,
+                                        analysisStatus: "none",
+                                        text: event.target.value,
+                                      })}
                                       placeholder="Lesson source text will appear here when the upload can be read. You can edit it before printing."
                                       rows={4}
                                       value={lessonSource.text}
@@ -6410,7 +6931,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   <div>
                     <p className="eyebrow">QPS</p>
                     <h4>Quick Phonics Screener</h4>
-                    <p className="pin-helper">Teacher-run QPS sessions save as Skills evidence and show a QPS marker on the chart.</p>
+                    <p className="pin-helper">
+                      Teacher-run QPS sessions save as Skills evidence and stay in the history. This box only shows a small recent view.
+                    </p>
                   </div>
                   <div className="small-group-popup-actions">
                     <a className="teacher-control-button secondary" href="/games/skills/qps-screener">
@@ -6421,8 +6944,58 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     </button>
                   </div>
                 </div>
+                <div className="qps-report-controls">
+                  <label className="qps-compact-toggle">
+                    <input
+                      checked={qpsShowCurrentWeekOnly}
+                      onChange={(event) => setQpsShowCurrentWeekOnly(event.target.checked)}
+                      type="checkbox"
+                    />
+                    Show current week only
+                  </label>
+                  <label>
+                    Print from
+                    <input
+                      onChange={(event) => setQpsPrintStartDate(event.target.value)}
+                      type="date"
+                      value={qpsPrintStartDate}
+                    />
+                  </label>
+                  <label>
+                    Print to
+                    <input
+                      onChange={(event) => setQpsPrintEndDate(event.target.value)}
+                      type="date"
+                      value={qpsPrintEndDate}
+                    />
+                  </label>
+                  <button
+                    className="teacher-text-button"
+                    onClick={() => {
+                      const range = qpsCurrentWeekRange();
+                      setQpsPrintStartDate(range.start);
+                      setQpsPrintEndDate(range.end);
+                    }}
+                    type="button"
+                  >
+                    This Week
+                  </button>
+                  <button
+                    className="teacher-text-button"
+                    onClick={() => {
+                      setQpsPrintStartDate("");
+                      setQpsPrintEndDate("");
+                    }}
+                    type="button"
+                  >
+                    All Dates
+                  </button>
+                </div>
+                <p className="pin-helper">
+                  Showing {qpsPanelResults.length} of {qpsPanelTotalCount} {qpsShowCurrentWeekOnly ? "current-week" : "saved"} QPS session{qpsPanelTotalCount === 1 ? "" : "s"}.
+                </p>
                 <div className="qps-report-list">
-                  {qpsResults.length ? qpsResults.slice(0, 5).map((result) => {
+                  {qpsPanelResults.length ? qpsPanelResults.map((result) => {
                     const match = matchResult(result, reportScholars);
                     const completedAt = formatDate(result.completedAt);
                     return (
@@ -6434,7 +7007,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       </article>
                     );
                   }) : (
-                    <p className="empty-results-message">No QPS sessions saved yet.</p>
+                    <p className="empty-results-message">
+                      {qpsResults.length ? "No QPS sessions saved for this week." : "No QPS sessions saved yet."}
+                    </p>
                   )}
                 </div>
               </section>
@@ -7008,8 +7583,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                             <strong>Needs practice so far</strong>
                             {progress.missedQuestions.map((missed, index) => (
                               <p key={`${progress.id}-progress-miss-${index}`}>
-                                {formatMissedContext(missed)}
-                                {formatMissedText(missed.word || `Question ${missed.questionIndex ?? index + 1}`, missed.incorrectSelections?.join(", "), missed.correctAnswer)}
+                                <span>
+                                  {formatMissedContext(missed)}
+                                  {formatMissedText(missed.word || `Question ${missed.questionIndex ?? index + 1}`, missed.incorrectSelections?.join(", "), missed.correctAnswer)}
+                                </span>
+                                {missedQuestionNote(progress, missed, index) ? (
+                                  <em className="missed-note">Note: {missedQuestionNote(progress, missed, index)}</em>
+                                ) : null}
                               </p>
                             ))}
                           </div>
@@ -7045,8 +7625,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     <p>{`${completedAt ? completedAt.toLocaleString() : "Date pending"}${location ? ` - ${location}` : ""}`}</p>
                     {isWholeClassMiss ? (
                       <p>
-                        {formatMissedContext(firstMiss)}
-                        {formatMissedText(result.word, result.incorrectSelection, result.correctAnswer)}
+                        <span>
+                          {formatMissedContext(firstMiss)}
+                          {formatMissedText(result.word, result.incorrectSelection, result.correctAnswer)}
+                        </span>
+                        {firstMiss && missedQuestionNote(result, firstMiss, 0) ? (
+                          <em className="missed-note">Note: {missedQuestionNote(result, firstMiss, 0)}</em>
+                        ) : null}
                       </p>
                     ) : (
                       <>
@@ -7061,8 +7646,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                             <strong>Missed</strong>
                             {result.missedQuestions.map((missed, index) => (
                               <p key={`${result.id}-detail-${index}`}>
-                                {formatMissedContext(missed)}
-                                {formatMissedText(missed.word || `Question ${missed.questionIndex ?? index + 1}`, missed.incorrectSelections?.join(", "), missed.correctAnswer)}
+                                <span>
+                                  {formatMissedContext(missed)}
+                                  {formatMissedText(missed.word || `Question ${missed.questionIndex ?? index + 1}`, missed.incorrectSelections?.join(", "), missed.correctAnswer)}
+                                </span>
+                                {missedQuestionNote(result, missed, index) ? (
+                                  <em className="missed-note">Note: {missedQuestionNote(result, missed, index)}</em>
+                                ) : null}
                               </p>
                             ))}
                           </div>
