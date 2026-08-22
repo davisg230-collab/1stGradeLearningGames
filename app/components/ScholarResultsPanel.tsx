@@ -384,10 +384,359 @@ const LETTER_SEARCH_SAFARI_GAME_ID = "letter-search-safari";
 const NUMBER_SEARCH_SAFARI_GAME_ID = "number-search-safari";
 const QPS_SCREENER_GAME_ID = "qps-screener";
 const HUB_CLASS_URL = "https://first-grade-news-hub-mrdavis.web.app/";
-const HUB_CURRICULUM_RECOMMENDATION_URL =
-  "https://us-central1-first-grade-news-hub.cloudfunctions.net/recommendCurriculumLessons";
+
 const HUB_TEACHER_WORKSPACE_SAVE_URL =
   "https://us-central1-first-grade-news-hub.cloudfunctions.net/saveTeacherWorkspaceResource";
+const UFLI_TOOLBOX_BASE_URL = "https://ufli.education.ufl.edu/foundations/toolbox";
+const UFLI_FOUNDATIONS_ROUTINE =
+  "Use the UFLI Foundations routine: phonemic awareness, visual drill, auditory drill, blending drill, new concept, word work, irregular words, and connected text.";
+const UFLI_INTERVENTION_LESSON_ROWS = `
+1|Alphabet Unit|a /short a/
+2|Alphabet Unit|m /m/
+3|Alphabet Unit|s /s/
+4|Alphabet Unit|t /t/
+5|Alphabet Unit|VC/CVC
+6|Alphabet Unit|p /p/
+7|Alphabet Unit|f /f/
+8|Alphabet Unit|i /short i/
+9|Alphabet Unit|n /n/
+10|Alphabet Unit|CVC Practice (a, i)
+11|Alphabet Unit|Nasalized A (an, am)
+12|Alphabet Unit|o /short o/
+13|Alphabet Unit|d /d/
+14|Alphabet Unit|c /k/
+15|Alphabet Unit|u /short u/
+16|Alphabet Unit|g /g/
+17|Alphabet Unit|b /b/
+18|Alphabet Unit|e /short e/
+19|Alphabet Unit|Short Vowel Review (all)
+20|Alphabet Unit|-s /s/
+21|Alphabet Unit|s /z/
+22|Alphabet Unit|k /k/
+23|Alphabet Unit|h /h/
+24|Alphabet Unit|r /r/ Part 1
+25|Alphabet Unit|r /r/ Part 2
+26|Alphabet Unit|l /l/ Part 1
+27|Alphabet Unit|l /l/ Part 2
+28|Alphabet Unit|w /w/
+29|Alphabet Unit|j /j/
+30|Alphabet Unit|y /y/
+31|Alphabet Unit|x /ks/
+32|Alphabet Unit|qu /kw/
+33|Alphabet Unit|v /v/
+34|Alphabet Unit|z /z/
+35a|Alphabet Review and Longer Words Unit|Short A Review
+35b|Alphabet Review and Longer Words Unit|Nasalized A Review (an, am)
+35c|Alphabet Review and Longer Words Unit|Short A Advanced Review
+36a|Alphabet Review and Longer Words Unit|Short I Review
+36b|Alphabet Review and Longer Words Unit|Short I Advanced Review
+37a|Alphabet Review and Longer Words Unit|Short O Review
+37b|Alphabet Review and Longer Words Unit|Short O Advanced Review
+38a|Alphabet Review and Longer Words Unit|Short A, I, O Review
+38b|Alphabet Review and Longer Words Unit|Short A, I, O Advanced Review
+39a|Alphabet Review and Longer Words Unit|Short U Review
+39b|Alphabet Review and Longer Words Unit|Short U Advanced Review
+40a|Alphabet Review and Longer Words Unit|Short E Review
+40b|Alphabet Review and Longer Words Unit|Short E Advanced Review
+41a|Alphabet Review and Longer Words Unit|Short Vowel Review (all)
+41b|Alphabet Review and Longer Words Unit|Short Vowel Review (all)
+41c|Alphabet Review and Longer Words Unit|Short Vowel Review (all)
+42|Digraphs Unit|FLSZ Spelling Rule
+43|Digraphs Unit|-all, -oll, -ull
+44|Digraphs Unit|ck /k/
+45|Digraphs Unit|sh /sh/
+46|Digraphs Unit|th /th/ voiced
+47|Digraphs Unit|th /th/ unvoiced
+48|Digraphs Unit|ch /ch/
+49|Digraphs Unit|Digraphs Review 1
+50|Digraphs Unit|wh /w/, ph /f/
+51|Digraphs Unit|ng /ng/
+52|Digraphs Unit|nk /ngk/
+53|Digraphs Unit|Digraphs Review 2
+54|VCe Unit|a_e /long a/
+55|VCe Unit|i_e /long i/
+56|VCe Unit|o_e /long o/
+57|VCe Unit|VCe review 1; e_e /long e/
+58|VCe Unit|u_e /long u/
+59|VCe Unit|VCe review 2
+60|VCe Unit|_ce /s/
+61|VCe Unit|_ge /j/
+62|VCe Unit|VCe review 3; Exceptions
+63|Reading Longer Words Unit|-es
+64|Reading Longer Words Unit|-ed
+65|Reading Longer Words Unit|-ing
+66|Reading Longer Words Unit|Syllables
+67a|Reading Longer Words Unit|Compound Words
+67b|Reading Longer Words Unit|Closed/Closed
+68|Reading Longer Words Unit|Open and Closed
+69|Ending Spelling Patterns Unit|tch /ch/
+70|Ending Spelling Patterns Unit|dge /j/
+71|Ending Spelling Patterns Unit|tch, dge Review
+72|Ending Spelling Patterns Unit|Long VCC: -ild, -old, -ind, -olt, -ost
+73|Ending Spelling Patterns Unit|y /long i/
+74|Ending Spelling Patterns Unit|y /long e/
+75|Ending Spelling Patterns Unit|-le
+76|Ending Spelling Patterns Unit|Ending Patterns Review
+77|R-Controlled Vowels Unit|ar /ar/
+78|R-Controlled Vowels Unit|or /or/, ore /or/
+79|R-Controlled Vowels Unit|ar, or, ore Review
+80|R-Controlled Vowels Unit|er /er/
+81|R-Controlled Vowels Unit|ir /er/, ur /er/
+82|R-Controlled Vowels Unit|Spelling /er/: er, ir, ur, w + or
+83|R-Controlled Vowels Unit|R-Controlled Vowels Review
+84|Long Vowel Teams Unit|ai /long a/, ay /long a/
+85|Long Vowel Teams Unit|ee /long e/, ea /long e/, ey /long e/
+86|Long Vowel Teams Unit|oa /long o/, ow /long o/, oe /long o/
+87|Long Vowel Teams Unit|ie /long i/, igh /long i/
+88|Long Vowel Teams Unit|Vowel Teams Review 1
+89|Other Vowel Teams Unit|u /oo/, oo /oo/
+90|Other Vowel Teams Unit|oo /long u/
+91|Other Vowel Teams Unit|ew /long u/, ui /long u/, ue /long u/
+92|Other Vowel Teams Unit|Vowel Teams Review 2
+93|Other Vowel Teams Unit|au /aw/, aw /aw/, augh /aw/
+94|Other Vowel Teams Unit|ea /short e/, a /short o/
+95|Diphthongs and Silent Letters Unit|oi /oi/, oy /oi/
+96|Diphthongs and Silent Letters Unit|ou /ow/, ow /ow/
+97|Diphthongs and Silent Letters Unit|Vowel Teams and Diphthongs Review
+98|Diphthongs and Silent Letters Unit|kn /n/, wr /r/, mb /m/
+99|Suffixes and Prefixes Unit|Suffixes; -s/-es
+100|Suffixes and Prefixes Unit|-er, -est
+101|Suffixes and Prefixes Unit|-ly
+102|Suffixes and Prefixes Unit|-less, -ful
+103|Suffixes and Prefixes Unit|Prefixes; un-
+104|Suffixes and Prefixes Unit|pre-, re-
+105|Suffixes and Prefixes Unit|dis-
+106|Suffixes and Prefixes Unit|Affixes Review
+107|Suffix Spelling Changes Unit|Doubling Rule: -ed, -ing
+108|Suffix Spelling Changes Unit|Doubling Rule: -er, -est
+109|Suffix Spelling Changes Unit|Drop E Rule
+110|Suffix Spelling Changes Unit|Y to I Rule
+111|Low Frequency Spelling Unit|ar /er/, or /er/
+112|Low Frequency Spelling Unit|air /air/, are /air/, ear /air/
+113|Low Frequency Spelling Unit|ear /ear/
+114|Low Frequency Spelling Unit|ei /long a/, eigh /long a/, ey /long a/, ea /long a/, aigh /long a/
+115|Low Frequency Spelling Unit|ew /long u/, eu /long u/, ue /long u/, ou /long u/
+116|Low Frequency Spelling Unit|ough /aw/, ough /long o/
+117|Low Frequency Spelling Unit|Signal Vowels: c /s/, g /j/
+118|Low Frequency Spelling Unit|ch /sh/, ch /k/, gn /n/, gh /g/, silent t
+119|Additional Affixes Unit|-sion, -tion
+120|Additional Affixes Unit|-ture
+121|Additional Affixes Unit|-er, -or, -ist
+122|Additional Affixes Unit|-ish
+123|Additional Affixes Unit|-y
+124|Additional Affixes Unit|-ness
+125|Additional Affixes Unit|-ment
+126|Additional Affixes Unit|-able, -ible
+127|Additional Affixes Unit|bi-, tri-, uni-
+128|Additional Affixes Unit|Affixes Review 2
+`;
+type UfliInterventionLesson = {
+  concept: string;
+  lessonNumber: string;
+  sourceText: string;
+  unitName: string;
+  url: string;
+};
+
+const UFLI_INTERVENTION_LESSONS: UfliInterventionLesson[] = UFLI_INTERVENTION_LESSON_ROWS
+  .trim()
+  .split("\n")
+  .map((row) => {
+    const [lessonNumber, unitName, concept] = row.split("|").map((part) => part.trim());
+    const lesson = {
+      concept,
+      lessonNumber,
+      sourceText: "",
+      unitName,
+      url: ufliToolboxUrlForLesson(lessonNumber),
+    };
+
+    return {
+      ...lesson,
+      sourceText: ufliSourceTextForLesson(lesson),
+    };
+  });
+
+function ufliToolboxUrlForLesson(lessonNumber: string) {
+  const numericLesson = Number((lessonNumber.match(/\d+/) ?? ["0"])[0]);
+
+  if (numericLesson <= 34) return `${UFLI_TOOLBOX_BASE_URL}/1-34/`;
+  if (numericLesson <= 41) return `${UFLI_TOOLBOX_BASE_URL}/35-41/`;
+  if (numericLesson <= 53) return `${UFLI_TOOLBOX_BASE_URL}/42-53/`;
+  if (numericLesson <= 62) return `${UFLI_TOOLBOX_BASE_URL}/54-62/`;
+  if (numericLesson <= 68) return `${UFLI_TOOLBOX_BASE_URL}/63-68/`;
+  if (numericLesson <= 76) return `${UFLI_TOOLBOX_BASE_URL}/69-76/`;
+  if (numericLesson <= 83) return `${UFLI_TOOLBOX_BASE_URL}/77-83/`;
+  if (numericLesson <= 88) return `${UFLI_TOOLBOX_BASE_URL}/84-88/`;
+  if (numericLesson <= 94) return `${UFLI_TOOLBOX_BASE_URL}/89-94/`;
+  if (numericLesson <= 98) return `${UFLI_TOOLBOX_BASE_URL}/95-98/`;
+  if (numericLesson <= 106) return `${UFLI_TOOLBOX_BASE_URL}/99-106/`;
+  if (numericLesson <= 110) return `${UFLI_TOOLBOX_BASE_URL}/107-110/`;
+  if (numericLesson <= 118) return `${UFLI_TOOLBOX_BASE_URL}/111-118/`;
+  return `${UFLI_TOOLBOX_BASE_URL}/119-128/`;
+}
+
+function ufliLessonSortValue(lessonNumber: string) {
+  const numericLesson = Number((lessonNumber.match(/\d+/) ?? ["0"])[0]);
+  const suffix = (lessonNumber.match(/[a-z]$/i)?.[0] ?? "").toLowerCase();
+  return numericLesson * 10 + (suffix ? suffix.charCodeAt(0) - 96 : 0);
+}
+
+function ufliSourceTextForLesson(lesson: Omit<UfliInterventionLesson, "sourceText">) {
+  const letterFocus = lesson.concept.match(/^([a-z])\s+\//i)?.[1] ?? "";
+  const letterFocusText = letterFocus
+    ? `Letter focus: letter ${letterFocus}, lowercase ${letterFocus}, uppercase ${letterFocus}, and the sound/spelling in ${lesson.concept}.`
+    : "";
+
+  return cleanSmallGroupSourceText([
+    `UFLI Foundations Lesson ${lesson.lessonNumber}: ${lesson.concept}.`,
+    `Unit: ${lesson.unitName}.`,
+    letterFocusText,
+    UFLI_FOUNDATIONS_ROUTINE,
+    `New concept and word work focus on ${lesson.concept}. Scholars practice accurate decoding, encoding, reading, spelling, and connected text with this target.`,
+    `For a small group, keep the full routine short and narrow the practice to the target need. Use visual drill, auditory drill, blending, word work, and a quick data check.`,
+  ].filter(Boolean).join("\n"));
+}
+
+function ufliConceptSearchText(lesson: UfliInterventionLesson) {
+  return normalizeCurriculumNeedKey(`${lesson.lessonNumber} ${lesson.unitName} ${lesson.concept}`);
+}
+
+function ufliConceptExplicitlyTargetsLetter(lesson: UfliInterventionLesson, letter: string) {
+  const concept = lesson.concept.toLowerCase();
+  const cleanLetter = letter.toLowerCase();
+  const directLetterPattern = new RegExp(`(^|[^a-z])${escapeRegExp(cleanLetter)}\\s*/`, "i");
+  const letterChunkPattern = new RegExp(`(^|[^a-z])${escapeRegExp(cleanLetter)}(?:_|\\b)`, "i");
+
+  return directLetterPattern.test(concept) || letterChunkPattern.test(concept) || (cleanLetter === "q" && /^qu\b/i.test(concept));
+}
+
+function ufliConceptExplicitlyTargetsChunk(lesson: UfliInterventionLesson, chunk: string) {
+  const concept = lesson.concept.toLowerCase();
+  const cleanChunk = chunk.toLowerCase();
+  const chunkPattern = new RegExp(`(^|[^a-z])${escapeRegExp(cleanChunk)}(?:\\b|\\s*/|_)`, "i");
+
+  return chunkPattern.test(concept);
+}
+
+function ufliLessonScoreForCandidate(lesson: UfliInterventionLesson, candidate: CurriculumNeedCandidate) {
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const chunkNeed = smallGroupNeedChunk(candidate);
+  const conceptText = ufliConceptSearchText(lesson);
+  const terms = curriculumCandidateMatchTerms(candidate);
+
+  if (letterNeed) {
+    if (ufliConceptExplicitlyTargetsLetter(lesson, letterNeed)) {
+      return {
+        matchType: "ufli-direct",
+        reason: `UFLI Lesson ${lesson.lessonNumber} directly teaches ${lesson.concept}, matching ${candidate.need}.`,
+        score: 100,
+      };
+    }
+
+    return null;
+  }
+
+  if (chunkNeed) {
+    if (ufliConceptExplicitlyTargetsChunk(lesson, chunkNeed)) {
+      return {
+        matchType: "ufli-direct",
+        reason: `UFLI Lesson ${lesson.lessonNumber} directly teaches ${lesson.concept}, matching ${candidate.need}.`,
+        score: 98,
+      };
+    }
+
+    if (/review/i.test(lesson.concept) && curriculumNeedTermMatches(conceptText, chunkNeed)) {
+      return {
+        matchType: "ufli-review",
+        reason: `UFLI Lesson ${lesson.lessonNumber} is a review lesson that includes ${chunkNeed}.`,
+        score: 72,
+      };
+    }
+
+    return null;
+  }
+
+  const exactTerm = terms.find((term) => term.length > 2 && curriculumNeedTermMatches(conceptText, term));
+  if (exactTerm) {
+    return {
+      matchType: /review/i.test(lesson.concept) ? "ufli-review" : "ufli-related",
+      reason: `UFLI Lesson ${lesson.lessonNumber} connects to ${exactTerm} through ${lesson.concept}.`,
+      score: /review/i.test(lesson.concept) ? 70 : 82,
+    };
+  }
+
+  if (/letter identification|letter sound|letter name|alphabet/i.test(candidate.need)) {
+    return {
+      matchType: "ufli-review",
+      reason: `${lesson.unitName} builds alphabet knowledge and letter-sound automaticity. Open a specific letter need for the tightest match.`,
+      score: 36,
+    };
+  }
+
+  return null;
+}
+
+function ufliRecommendationForLesson(
+  lesson: UfliInterventionLesson,
+  candidate: CurriculumNeedCandidate,
+  scoredMatch: { matchType: string; reason: string; score: number },
+): CurriculumRecommendation {
+  return {
+    id: `ufli-${lesson.lessonNumber}`,
+    iCanStatement: `I can practice ${lesson.concept} in words and connected reading.`,
+    lessonNumber: lesson.lessonNumber,
+    lessonTitle: lesson.concept,
+    matchDetails: [{
+      matchType: scoredMatch.matchType,
+      need: candidate.need,
+      reason: scoredMatch.reason,
+    }],
+    matchedNeeds: [candidate.need],
+    objective: `Use UFLI Foundations Lesson ${lesson.lessonNumber} to strengthen ${lesson.concept} for this small group need.`,
+    parentSummary: `Scholars practice ${lesson.concept} with a short routine for hearing, reading, spelling, and writing the target pattern.`,
+    priorityStandard: "Foundational skills intervention",
+    reason: scoredMatch.reason,
+    score: scoredMatch.score,
+    sourceText: lesson.sourceText,
+    subject: "skills",
+    subjectLabel: "UFLI Foundations",
+    unitOrModule: lesson.unitName,
+    url: lesson.url,
+  };
+}
+
+function findUfliRecommendationsForNeedCandidate(candidate: CurriculumNeedCandidate) {
+  return UFLI_INTERVENTION_LESSONS
+    .map((lesson) => {
+      const scoredMatch = ufliLessonScoreForCandidate(lesson, candidate);
+      return scoredMatch ? {
+        recommendation: ufliRecommendationForLesson(lesson, candidate, scoredMatch),
+        sortValue: ufliLessonSortValue(lesson.lessonNumber),
+      } : null;
+    })
+    .filter((item): item is { recommendation: CurriculumRecommendation; sortValue: number } => Boolean(item))
+    .sort((a, b) => b.recommendation.score - a.recommendation.score || a.sortValue - b.sortValue)
+    .slice(0, 3)
+    .map((item) => item.recommendation);
+}
+
+function findUfliRecommendationsForNeedCandidates(candidates: CurriculumNeedCandidate[]) {
+  const recommendations = new Map<string, CurriculumRecommendation>();
+
+  candidates.forEach((candidate) => {
+    findUfliRecommendationsForNeedCandidate(candidate).forEach((recommendation) => {
+      const existing = recommendations.get(recommendation.id);
+      if (!existing || recommendation.score > existing.score) {
+        recommendations.set(recommendation.id, recommendation);
+      }
+    });
+  });
+
+  return Array.from(recommendations.values())
+    .sort((a, b) => b.score - a.score || ufliLessonSortValue(a.lessonNumber) - ufliLessonSortValue(b.lessonNumber))
+    .slice(0, 12);
+}
 const HUB_FIREBASE_APP_NAME = "first-grade-hub-bridge";
 const HUB_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBVFcyBYlz3DmCkOervIswwjPf6wwFZlhU",
@@ -2808,9 +3157,13 @@ function recommendationsForNeedCandidate(
     return matchingRecommendations.slice(0, 4);
   }
 
-  // A focused search only sends terms for one need. If the Hub returns lessons
-  // but the local matcher is too strict for that wording, show those focused
-  // results instead of making the button appear broken.
+  if (smallGroupSingleLetterNeed(candidate)) {
+    return [];
+  }
+
+  // A focused search only sends terms for one need. If the UFLI bank returns
+  // lessons but the local matcher is too strict for that wording, show those
+  // focused results instead of making the button appear broken.
   return recommendations.slice(0, 4);
 }
 
@@ -2825,6 +3178,7 @@ function recommendationExplicitlyTeachesLetter(
     recommendation.objective,
     recommendation.parentSummary,
     recommendation.priorityStandard,
+    recommendation.sourceText,
   ]
     .map((value) => String(value ?? ""))
     .join(" ")
@@ -2862,6 +3216,9 @@ function curriculumRecommendationMatchLabel(
 ) {
   const detail = curriculumRecommendationDetailsForCandidate(recommendation, candidate)[0];
 
+  if (detail?.matchType === "ufli-direct") return "UFLI direct skill";
+  if (detail?.matchType === "ufli-review") return "UFLI review lesson";
+  if (detail?.matchType === "ufli-related") return "UFLI related lesson";
   if (detail?.matchType === "direct") return "Direct lesson skill";
   if (detail?.matchType === "standard") return "Priority standard match";
   if (detail?.matchType === "lesson") return "Lesson title match";
@@ -2879,7 +3236,7 @@ function curriculumRecommendationReason(
   if (detail?.reason) return detail.reason;
   if (recommendation.reason) return recommendation.reason;
   if (recommendation.matchedNeeds.length) {
-    return `Matched ${recommendation.matchedNeeds.slice(0, 4).join(", ")} in the saved Hub lesson.`;
+    return `Matched ${recommendation.matchedNeeds.slice(0, 4).join(", ")} in the recommended lesson.`;
   }
   return `Suggested for ${candidate.need} based on the current data view.`;
 }
@@ -2894,7 +3251,7 @@ function isStrongSmallGroupLessonMatch(
   const detail = curriculumRecommendationDetailsForCandidate(recommendation, candidate)[0];
   const matchType = detail?.matchType || "";
 
-  if (["direct", "source"].includes(matchType)) return true;
+  if (["ufli-direct", "direct", "source"].includes(matchType)) return true;
   if (index === 0 && ["lesson", "related"].includes(matchType) && recommendation.score >= 48) return true;
 
   return false;
@@ -2936,6 +3293,8 @@ function curriculumRecommendationSearchTerms(candidate: CurriculumNeedCandidate)
     return [
       `letter ${letterNeed}`,
       `lowercase ${letterNeed}`,
+      `/${letterNeed}/`,
+      `sound /${letterNeed}/`,
       `${letterNeed} sound`,
       candidate.need,
     ];
@@ -4084,7 +4443,7 @@ function buildSmallGroupHubPlanResource(
   lessonSource?: SmallGroupLessonSource,
 ) {
   const bestLesson = recommendations[0];
-  const sourceText = lessonSource?.text.trim() ?? "";
+  const sourceText = lessonSource?.text.trim() || recommendations[0]?.sourceText?.trim() || "";
   const sourceAnalysis = lessonSource?.analysis ?? (
     isReadableLessonSourceText(sourceText, 8, 40)
       ? buildSmallGroupLessonAnalysis(candidate, bestLesson, subject, sourceText)
@@ -4110,7 +4469,7 @@ function buildSmallGroupHubPlanResource(
     : "No connected lesson";
   const title = `Small Group: ${candidate.need}${bestLesson?.lessonNumber ? ` - Lesson ${bestLesson.lessonNumber.replace(/^lesson\s*/i, "")}` : ""}`;
   const notes = [
-    "SMALL-GROUP CURRICULUM PLAN",
+    "SMALL-GROUP UFLI INTERVENTION PLAN",
     "",
     `Subject: ${smallGroupPlanSubjectLabel(subject)}`,
     `Target need: ${candidate.need}`,
@@ -5552,33 +5911,18 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     }
 
     try {
-      const response = await fetch(HUB_CURRICULUM_RECOMMENDATION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          limit: focusCandidate ? 12 : 8,
-          needs,
-          subject: curriculumRecommendationSubject,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("The Hub could not search curriculum lessons yet.");
+      if (curriculumRecommendationSubject !== "skills") {
+        throw new Error("The UFLI intervention bank is for CKLA Skills small groups. Math and Listening groups should stay teacher-selected for now.");
       }
 
-      const data = (await response.json()) as CurriculumRecommendationResponse;
-      const nextRecommendations = data.recommendations ?? [];
+      const nextRecommendations = focusCandidate
+        ? findUfliRecommendationsForNeedCandidate(focusCandidate)
+        : findUfliRecommendationsForNeedCandidates(searchCandidates);
 
       if (focusCandidate) {
         setCurriculumRecommendationsByNeedKey((current) => ({
           ...current,
-          [focusCandidate.key]: recommendationsForNeedCandidate(
-            nextRecommendations,
-            focusCandidate,
-            { allowFocusedFallback: true },
-          ),
+          [focusCandidate.key]: nextRecommendations,
         }));
         setCurriculumRecommendationErrorsByNeedKey((current) => ({
           ...current,
@@ -5590,14 +5934,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         }));
       } else {
         setCurriculumRecommendations(nextRecommendations);
-        setCurriculumRecommendationNeeds(data.needs?.length ? data.needs : needs);
+        setCurriculumRecommendationNeeds(needs);
         setCurriculumRecommendationStatus("success");
       }
     } catch (nextError) {
       const message =
         nextError instanceof Error
           ? nextError.message
-          : "Curriculum recommendations could not load yet.";
+          : "UFLI intervention recommendations could not load yet.";
 
       if (focusCandidate) {
         setCurriculumRecommendationsByNeedKey((current) => ({
@@ -6959,7 +7303,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    const sourceText = lessonSource?.text.trim() ?? "";
+    const sourceText = lessonSource?.text.trim() || recommendations[0]?.sourceText?.trim() || "";
 
     if (isReadableLessonSourceText(sourceText, 8, 40)) {
       const targetMatch = smallGroupSourceTargetMatch(
@@ -7016,8 +7360,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     }
 
     const reportWindow = window.open("", "_blank");
-    const sourceText = lessonSource?.text.trim() ?? "";
-    const sourceTitle = lessonSource?.fileName.trim() ?? "";
+    const sourceText = lessonSource?.text.trim() || recommendations[0]?.sourceText?.trim() || "";
+    const sourceTitle = lessonSource?.fileName.trim() || recommendations[0]?.subjectLabel || "";
     const bestLesson = recommendations[0];
     const sourceAnalysis = lessonSource?.analysis ?? (
       isReadableLessonSourceText(sourceText, 8, 40)
@@ -7048,7 +7392,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       <section class="box">
         <p class="match">${escapeReportHtml(curriculumRecommendationMatchLabel(bestLesson, candidate))}</p>
         <h2>${escapeReportHtml(curriculumRecommendationLessonLabel(bestLesson))}</h2>
-        <h3>${escapeReportHtml(bestLesson.lessonTitle || "Saved Hub lesson")}</h3>
+        <h3>${escapeReportHtml(bestLesson.lessonTitle || "UFLI lesson")}</h3>
         ${bestLesson.priorityStandard ? `<p><strong>Standard:</strong> ${escapeReportHtml(bestLesson.priorityStandard)}</p>` : ""}
         ${bestLesson.iCanStatement ? `<p><strong>I Can:</strong> ${escapeReportHtml(bestLesson.iCanStatement)}</p>` : ""}
         <p><strong>Why this lesson:</strong> ${escapeReportHtml(curriculumRecommendationReason(bestLesson, candidate))}</p>
@@ -7086,7 +7430,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         </style>
       </head>
       <body>
-        <h1>Small-Group Curriculum Plan</h1>
+        <h1>Small-Group UFLI Intervention Plan</h1>
         <p class="meta">${escapeReportHtml(activeReportLabel)} - ${escapeReportHtml(new Date().toLocaleDateString())}</p>
         <div class="layout">
           <aside>
@@ -7150,7 +7494,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
     const reportWindow = window.open("", "_blank");
     const bestLesson = recommendations[0];
-    const sourceText = lessonSource?.text.trim() ?? "";
+    const sourceText = lessonSource?.text.trim() || recommendations[0]?.sourceText?.trim() || "";
     const sourceAnalysis = lessonSource?.analysis ?? (
       isReadableLessonSourceText(sourceText, 8, 40)
         ? buildSmallGroupLessonAnalysis(candidate, bestLesson, curriculumRecommendationSubject, sourceText)
@@ -7239,7 +7583,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     <section className="curriculum-recommendation-card">
       <div className="result-row-head">
         <div>
-          <p className="eyebrow">Curriculum Match</p>
+          <p className="eyebrow">UFLI Intervention Match</p>
           <h4>Plan From These Groups</h4>
         </div>
         <button
@@ -7248,11 +7592,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           onClick={() => void fetchCurriculumRecommendations()}
           type="button"
         >
-          {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
+          {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find UFLI Lessons"}
         </button>
       </div>
       <p className="pin-helper">
-        Uses the charted data, small-group evidence, and current game/assessment results together so each suggestion shows who needs help, why, and which Hub lessons may fit.
+        Uses charted data, QPS, teacher observations, and game/assessment results to suggest UFLI intervention lessons for Skills small groups.
       </p>
       {curriculumNeedCandidates.length ? (
         <div className="curriculum-recommendation-need-summary">
@@ -7272,7 +7616,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       ) : null}
       {curriculumRecommendationStatus === "success" && curriculumRecommendationNeeds.length ? (
         <p className="pin-helper">
-          Searched {curriculumRecommendationNeeds.length} curriculum term{curriculumRecommendationNeeds.length === 1 ? "" : "s"} from the chart and small-group data.
+          Checked {curriculumRecommendationNeeds.length} UFLI search term{curriculumRecommendationNeeds.length === 1 ? "" : "s"} from the chart and small-group data.
         </p>
       ) : null}
       {curriculumRecommendationStatus === "success" ? (
@@ -7307,11 +7651,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </button>
                   <a
                     className="curriculum-recommendation-link secondary"
-                    href={curriculumGroupUploadUrl(candidate, curriculumRecommendationSubject)}
+                    href={UFLI_TOOLBOX_BASE_URL}
                     rel="noreferrer"
                     target="_blank"
                   >
-                    Upload Lesson to Hub
+                    Open UFLI Toolbox
                   </a>
                 </div>
               </div>
@@ -7349,14 +7693,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         rel="noreferrer"
                         target="_blank"
                       >
-                        Open Lesson in Hub
+                        Open UFLI Toolbox
                       </a>
                     </article>
                   ))}
                 </div>
               ) : (
                 <p className="empty-results-message">
-                  No saved Hub lesson matched this need yet. Use Upload Lesson to Hub to add the source lesson for this group.
+                  No UFLI lesson matched this need yet. Open a more specific Skills target, such as d, ch, or short a, for a tighter match.
                 </p>
               )}
             </details>
@@ -7669,7 +8013,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   <summary>
                     <span>
                       <strong>Small-Group Needs</strong>
-                      <em>Open to find lessons and make group plans.</em>
+                      <em>Open to find UFLI lessons and make group plans.</em>
                     </span>
                     <span>{curriculumNeedCandidates.length} need{curriculumNeedCandidates.length === 1 ? "" : "s"}</span>
                   </summary>
@@ -7721,11 +8065,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                           onClick={() => void fetchCurriculumRecommendations(selectedSmallGroupNeed)}
                           type="button"
                         >
-                          {selectedSmallGroupRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
+                          {selectedSmallGroupRecommendationStatus === "loading" ? "Finding..." : "Find UFLI Lessons"}
                         </button>
                       </div>
                       {selectedSmallGroupRecommendationStatus === "loading" ? (
-                        <p className="pin-helper">Searching saved Hub lessons for this exact group need.</p>
+                        <p className="pin-helper">Searching the UFLI intervention bank for this exact group need.</p>
                       ) : null}
                       {selectedSmallGroupRecommendationError ? (
                         <p className="teacher-message error">{selectedSmallGroupRecommendationError}</p>
@@ -7844,8 +8188,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         ) : (
                           <p className="empty-results-message">
                             {selectedSmallGroupRecommendationStatus === "success"
-                              ? "No saved Hub lesson matched this group yet."
-                              : "Click Find Lessons to pull saved curriculum lessons for this group."}
+                              ? "No UFLI lesson matched this group yet."
+                              : "Click Find UFLI Lessons to pull intervention lessons for this group."}
                           </p>
                         )}
                       </div>
