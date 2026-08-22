@@ -1014,10 +1014,12 @@ button.area-card {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
+  max-height: 250px;
+  overflow: auto;
+  padding-right: 2px;
 }
 
-.qps-call-on-list span,
-.qps-call-on-more {
+.qps-call-on-list span {
   display: grid;
   gap: 2px;
   border: 1px solid rgb(124 111 91 / 0.14);

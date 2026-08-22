@@ -1173,6 +1173,13 @@ export function QpsScreenerGame() {
   const selectedScholar = scholars.find((scholar) => scholar.id === selectedScholarId) ?? null;
   const isWholeClassMode = selectedScholarId === QPS_WHOLE_CLASS_MODE;
   const canUseTeacherBoard = hasPinTeacherAccess || isAuthorizedTeacherEmail(teacherEmail);
+  const signedInRosterTeacherEmail = rosterTeacherEmailForEmail(teacherEmail);
+  const callOnRosterScholars = useMemo(
+    () => signedInRosterTeacherEmail
+      ? scholars.filter((scholar) => scholar.teacherEmail === signedInRosterTeacherEmail)
+      : [],
+    [scholars, signedInRosterTeacherEmail],
+  );
   const wholeClassLiveTarget = useMemo(
     () => isWholeClassMode
       ? {
@@ -1196,13 +1203,13 @@ export function QpsScreenerGame() {
   const currentChartTarget = qpsChartTargetForItem(currentItem);
   const qpsCallOnScholars = useMemo(
     () => qpsCallOnScholarsForTarget(
-      scholars,
+      callOnRosterScholars,
       qpsCallOnRecords,
       qpsCallOnProgressRecords,
       qpsSkillsOverrides,
       currentChartTarget,
     ),
-    [currentChartTarget, qpsCallOnProgressRecords, qpsCallOnRecords, qpsSkillsOverrides, scholars],
+    [callOnRosterScholars, currentChartTarget, qpsCallOnProgressRecords, qpsCallOnRecords, qpsSkillsOverrides],
   );
 
   useEffect(() => {
@@ -2118,16 +2125,13 @@ export function QpsScreenerGame() {
                   <p className="pin-helper">This slide is not tied to the current Letter Sounds or Digraphs chart yet.</p>
                 ) : qpsCallOnScholars.length ? (
                   <div className="qps-call-on-list">
-                    {qpsCallOnScholars.slice(0, 10).map((scholar) => (
+                    {qpsCallOnScholars.map((scholar) => (
                       <span className={scholar.status === "needs-review" ? "needs-review" : "unassessed"} key={scholar.id}>
                         <strong>{scholar.firstName}</strong>
                         <em>{scholar.trackingInitials}</em>
                         <small>{scholar.status === "needs-review" ? "Needs review" : "No evidence"}</small>
                       </span>
                     ))}
-                    {qpsCallOnScholars.length > 10 ? (
-                      <span className="qps-call-on-more">+{qpsCallOnScholars.length - 10} more</span>
-                    ) : null}
                   </div>
                 ) : (
                   <p className="pin-helper">Everyone currently shows mastered for this chart target.</p>
