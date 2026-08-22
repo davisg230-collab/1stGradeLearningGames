@@ -136,6 +136,7 @@ type EditableLevel = Record<string, unknown> & {
   name: string;
   practiceLabel?: string;
   completionMessage?: string;
+  underConstruction?: boolean;
 };
 
 type AssessmentChoiceVisual = {
@@ -950,6 +951,7 @@ function normalizeLevel(value: unknown, index: number): EditableLevel {
     lessonRange: asText(raw.lessonRange).trim(),
     name: asText(raw.name, `Level ${index + 1}`).trim(),
     practiceLabel: asText(raw.practiceLabel).trim(),
+    underConstruction: raw.underConstruction === true,
   };
 }
 
@@ -3579,11 +3581,11 @@ export function GameEditorPanel({
     });
   }
 
-  function updateLevel(field: keyof EditableLevel, value: string) {
+  function updateLevel(field: keyof EditableLevel, value: string | boolean) {
     updateSelectedGame((game) => {
       const level = game.content.levels[selectedLevelIndex];
       if (level) {
-        level[field] = value;
+        level[field] = value as never;
       }
     });
   }
@@ -3597,6 +3599,7 @@ export function GameEditorPanel({
         lessonRange: "",
         name: `Level ${game.content.levels.length + 1}`,
         practiceLabel: "",
+        underConstruction: false,
       });
     });
     setSelectedLevelIndex(selectedGame?.content.levels.length ?? 0);
@@ -5200,7 +5203,10 @@ export function GameEditorPanel({
                       type="button"
                     >
                       <strong>{index + 1}. {level.name}</strong>
-                      <span>{selectedGame.content.questions.filter((question) => question.zone === index).length} questions</span>
+                      <span>
+                        {selectedGame.content.questions.filter((question) => question.zone === index).length} questions
+                        {level.underConstruction ? " - Under Construction" : ""}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -5215,6 +5221,14 @@ export function GameEditorPanel({
                     <label>Lesson range<input value={selectedLevel.lessonRange ?? ""} onChange={(event) => updateLevel("lessonRange", event.target.value)} /></label>
                     <label>Icon<input value={selectedLevel.icon} onChange={(event) => updateLevel("icon", event.target.value)} /></label>
                     <label>Detail<textarea rows={3} value={selectedLevel.detail} onChange={(event) => updateLevel("detail", event.target.value)} /></label>
+                    <button
+                      aria-pressed={selectedLevel.underConstruction === true}
+                      className={`construction-toggle-button${selectedLevel.underConstruction === true ? " is-active" : ""}`}
+                      onClick={() => updateLevel("underConstruction", selectedLevel.underConstruction !== true)}
+                      type="button"
+                    >
+                      {selectedLevel.underConstruction === true ? "Open This Level" : "Level Under Construction"}
+                    </button>
                   </div>
                 ) : null}
               </section>

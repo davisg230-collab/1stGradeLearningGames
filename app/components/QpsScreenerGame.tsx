@@ -104,6 +104,8 @@ type QpsItemScore = {
 
 type QpsLiveSession = {
   active: boolean;
+  awardKey: string;
+  awardSection: string;
   currentIndex: number;
   formId: QpsFormId;
   lastChangedBy: "scholar" | "teacher";
@@ -116,6 +118,11 @@ type QpsLiveSession = {
 type QpsScholarSlideProfile = {
   firstName: string;
   firstNameKey: string;
+};
+
+type QpsSectionAward = {
+  key: string;
+  section: string;
 };
 
 type QpsCallOnStatus = "mastered" | "needs-review" | "unassessed";
@@ -653,6 +660,20 @@ function qpsRecordScholar(record: QpsCallOnRecord, scholars: QpsScholar[]) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+function qpsSectionsForItems(items: QpsItem[]) {
+  return [...new Set(items.map((item) => item.section).filter(Boolean))];
+}
+
+function qpsShortSectionLabel(section: string) {
+  return section.replace(/^Set\s+\d+\s*-\s*/i, "").trim() || section;
+}
+
+function qpsIsLastItemInSection(items: QpsItem[], index: number) {
+  const item = items[index];
+  const nextItem = items[index + 1];
+  return Boolean(item) && (!nextItem || nextItem.section !== item.section);
+}
+
 function mapQpsLiveSession(doc: FirestoreDocSnapshot): QpsLiveSession | null {
   if (doc.exists === false) {
     return null;
@@ -675,6 +696,8 @@ function mapQpsLiveSession(doc: FirestoreDocSnapshot): QpsLiveSession | null {
 
   return {
     active: data.active === true,
+    awardKey: asText(data.awardKey).trim(),
+    awardSection: asText(data.awardSection).trim(),
     currentIndex: boundedQpsIndex(data.currentIndex, QPS_FORMS[formId].items.length),
     formId,
     lastChangedBy: data.lastChangedBy === "scholar" ? "scholar" : "teacher",
@@ -1084,12 +1107,18 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
   const [isLoading, setIsLoading] = useState(true);
   const [liveSession, setLiveSession] = useState<QpsLiveSession | null>(null);
   const [isMoving, setIsMoving] = useState(false);
+  const [visibleAward, setVisibleAward] = useState<QpsSectionAward | null>(null);
+  const lastAwardKeyRef = useRef("");
 
   const selectedForm = forms[liveSession?.formId ?? "A"];
   const qpsItems = selectedForm.items;
   const currentIndex = boundedQpsIndex(liveSession?.currentIndex ?? 0, qpsItems.length);
   const currentItem = qpsItems[currentIndex] ?? qpsItems[0];
   const isConnected = liveSession?.active === true && liveSession.scholarFirstNameKey === profile.firstNameKey;
+  const qpsSections = useMemo(() => qpsSectionsForItems(qpsItems), [qpsItems]);
+  const currentSectionIndex = Math.max(0, qpsSections.indexOf(currentItem?.section ?? ""));
+  const awardSectionIndex = liveSession?.awardSection ? qpsSections.indexOf(liveSession.awardSection) : -1;
+  const completedSectionIndex = Math.max(awardSectionIndex, currentSectionIndex - 1);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -1116,6 +1145,21 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
       unsubscribe?.();
     };
   }, [profile.firstNameKey]);
+
+  useEffect(() => {
+    if (!liveSession?.awardKey || !liveSession.awardSection || liveSession.awardKey === lastAwardKeyRef.current) {
+      return;
+    }
+
+    lastAwardKeyRef.current = liveSession.awardKey;
+    setVisibleAward({ key: liveSession.awardKey, section: liveSession.awardSection });
+
+    const handle = window.setTimeout(() => {
+      setVisibleAward((currentAward) => currentAward?.key === liveSession.awardKey ? null : currentAward);
+    }, 5000);
+
+    return () => window.clearTimeout(handle);
+  }, [liveSession?.awardKey, liveSession?.awardSection]);
 
   const moveToIndex = async (nextIndex: number) => {
     if (!isConnected) {
@@ -1170,6 +1214,26 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
               <span>Connected with your teacher</span>
               <strong>{selectedForm.label} - Item {currentIndex + 1} of {qpsItems.length}</strong>
             </div>
+            <div className="qps-scholar-progress" aria-label="QPS section progress">
+              {qpsSections.map((section, index) => (
+                <span
+                  className={`${index <= completedSectionIndex ? "is-earned" : ""} ${index === currentSectionIndex ? "is-current" : ""}`}
+                  key={section}
+                  title={section}
+                >
+                  {index <= completedSectionIndex ? "STAR" : index + 1}
+                </span>
+              ))}
+            </div>
+            {visibleAward ? (
+              <div className="qps-section-award" role="status" aria-live="polite">
+                <span className="qps-award-medal">STAR</span>
+                <div>
+                  <strong>Section complete!</strong>
+                  <p>You earned a star for {qpsShortSectionLabel(visibleAward.section)}. Keep going and try your best.</p>
+                </div>
+              </div>
+            ) : null}
             <div className="qps-scholar-card">
               <p>{currentItem.section}</p>
               <strong className={`qps-reader-display is-${currentItem.type}`}>
@@ -1220,6 +1284,7 @@ export function QpsScreenerGame() {
   const [qpsCallOnRecords, setQpsCallOnRecords] = useState<QpsCallOnRecord[]>([]);
   const [qpsCallOnProgressRecords, setQpsCallOnProgressRecords] = useState<QpsCallOnRecord[]>([]);
   const [qpsSkillsOverrides, setQpsSkillsOverrides] = useState<QpsSkillsOverride[]>([]);
+  const [qpsSectionAward, setQpsSectionAward] = useState<QpsSectionAward | null>(null);
   const [forms, setForms] = useState<Record<QpsFormId, QpsForm>>(QPS_FORMS);
   const [scores, setScores] = useState<Record<string, QpsItemScore>>(() => qpsItemScoreDefaults(QPS_FORMS.A.items));
   const [scholars, setScholars] = useState<QpsScholar[]>([]);
@@ -1375,6 +1440,7 @@ export function QpsScreenerGame() {
 
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
+    setQpsSectionAward(null);
     setLoadedProgressKey("");
     setStatus("");
   }, [qpsItems, selectedScholar]);
@@ -1513,6 +1579,8 @@ export function QpsScreenerGame() {
         .doc(liveTarget.firstNameKey)
         .set({
           active,
+          awardKey: active ? qpsSectionAward?.key ?? "" : "",
+          awardSection: active ? qpsSectionAward?.section ?? "" : "",
           createdAt: serverTime,
           currentIndex: boundedQpsIndex(currentIndex, qpsItems.length),
           formId,
@@ -1646,7 +1714,7 @@ export function QpsScreenerGame() {
     }, 175);
 
     return () => window.clearTimeout(handle);
-  }, [currentIndex, formId, liveSessionActive, selectedLiveTarget, scholarSlideProfile]);
+  }, [currentIndex, formId, liveSessionActive, qpsSectionAward, selectedLiveTarget, scholarSlideProfile]);
 
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     setScores((currentScores) => ({
@@ -1658,7 +1726,22 @@ export function QpsScreenerGame() {
     }));
   };
 
+  const queueSectionAward = (section: string) => {
+    if (!section) {
+      return;
+    }
+
+    setQpsSectionAward({
+      key: `${Date.now()}-${slug(section).slice(0, 32)}`,
+      section,
+    });
+  };
+
   const markCorrect = () => {
+    if (qpsIsLastItemInSection(qpsItems, currentIndex)) {
+      queueSectionAward(currentItem.section);
+    }
+
     updateCurrentScore({ said: "", status: "correct" });
     setWholeClassMissStatus("");
 
@@ -1779,6 +1862,7 @@ export function QpsScreenerGame() {
 
   const handleScholarSelection = (nextScholarId: string) => {
     setSelectedScholarId(nextScholarId);
+    setQpsSectionAward(null);
     setWholeClassMissStatus("");
 
     if (nextScholarId === QPS_WHOLE_CLASS_MODE) {
@@ -1787,7 +1871,11 @@ export function QpsScreenerGame() {
   };
 
   const goToNext = () => {
-    setCurrentIndex((index) => Math.min(qpsItems.length - 1, index + 1));
+    const nextIndex = Math.min(qpsItems.length - 1, currentIndex + 1);
+    if (nextIndex !== currentIndex && qpsItems[currentIndex]?.section !== qpsItems[nextIndex]?.section) {
+      queueSectionAward(qpsItems[currentIndex].section);
+    }
+    setCurrentIndex(nextIndex);
     setWholeClassMissStatus("");
   };
 
@@ -1799,6 +1887,7 @@ export function QpsScreenerGame() {
   const resetScores = () => {
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
+    setQpsSectionAward(null);
     setStatus("");
     setWholeClassMissStatus("");
   };
@@ -2051,7 +2140,10 @@ export function QpsScreenerGame() {
           <aside className="qps-score-panel">
             <label>
               QPS Form
-              <select onChange={(event) => setFormId(event.target.value as QpsFormId)} value={formId}>
+              <select onChange={(event) => {
+                setQpsSectionAward(null);
+                setFormId(event.target.value as QpsFormId);
+              }} value={formId}>
                 <option value="A">Form A</option>
                 <option value="B">Form B</option>
                 <option value="C">Form C</option>
