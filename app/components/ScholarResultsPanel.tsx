@@ -5510,6 +5510,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const [selectedSkillsDataCellKey, setSelectedSkillsDataCellKey] = useState("");
   const [selectedSkillsDataScholarId, setSelectedSkillsDataScholarId] = useState("");
   const [selectedScholarId, setSelectedScholarId] = useState("");
+  const [smallGroupNeedsOpen, setSmallGroupNeedsOpen] = useState(false);
   const [selectedSmallGroupNeedKey, setSelectedSmallGroupNeedKey] = useState("");
   const [selectedManagedGameId, setSelectedManagedGameId] = useState(
     "unit1-zone1-sound-safari",
@@ -5756,6 +5757,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           ? "Math"
           : "Students";
   const curriculumRecommendationSubject = curriculumSubjectForReportView(dataReportView);
+  const dataGlanceActive = dataReportView === "skills" || dataReportView === "math";
+  const skillsSmallGroupActive = dataReportView === "skills";
 
   const visibleSkillsDataReports = useMemo(() => {
     const subject: SkillsDataReportSubject = dataReportView === "math" ? "math" : "skills";
@@ -5766,16 +5769,19 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     ?? visibleSkillsDataReports[0]
     ?? SKILLS_DATA_REPORTS[0];
   const skillsDataRows = useMemo(
-    () => buildSkillsDataRows(
-      selectedSkillsDataReport.id,
-      selectedSkillsDataReport.targets,
-      reportScholars,
-      results,
-      progressRecords,
-      skillsDataOverrides,
-      skillsDataSortMode,
-    ),
+    () => dataGlanceActive
+      ? buildSkillsDataRows(
+        selectedSkillsDataReport.id,
+        selectedSkillsDataReport.targets,
+        reportScholars,
+        results,
+        progressRecords,
+        skillsDataOverrides,
+        skillsDataSortMode,
+      )
+      : [],
     [
+      dataGlanceActive,
       progressRecords,
       results,
       selectedSkillsDataReport,
@@ -5785,11 +5791,17 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     ],
   );
   const skillsDataTargetSummaryRows = useMemo(
-    () => skillsDataTargetSummaries(skillsDataRows, selectedSkillsDataReport.targets),
-    [selectedSkillsDataReport.targets, skillsDataRows],
+    () => dataGlanceActive
+      ? skillsDataTargetSummaries(skillsDataRows, selectedSkillsDataReport.targets)
+      : [],
+    [dataGlanceActive, selectedSkillsDataReport.targets, skillsDataRows],
   );
   const visibleSkillsDataTargets = useMemo(
     () => {
+      if (!dataGlanceActive) {
+        return [];
+      }
+
       const filteredTargets = skillsDataTargetSummaryRows
         .filter((summary) => skillsDataTargetIsVisible(summary, skillsDataFocusMode))
         .map((summary) => summary.target);
@@ -5797,6 +5809,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       return filteredTargets.length ? filteredTargets : selectedSkillsDataReport.targets;
     },
     [
+      dataGlanceActive,
       selectedSkillsDataReport.targets,
       skillsDataFocusMode,
       skillsDataTargetSummaryRows,
@@ -6366,6 +6379,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       .slice(0, 5);
   }, [curriculumRecommendationSubject, progressRecords, selectedSkillsDataScholarRow]);
   const qpsResults = useMemo(() => {
+    if (dataReportView !== "skills") {
+      return [];
+    }
+
     return results
       .filter((result) =>
         result.gameId === QPS_SCREENER_GAME_ID
@@ -6374,8 +6391,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       .sort((a, b) =>
         (formatDate(b.completedAt)?.getTime() ?? 0) - (formatDate(a.completedAt)?.getTime() ?? 0),
       );
-  }, [results, reportScholars]);
+  }, [dataReportView, results, reportScholars]);
   const qpsReportRecords = useMemo<QpsReportRecord[]>(() => {
+    if (dataReportView !== "skills") {
+      return [];
+    }
+
     const savedRecords = qpsResults;
     const activeProgressRecords = progressRecords.filter((progress) =>
       progress.gameId === QPS_SCREENER_GAME_ID
@@ -6386,7 +6407,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     return [...savedRecords, ...activeProgressRecords].sort((a, b) =>
       (reportRecordDate(b)?.getTime() ?? 0) - (reportRecordDate(a)?.getTime() ?? 0),
     );
-  }, [progressRecords, qpsResults, reportScholars]);
+  }, [dataReportView, progressRecords, qpsResults, reportScholars]);
   const currentWeekQpsRange = qpsCurrentWeekRange();
   const qpsPanelResults = (qpsShowCurrentWeekOnly
     ? qpsReportRecords.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end))
@@ -6398,28 +6419,30 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const curriculumNeedCandidates = useMemo(() => {
     const candidates = new Map<string, CurriculumNeedCandidate>();
 
-    if (dataReportView === "skills" || dataReportView === "math") {
-      skillsDataTargetSummaryRows
-        .filter((summary) => summary.needsReviewCount > 0)
-        .sort((a, b) => b.needsReviewCount - a.needsReviewCount || a.target.localeCompare(b.target))
-        .slice(0, 10)
-        .forEach((summary) => {
-          const scholarsForTarget = skillsDataRows
-            .filter((row) =>
-              row.cells.some((cell) =>
-                cell.target === summary.target && cell.status === "needs-review",
-              ),
-            )
-            .map((row) => `${row.scholar.firstName} ${row.scholar.lastName}`);
-
-          addCurriculumNeedCandidate(candidates, summary.target, {
-            count: summary.needsReviewCount,
-            scholars: scholarsForTarget,
-            searchTerms: [summary.target, `${selectedSkillsDataReport.label} ${summary.target}`],
-            source: "Data at a Glance chart",
-          });
-        });
+    if (!skillsSmallGroupActive) {
+      return [];
     }
+
+    skillsDataTargetSummaryRows
+      .filter((summary) => summary.needsReviewCount > 0)
+      .sort((a, b) => b.needsReviewCount - a.needsReviewCount || a.target.localeCompare(b.target))
+      .slice(0, 10)
+      .forEach((summary) => {
+        const scholarsForTarget = skillsDataRows
+          .filter((row) =>
+            row.cells.some((cell) =>
+              cell.target === summary.target && cell.status === "needs-review",
+            ),
+          )
+          .map((row) => `${row.scholar.firstName} ${row.scholar.lastName}`);
+
+        addCurriculumNeedCandidate(candidates, summary.target, {
+          count: summary.needsReviewCount,
+          scholars: scholarsForTarget,
+          searchTerms: [summary.target, `${selectedSkillsDataReport.label} ${summary.target}`],
+          source: "Data at a Glance chart",
+        });
+      });
 
     dashboardStruggles.forEach((struggle) => {
       addCurriculumNeedCandidate(candidates, struggle.label, {
@@ -6461,19 +6484,22 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     dashboardProgress,
     dashboardResults,
     dashboardStruggles,
-    dataReportView,
     selectedSkillsDataReport.label,
     skillsDataRows,
     skillsDataTargetSummaryRows,
+    skillsSmallGroupActive,
     reportScholars,
   ]);
   const visibleCurriculumNeedCandidates = useMemo(() => {
     const dismissedKeys = new Set(dismissedSmallGroupNeedKeys);
     return curriculumNeedCandidates.filter((candidate) => !dismissedKeys.has(candidate.key));
   }, [curriculumNeedCandidates, dismissedSmallGroupNeedKeys]);
+  const smallGroupStacksActive = skillsSmallGroupActive && (smallGroupNeedsOpen || Boolean(selectedSmallGroupNeedKey));
   const smallGroupNeedStacks = useMemo(() =>
-    buildSmallGroupNeedStacks(visibleCurriculumNeedCandidates),
-  [visibleCurriculumNeedCandidates]);
+    smallGroupStacksActive
+      ? buildSmallGroupNeedStacks(visibleCurriculumNeedCandidates)
+      : [],
+  [smallGroupStacksActive, visibleCurriculumNeedCandidates]);
   const curriculumRecommendationGroups = useMemo(() => {
     return visibleCurriculumNeedCandidates.map((candidate) => ({
       candidate,
@@ -6832,6 +6858,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setCurriculumRecommendationNeeds([]);
     setCurriculumRecommendationError("");
     setCurriculumRecommendationStatus("idle");
+    setSmallGroupNeedsOpen(false);
 
     if (view === "math") {
       setSkillsDataReportId("math-starting-point");
@@ -8643,7 +8670,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </div>
                 </details>
 
-                <details className="dashboard-collapsible-section struggle-board">
+                {skillsSmallGroupActive ? (
+                <>
+                <details
+                  className="dashboard-collapsible-section struggle-board"
+                  onToggle={(event) => setSmallGroupNeedsOpen(event.currentTarget.open)}
+                >
                   <summary>
                     <span>
                       <strong>Small-Group Needs</strong>
@@ -8842,6 +8874,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       </div>
                     </section>
                   </div>
+                ) : null}
+                </>
                 ) : null}
 
                 <details className="dashboard-detail-list">
