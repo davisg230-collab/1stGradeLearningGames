@@ -5,7 +5,9 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email in [
           'davisg230@gmail.com',
-          'lvest1@crossroadsschoolskc.org'
+          'lvest1@crossroadsschoolskc.org',
+          'lvest1010@gmail.com',
+          'lvest@crossroadsschoolskc.org'
         ];
     }
 
@@ -14,8 +16,20 @@ service cloud.firestore {
         && resource.data.teacherEmail == request.auth.token.email;
     }
 
+    function isAuthorizedRosterTeacherEmail(email) {
+      return email in [
+        'davisg230@gmail.com',
+        'lvest1@crossroadsschoolskc.org'
+      ];
+    }
+
+    function canManageScholarRoster() {
+      return isTeacherEditor()
+        && isAuthorizedRosterTeacherEmail(resource.data.teacherEmail);
+    }
+
     function isValidCardId(cardId) {
-      return cardId.matches('^(CKLA Skills:unit-[0-9]+|Eureka Math:module-[0-9]+)$');
+      return cardId.matches('^(CKLA Skills:(starting-point|letter-search-safari|unit-[0-9]+)|CKLA Listening & Learning:unit-[0-9]+|Eureka Math:module-[0-9]+|Math:(starting-point|number-search-safari))$');
     }
 
     function isValidName(value) {
@@ -34,17 +48,47 @@ service cloud.firestore {
         && value.matches('^[A-Za-z0-9 _./-]{1,50}$');
     }
 
+    function isValidReportChoice(value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 120;
+    }
+
     function isValidWord(value) {
       return value is string
-        && value.matches('^[A-Z0-9]{1,30}$');
+        && value.size() > 0
+        && value.size() <= 120;
     }
 
     function isValidPublicGameId(value) {
       return value in [
         'ckla-unit-1-word-builder-blast',
         'ckla-unit-2-long-vowel-quest',
+        'letter-search-safari',
+        'math-starting-point-quest',
+        'number-search-safari',
+        'skills-starting-point',
         'unit1-zone1-sound-safari'
-      ];
+      ] || (
+        value is string
+        && (
+          value.matches('^ckla-unit-[3-7]-skills-quest$')
+          || value.matches('^ckla-listening-learning-unit-([1-9]|10|11)$')
+          || value.matches('^eureka-math-module-[1-6]$')
+        )
+      );
+    }
+
+    function isSharedCklaUnitGame() {
+      return request.resource.data.gameId == 'unit1-zone1-sound-safari'
+        || request.resource.data.gameId == 'ckla-unit-2-long-vowel-quest'
+        || request.resource.data.gameId == 'letter-search-safari'
+        || request.resource.data.gameId == 'math-starting-point-quest'
+        || request.resource.data.gameId == 'number-search-safari'
+        || request.resource.data.gameId == 'skills-starting-point'
+        || request.resource.data.gameId.matches('^ckla-unit-[3-7]-skills-quest$')
+        || request.resource.data.gameId.matches('^ckla-listening-learning-unit-([1-9]|10|11)$')
+        || request.resource.data.gameId.matches('^eureka-math-module-[1-6]$');
     }
 
     function isValidEditableGameId(gameId) {
@@ -80,6 +124,7 @@ service cloud.firestore {
         && request.resource.data.schemaVersion == 1
         && request.resource.data.subject in [
           'ckla',
+          'ckla-listening-learning',
           'math'
         ]
         && request.resource.data.title is string
@@ -125,7 +170,6 @@ service cloud.firestore {
         && request.resource.data.content.levels.size() > 0
         && request.resource.data.content.levels.size() <= 40
         && request.resource.data.content.questions is list
-        && request.resource.data.content.questions.size() > 0
         && request.resource.data.content.questions.size() <= 300
         && (
           !request.resource.data.content.keys().hasAny(['supplementalQuestions'])
@@ -144,7 +188,7 @@ service cloud.firestore {
         && (
           !request.resource.data.content.keys().hasAny(['zoneEncouragements'])
           || (
-            request.resource.data.content.zoneEncouragements is list
+            request.resource.data.content.zoneEncouragements is map
             && request.resource.data.content.zoneEncouragements.size() <= 80
           )
         );
@@ -186,6 +230,81 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.token.email;
     }
 
+    function isValidSkillsDataOverride() {
+      return request.resource.data.keys().hasOnly([
+          'createdAt',
+          'note',
+          'reportId',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'status',
+          'target',
+          'teacherEmail',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && request.resource.data.keys().hasAll([
+          'reportId',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'status',
+          'target',
+          'teacherEmail',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && request.resource.data.reportId in [
+          'letter-sounds',
+          'digraphs',
+          'number-recognition',
+          'counting-quantities'
+        ]
+        && request.resource.data.scholarFirstName is string
+        && request.resource.data.scholarFirstName.size() > 0
+        && request.resource.data.scholarFirstName.size() <= 40
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && request.resource.data.scholarId is string
+        && request.resource.data.scholarId.size() > 0
+        && request.resource.data.scholarId.size() <= 150
+        && request.resource.data.status in [
+          'mastered',
+          'needs-review'
+        ]
+        && request.resource.data.target is string
+        && (
+          (
+            request.resource.data.reportId in [
+              'letter-sounds',
+              'digraphs'
+            ]
+            && request.resource.data.target.matches('^[a-z]{1,3}$')
+          )
+          || (
+            request.resource.data.reportId in [
+              'number-recognition',
+              'counting-quantities'
+            ]
+            && request.resource.data.target.matches('^([1-9]|1[0-9]|20)$')
+          )
+        )
+        && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.token.email
+        && (
+          !request.resource.data.keys().hasAny(['createdAt'])
+          || request.resource.data.createdAt is timestamp
+        )
+        && (
+          !request.resource.data.keys().hasAny(['note'])
+          || (
+            request.resource.data.note is string
+            && request.resource.data.note.size() <= 500
+          )
+        );
+    }
+
     function isSoundSafariLevelFieldsValid() {
       return request.resource.data.keys().hasAll([
           'levelId',
@@ -216,122 +335,68 @@ service cloud.firestore {
 
     function isSoundSafariResultTotalsValid() {
       return isSoundSafariLevelFieldsValid()
-        && (
-          (
-            request.resource.data.levelId == 'level-1'
-            && request.resource.data.levelIndex == 0
-            && request.resource.data.levelName == 'Back-to-School Basecamp'
-            && request.resource.data.totalQuestions == 12
-            && request.resource.data.score <= 12
-            && request.resource.data.missedCount <= 12
-            && request.resource.data.missedQuestions.size() <= 12
-          )
-          || (
-            request.resource.data.levelId == 'level-2'
-            && request.resource.data.levelIndex == 1
-            && request.resource.data.levelName == 'Code Trail'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.missedCount <= 15
-            && request.resource.data.missedQuestions.size() <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-3'
-            && request.resource.data.levelIndex == 2
-            && request.resource.data.levelName == 'Digraph Crossing'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.missedCount <= 15
-            && request.resource.data.missedQuestions.size() <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-4'
-            && request.resource.data.levelIndex == 3
-            && request.resource.data.levelName == 'Spelling Ridge'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.missedCount <= 15
-            && request.resource.data.missedQuestions.size() <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-5'
-            && request.resource.data.levelIndex == 4
-            && request.resource.data.levelName == 'Sentence Springs'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.missedCount <= 15
-            && request.resource.data.missedQuestions.size() <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-6'
-            && request.resource.data.levelIndex == 5
-            && request.resource.data.levelName == 'Unit 1 Summit'
-            && request.resource.data.totalQuestions == 20
-            && request.resource.data.score <= 20
-            && request.resource.data.missedCount <= 20
-            && request.resource.data.missedQuestions.size() <= 20
-          )
-        );
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions > 0
+        && request.resource.data.totalQuestions <= 300
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.missedCount <= request.resource.data.totalQuestions
+        && request.resource.data.missedQuestions.size() <= request.resource.data.totalQuestions;
+    }
+
+    function isSharedCklaResultTotalsValid() {
+      return request.resource.data.keys().hasAll([
+          'levelId',
+          'levelIndex',
+          'levelName'
+        ])
+        && request.resource.data.levelId is string
+        && request.resource.data.levelId.size() > 0
+        && request.resource.data.levelId.size() <= 80
+        && request.resource.data.levelIndex is int
+        && request.resource.data.levelIndex >= 0
+        && request.resource.data.levelIndex <= 39
+        && request.resource.data.levelName is string
+        && request.resource.data.levelName.size() > 0
+        && request.resource.data.levelName.size() <= 120
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions > 0
+        && request.resource.data.totalQuestions <= 300
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.missedCount <= request.resource.data.totalQuestions
+        && request.resource.data.missedQuestions.size() <= request.resource.data.totalQuestions;
+    }
+
+    function isSharedCklaProgressTotalsValid() {
+      return request.resource.data.keys().hasAll([
+          'levelId',
+          'levelIndex',
+          'levelName'
+        ])
+        && request.resource.data.levelId is string
+        && request.resource.data.levelId.size() > 0
+        && request.resource.data.levelId.size() <= 80
+        && request.resource.data.levelIndex is int
+        && request.resource.data.levelIndex >= 0
+        && request.resource.data.levelIndex <= 39
+        && request.resource.data.levelName is string
+        && request.resource.data.levelName.size() > 0
+        && request.resource.data.levelName.size() <= 120
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions > 0
+        && request.resource.data.totalQuestions <= 300
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.questionsCompleted <= request.resource.data.totalQuestions
+        && request.resource.data.currentQuestionIndex <= request.resource.data.totalQuestions;
     }
 
     function isSoundSafariProgressTotalsValid() {
       return isSoundSafariLevelFieldsValid()
-        && (
-          (
-            request.resource.data.levelId == 'level-1'
-            && request.resource.data.levelIndex == 0
-            && request.resource.data.levelName == 'Back-to-School Basecamp'
-            && request.resource.data.totalQuestions == 12
-            && request.resource.data.score <= 12
-            && request.resource.data.questionsCompleted <= 12
-            && request.resource.data.currentQuestionIndex <= 12
-          )
-          || (
-            request.resource.data.levelId == 'level-2'
-            && request.resource.data.levelIndex == 1
-            && request.resource.data.levelName == 'Code Trail'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.questionsCompleted <= 15
-            && request.resource.data.currentQuestionIndex <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-3'
-            && request.resource.data.levelIndex == 2
-            && request.resource.data.levelName == 'Digraph Crossing'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.questionsCompleted <= 15
-            && request.resource.data.currentQuestionIndex <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-4'
-            && request.resource.data.levelIndex == 3
-            && request.resource.data.levelName == 'Spelling Ridge'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.questionsCompleted <= 15
-            && request.resource.data.currentQuestionIndex <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-5'
-            && request.resource.data.levelIndex == 4
-            && request.resource.data.levelName == 'Sentence Springs'
-            && request.resource.data.totalQuestions == 15
-            && request.resource.data.score <= 15
-            && request.resource.data.questionsCompleted <= 15
-            && request.resource.data.currentQuestionIndex <= 15
-          )
-          || (
-            request.resource.data.levelId == 'level-6'
-            && request.resource.data.levelIndex == 5
-            && request.resource.data.levelName == 'Unit 1 Summit'
-            && request.resource.data.totalQuestions == 20
-            && request.resource.data.score <= 20
-            && request.resource.data.questionsCompleted <= 20
-            && request.resource.data.currentQuestionIndex <= 20
-          )
-        );
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions > 0
+        && request.resource.data.totalQuestions <= 300
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.questionsCompleted <= request.resource.data.totalQuestions
+        && request.resource.data.currentQuestionIndex <= request.resource.data.totalQuestions;
     }
 
     function isSoundSafariMasteryFieldsValid() {
@@ -351,11 +416,57 @@ service cloud.firestore {
         && request.resource.data.soundSafariComplete is bool;
     }
 
+    function isValidOptionalCategoryScores() {
+      return !request.resource.data.keys().hasAny(['categoryScores'])
+        || request.resource.data.categoryScores is map;
+    }
+
+    function isValidOptionalResponseTimes() {
+      return !request.resource.data.keys().hasAny(['responseTimesMs'])
+        || (
+          request.resource.data.responseTimesMs is list
+          && request.resource.data.responseTimesMs.size() <= 300
+        );
+    }
+
+    function isValidOptionalAssessmentMetadata() {
+      return (
+          !request.resource.data.keys().hasAny(['assessmentId'])
+          || (
+            request.resource.data.assessmentId is string
+            && request.resource.data.assessmentId.matches('^[a-z0-9-]{3,80}$')
+          )
+        )
+        && (
+          !request.resource.data.keys().hasAny(['assessmentVersion'])
+          || (
+            request.resource.data.assessmentVersion is string
+            && request.resource.data.assessmentVersion.size() >= 1
+            && request.resource.data.assessmentVersion.size() <= 120
+          )
+        );
+    }
+
+    function isValidOptionalQuestionResponses() {
+      return !request.resource.data.keys().hasAny(['questionResponses'])
+        || (
+          request.resource.data.questionResponses is list
+          && request.resource.data.questionResponses.size() <= 300
+        );
+    }
+
+    function isValidOptionalLearningLocation() {
+      return !request.resource.data.keys().hasAny(['learningLocation'])
+        || request.resource.data.learningLocation in ['home', 'school'];
+    }
+
     function isValidCardEdit() {
       return request.resource.data.keys().hasOnly([
           'description',
           'icon',
+          'sortOrder',
           'title',
+          'underConstruction',
           'updatedAt',
           'updatedBy'
         ])
@@ -372,9 +483,21 @@ service cloud.firestore {
         && request.resource.data.icon is string
         && request.resource.data.icon.size() > 0
         && request.resource.data.icon.size() <= 500
+        && (
+          !request.resource.data.keys().hasAny(['sortOrder'])
+          || (
+            request.resource.data.sortOrder is number
+            && request.resource.data.sortOrder >= 0
+            && request.resource.data.sortOrder <= 200
+          )
+        )
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 80
+        && (
+          !request.resource.data.keys().hasAny(['underConstruction'])
+          || request.resource.data.underConstruction is bool
+        )
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.updatedBy == request.auth.token.email;
     }
@@ -396,7 +519,8 @@ service cloud.firestore {
           'enter-edit-mode',
           'exit-edit-mode',
           'reset-card',
-          'update-card'
+          'update-card',
+          'update-card-order'
         ]
         && (
           request.resource.data.cardKey == null
@@ -415,6 +539,7 @@ service cloud.firestore {
           'createdAt',
           'firstName',
           'firstNameKey',
+          'includeInReports',
           'lastName',
           'lastNameKey',
           'teacherEmail',
@@ -435,19 +560,27 @@ service cloud.firestore {
         && isValidName(request.resource.data.lastName)
         && isValidNameKey(request.resource.data.firstNameKey)
         && isValidNameKey(request.resource.data.lastNameKey)
-        && request.resource.data.teacherEmail == request.auth.token.email
+        && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.updatedAt is timestamp;
+        && request.resource.data.updatedAt is timestamp
+        && (
+          !request.resource.data.keys().hasAny(['includeInReports'])
+          || request.resource.data.includeInReports is bool
+        );
     }
 
     function isValidIndividualResult() {
       return request.resource.data.keys().hasOnly([
+          'assessmentId',
+          'assessmentVersion',
           'attempts',
+          'categoryScores',
           'completedAt',
           'createdAt',
           'gameId',
           'gameTitle',
           'incorrectSelections',
+          'learningLocation',
           'levelId',
           'levelIndex',
           'levelName',
@@ -459,6 +592,8 @@ service cloud.firestore {
           'missedQuestions',
           'mode',
           'percent',
+          'questionResponses',
+          'responseTimesMs',
           'schemaVersion',
           'scholarFirstName',
           'scholarFirstNameKey',
@@ -488,7 +623,16 @@ service cloud.firestore {
           'totalQuestions'
         ])
         && request.resource.data.schemaVersion == 1
-        && request.resource.data.mode == 'individual-complete'
+        && (
+          request.resource.data.mode == 'individual-complete'
+          || (
+            request.resource.data.mode == 'practice-complete'
+            && request.resource.data.gameId in [
+              'math-starting-point-quest',
+              'skills-starting-point'
+            ]
+          )
+        )
         && request.resource.data.teacherEmail == 'unassigned'
         && request.resource.data.scholarId == null
         && isValidName(request.resource.data.scholarFirstName)
@@ -508,15 +652,8 @@ service cloud.firestore {
             && request.resource.data.missedQuestions.size() <= 34
           )
           || (
-            request.resource.data.gameId == 'ckla-unit-2-long-vowel-quest'
-            && request.resource.data.score <= 34
-            && request.resource.data.totalQuestions == 34
-            && request.resource.data.missedCount <= 34
-            && request.resource.data.missedQuestions.size() <= 34
-          )
-          || (
-            request.resource.data.gameId == 'unit1-zone1-sound-safari'
-            && isSoundSafariResultTotalsValid()
+            isSharedCklaUnitGame()
+            && isSharedCklaResultTotalsValid()
             && isSoundSafariMasteryFieldsValid()
           )
         )
@@ -532,7 +669,12 @@ service cloud.firestore {
         && request.resource.data.incorrectSelections.size() <= 100
         && request.resource.data.missedQuestions is list
         && request.resource.data.completedAt is timestamp
-        && request.resource.data.createdAt is timestamp;
+        && request.resource.data.createdAt is timestamp
+        && isValidOptionalAssessmentMetadata()
+        && isValidOptionalCategoryScores()
+        && isValidOptionalLearningLocation()
+        && isValidOptionalQuestionResponses()
+        && isValidOptionalResponseTimes();
     }
 
     function isValidWholeClassMiss() {
@@ -588,7 +730,9 @@ service cloud.firestore {
           request.resource.data.teacherEmail == 'unassigned'
           || request.resource.data.teacherEmail in [
             'davisg230@gmail.com',
-            'lvest1@crossroadsschoolskc.org'
+            'lvest1@crossroadsschoolskc.org',
+            'lvest1010@gmail.com',
+            'lvest@crossroadsschoolskc.org'
           ]
         )
         && request.resource.data.scholarId == null
@@ -601,8 +745,8 @@ service cloud.firestore {
         && request.resource.data.gameTitle.size() > 0
         && request.resource.data.gameTitle.size() <= 80
         && isValidWord(request.resource.data.word)
-        && isValidChoice(request.resource.data.correctAnswer)
-        && isValidChoice(request.resource.data.incorrectSelection)
+        && isValidReportChoice(request.resource.data.correctAnswer)
+        && isValidReportChoice(request.resource.data.incorrectSelection)
         && request.resource.data.questionIndex is int
         && request.resource.data.questionIndex >= 1
         && (
@@ -617,6 +761,27 @@ service cloud.firestore {
           || (
             request.resource.data.gameId == 'unit1-zone1-sound-safari'
             && request.resource.data.questionIndex <= 65
+          )
+          || (
+            request.resource.data.gameId.matches('^ckla-unit-[3-7]-skills-quest$')
+            && request.resource.data.questionIndex <= 300
+          )
+          || (
+            request.resource.data.gameId.matches('^ckla-listening-learning-unit-([1-9]|10|11)$')
+            && request.resource.data.questionIndex <= 300
+          )
+          || (
+            request.resource.data.gameId.matches('^eureka-math-module-[1-6]$')
+            && request.resource.data.questionIndex <= 300
+          )
+          || (
+            request.resource.data.gameId in [
+              'letter-search-safari',
+              'math-starting-point-quest',
+              'number-search-safari',
+              'skills-starting-point'
+            ]
+            && request.resource.data.questionIndex <= 300
           )
         )
         && request.resource.data.score == 0
@@ -633,6 +798,9 @@ service cloud.firestore {
 
     function isValidProgressSubmission(progressId) {
       return request.resource.data.keys().hasOnly([
+          'assessmentId',
+          'assessmentVersion',
+          'categoryScores',
           'completedAt',
           'createdAt',
           'currentQuestionIndex',
@@ -640,12 +808,18 @@ service cloud.firestore {
           'currentWord',
           'gameId',
           'gameTitle',
+          'incorrectSelections',
+          'learningLocation',
           'levelId',
           'levelIndex',
           'levelName',
+          'missedCount',
+          'missedQuestions',
           'mode',
           'percentComplete',
+          'questionResponses',
           'questionsCompleted',
+          'responseTimesMs',
           'schemaVersion',
           'scholarFirstName',
           'scholarFirstNameKey',
@@ -665,6 +839,9 @@ service cloud.firestore {
           'currentWord',
           'gameId',
           'gameTitle',
+          'incorrectSelections',
+          'missedCount',
+          'missedQuestions',
           'mode',
           'percentComplete',
           'questionsCompleted',
@@ -694,7 +871,9 @@ service cloud.firestore {
           request.resource.data.teacherEmail == 'unassigned'
           || request.resource.data.teacherEmail in [
             'davisg230@gmail.com',
-            'lvest1@crossroadsschoolskc.org'
+            'lvest1@crossroadsschoolskc.org',
+            'lvest1010@gmail.com',
+            'lvest@crossroadsschoolskc.org'
           ]
         )
         && request.resource.data.scholarId == null
@@ -710,6 +889,13 @@ service cloud.firestore {
         && isValidWord(request.resource.data.currentWord)
         && request.resource.data.score is int
         && request.resource.data.score >= 0
+        && request.resource.data.incorrectSelections is list
+        && request.resource.data.incorrectSelections.size() <= 100
+        && request.resource.data.missedCount is int
+        && request.resource.data.missedCount >= 0
+        && request.resource.data.missedCount <= request.resource.data.totalQuestions
+        && request.resource.data.missedQuestions is list
+        && request.resource.data.missedQuestions.size() == request.resource.data.missedCount
         && request.resource.data.questionsCompleted is int
         && request.resource.data.questionsCompleted >= 0
         && request.resource.data.currentQuestionIndex is int
@@ -723,15 +909,8 @@ service cloud.firestore {
             && request.resource.data.currentQuestionIndex <= 34
           )
           || (
-            request.resource.data.gameId == 'ckla-unit-2-long-vowel-quest'
-            && request.resource.data.totalQuestions == 34
-            && request.resource.data.score <= 34
-            && request.resource.data.questionsCompleted <= 34
-            && request.resource.data.currentQuestionIndex <= 34
-          )
-          || (
-            request.resource.data.gameId == 'unit1-zone1-sound-safari'
-            && isSoundSafariProgressTotalsValid()
+            isSharedCklaUnitGame()
+            && isSharedCklaProgressTotalsValid()
           )
         )
         && request.resource.data.percentComplete is int
@@ -739,10 +918,284 @@ service cloud.firestore {
         && request.resource.data.percentComplete <= 100
         && request.resource.data.createdAt is timestamp
         && request.resource.data.updatedAt is timestamp
+        && isValidOptionalAssessmentMetadata()
         && (
           request.resource.data.completedAt == null
           || request.resource.data.completedAt is timestamp
-        );
+        )
+        && isValidOptionalCategoryScores()
+        && isValidOptionalLearningLocation()
+        && isValidOptionalQuestionResponses()
+        && isValidOptionalResponseTimes();
+    }
+
+    function isValidGameLevelControl(control, levelCount) {
+      return control is map
+        && control.keys().hasOnly([
+          'commandId',
+          'lockedLevelIndexes',
+          'masteryCounts',
+          'masteryOverrideLevelIndexes',
+          'restartLevelIndex',
+          'unlockedLevelIndexes'
+        ])
+        && control.keys().hasAll([
+          'commandId',
+          'lockedLevelIndexes',
+          'masteryCounts',
+          'masteryOverrideLevelIndexes',
+          'restartLevelIndex',
+          'unlockedLevelIndexes'
+        ])
+        && control.commandId is string
+        && control.commandId.matches('^[A-Za-z0-9-]{10,80}$')
+        && control.lockedLevelIndexes is list
+        && control.lockedLevelIndexes.size() <= levelCount
+        && control.masteryCounts is list
+        && control.masteryCounts.size() == levelCount
+        && control.masteryOverrideLevelIndexes is list
+        && control.masteryOverrideLevelIndexes.size() <= levelCount
+        && control.restartLevelIndex is int
+        && control.restartLevelIndex >= -1
+        && control.restartLevelIndex < levelCount
+        && control.unlockedLevelIndexes is list
+        && control.unlockedLevelIndexes.size() <= levelCount;
+    }
+
+    function isValidManagedGameControls(controls) {
+      return controls is map
+        && controls.keys().hasOnly([
+          'unit1-zone1-sound-safari',
+          'ckla-unit-2-long-vowel-quest',
+          'ckla-unit-3-skills-quest',
+          'ckla-unit-4-skills-quest',
+          'ckla-unit-5-skills-quest',
+          'ckla-unit-6-skills-quest',
+          'ckla-unit-7-skills-quest',
+          'letter-search-safari',
+          'number-search-safari',
+          'ckla-listening-learning-unit-1',
+          'ckla-listening-learning-unit-2',
+          'ckla-listening-learning-unit-3',
+          'ckla-listening-learning-unit-4',
+          'ckla-listening-learning-unit-5',
+          'ckla-listening-learning-unit-6',
+          'ckla-listening-learning-unit-7',
+          'ckla-listening-learning-unit-8',
+          'ckla-listening-learning-unit-9',
+          'ckla-listening-learning-unit-10',
+          'ckla-listening-learning-unit-11',
+          'eureka-math-module-1',
+          'eureka-math-module-2',
+          'eureka-math-module-3',
+          'eureka-math-module-4',
+          'eureka-math-module-5',
+          'eureka-math-module-6'
+        ])
+        && controls.size() >= 1
+        && (!controls.keys().hasAny(['unit1-zone1-sound-safari'])
+          || isValidGameLevelControl(controls['unit1-zone1-sound-safari'], 6))
+        && (!controls.keys().hasAny(['ckla-unit-2-long-vowel-quest'])
+          || isValidGameLevelControl(controls['ckla-unit-2-long-vowel-quest'], 5))
+        && (!controls.keys().hasAny(['ckla-unit-3-skills-quest'])
+          || isValidGameLevelControl(controls['ckla-unit-3-skills-quest'], 1))
+        && (!controls.keys().hasAny(['ckla-unit-4-skills-quest'])
+          || isValidGameLevelControl(controls['ckla-unit-4-skills-quest'], 1))
+        && (!controls.keys().hasAny(['ckla-unit-5-skills-quest'])
+          || isValidGameLevelControl(controls['ckla-unit-5-skills-quest'], 1))
+        && (!controls.keys().hasAny(['ckla-unit-6-skills-quest'])
+          || isValidGameLevelControl(controls['ckla-unit-6-skills-quest'], 1))
+        && (!controls.keys().hasAny(['ckla-unit-7-skills-quest'])
+          || isValidGameLevelControl(controls['ckla-unit-7-skills-quest'], 1))
+        && (!controls.keys().hasAny(['letter-search-safari'])
+          || isValidGameLevelControl(controls['letter-search-safari'], 3))
+        && (!controls.keys().hasAny(['number-search-safari'])
+          || isValidGameLevelControl(controls['number-search-safari'], 2))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-1'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-1'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-2'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-2'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-3'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-3'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-4'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-4'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-5'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-5'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-6'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-6'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-7'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-7'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-8'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-8'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-9'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-9'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-10'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-10'], 1))
+        && (!controls.keys().hasAny(['ckla-listening-learning-unit-11'])
+          || isValidGameLevelControl(controls['ckla-listening-learning-unit-11'], 1))
+        && (!controls.keys().hasAny(['eureka-math-module-1'])
+          || isValidGameLevelControl(controls['eureka-math-module-1'], 1))
+        && (!controls.keys().hasAny(['eureka-math-module-2'])
+          || isValidGameLevelControl(controls['eureka-math-module-2'], 1))
+        && (!controls.keys().hasAny(['eureka-math-module-3'])
+          || isValidGameLevelControl(controls['eureka-math-module-3'], 1))
+        && (!controls.keys().hasAny(['eureka-math-module-4'])
+          || isValidGameLevelControl(controls['eureka-math-module-4'], 1))
+        && (!controls.keys().hasAny(['eureka-math-module-5'])
+          || isValidGameLevelControl(controls['eureka-math-module-5'], 1))
+        && (!controls.keys().hasAny(['eureka-math-module-6'])
+          || isValidGameLevelControl(controls['eureka-math-module-6'], 1));
+    }
+
+    function isValidScholarControl(controlId) {
+      return isTeacherEditor()
+        && controlId == request.resource.data.scholarFirstNameKey
+        && request.resource.data.keys().hasOnly([
+          'action',
+          'commandId',
+          'gameControls',
+          'lockedLevelIndexes',
+          'masteryCounts',
+          'masteryOverrideLevelIndexes',
+          'restartLevelIndex',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'teacherEmail',
+          'unlockedLevelIndexes',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'action',
+          'commandId',
+          'gameControls',
+          'lockedLevelIndexes',
+          'masteryCounts',
+          'masteryOverrideLevelIndexes',
+          'restartLevelIndex',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'teacherEmail',
+          'unlockedLevelIndexes',
+          'updatedAt'
+        ])
+        && request.resource.data.action == 'manage-game-levels'
+        && request.resource.data.commandId is string
+        && request.resource.data.commandId.matches('^[A-Za-z0-9-]{10,80}$')
+        && isValidName(request.resource.data.scholarFirstName)
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && isValidManagedGameControls(request.resource.data.gameControls)
+        && request.resource.data.masteryCounts is list
+        && request.resource.data.masteryCounts.size() == 6
+        && request.resource.data.masteryCounts[0] >= 0 && request.resource.data.masteryCounts[0] <= 3
+        && request.resource.data.masteryCounts[1] >= 0 && request.resource.data.masteryCounts[1] <= 3
+        && request.resource.data.masteryCounts[2] >= 0 && request.resource.data.masteryCounts[2] <= 3
+        && request.resource.data.masteryCounts[3] >= 0 && request.resource.data.masteryCounts[3] <= 3
+        && request.resource.data.masteryCounts[4] >= 0 && request.resource.data.masteryCounts[4] <= 3
+        && request.resource.data.masteryCounts[5] >= 0 && request.resource.data.masteryCounts[5] <= 3
+        && request.resource.data.masteryOverrideLevelIndexes is list
+        && request.resource.data.masteryOverrideLevelIndexes.size() <= 6
+        && request.resource.data.lockedLevelIndexes is list
+        && request.resource.data.lockedLevelIndexes.size() <= 6
+        && request.resource.data.restartLevelIndex is int
+        && request.resource.data.restartLevelIndex >= -1
+        && request.resource.data.restartLevelIndex <= 5
+        && request.resource.data.unlockedLevelIndexes is list
+        && request.resource.data.unlockedLevelIndexes.size() <= 6
+        && request.resource.data.teacherEmail == request.auth.token.email
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function isValidPreassessmentStatus(statusId) {
+      return (
+          (
+            statusId.matches('^math-starting-point-quest-[a-z]{1,30}$')
+            && request.resource.data.gameId == 'math-starting-point-quest'
+            && request.resource.data.subject == 'math'
+          )
+          || (
+            statusId.matches('^skills-starting-point-[a-z]{1,30}$')
+            && request.resource.data.gameId == 'skills-starting-point'
+            && request.resource.data.subject == 'skills'
+          )
+        )
+        && request.resource.data.keys().hasOnly([
+          'assessmentId',
+          'assessmentVersion',
+          'categoryScores',
+          'completedAt',
+          'completedRetakeCommandId',
+          'createdAt',
+          'gameId',
+          'learningLocation',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'score',
+          'subject',
+          'totalQuestions',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'completedAt',
+          'createdAt',
+          'gameId',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'score',
+          'subject',
+          'totalQuestions',
+          'updatedAt'
+        ])
+        && isValidName(request.resource.data.scholarFirstName)
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions >= 1
+        && request.resource.data.totalQuestions <= 100
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && (
+          !request.resource.data.keys().hasAny(['completedRetakeCommandId'])
+          || (
+            request.resource.data.completedRetakeCommandId is string
+            && request.resource.data.completedRetakeCommandId.size() >= 1
+            && request.resource.data.completedRetakeCommandId.size() <= 80
+          )
+        )
+        && isValidOptionalAssessmentMetadata()
+        && isValidOptionalCategoryScores()
+        && isValidOptionalLearningLocation()
+        && request.resource.data.completedAt is timestamp
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function isValidPreassessmentControl(controlId) {
+      return isTeacherEditor()
+        && (
+          controlId.matches('^math-starting-point-quest-[a-z]{1,30}$')
+          || controlId.matches('^skills-starting-point-[a-z]{1,30}$')
+        )
+        && request.resource.data.keys().hasOnly([
+          'action',
+          'commandId',
+          'scholarFirstNameKey',
+          'teacherEmail',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'action',
+          'commandId',
+          'scholarFirstNameKey',
+          'teacherEmail',
+          'updatedAt'
+        ])
+        && request.resource.data.action in ['normal', 'retake', 'waived']
+        && request.resource.data.commandId is string
+        && request.resource.data.commandId.size() >= 1
+        && request.resource.data.commandId.size() <= 80
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && request.resource.data.teacherEmail == request.auth.token.email
+        && request.resource.data.updatedAt is timestamp;
     }
 
     function canReadResult() {
@@ -793,9 +1246,15 @@ service cloud.firestore {
       allow create: if isTeacherEditor()
         && isValidScholar();
       allow read: if isTeacherEditor();
-      allow delete: if isOwnedBySignedInTeacher();
-      allow update: if isOwnedBySignedInTeacher()
+      allow delete: if canManageScholarRoster();
+      allow update: if canManageScholarRoster()
         && isValidScholar();
+    }
+
+    match /gameHubSkillsDataOverrides/{overrideId} {
+      allow read, delete: if isTeacherEditor();
+      allow create, update: if isTeacherEditor()
+        && isValidSkillsDataOverride();
     }
 
     match /gameHubResultSubmissions/{resultId} {
@@ -808,6 +1267,29 @@ service cloud.firestore {
     match /gameHubProgressSubmissions/{progressId} {
       allow create, update: if isValidProgressSubmission(progressId);
       allow read, delete: if isTeacherEditor();
+    }
+
+    match /gameHubPreassessmentStatus/{statusId} {
+      allow get: if statusId.matches('^math-starting-point-quest-[a-z]{1,30}$')
+        || statusId.matches('^skills-starting-point-[a-z]{1,30}$');
+      allow list: if isTeacherEditor();
+      allow create, update: if isValidPreassessmentStatus(statusId);
+      allow delete: if isTeacherEditor();
+    }
+
+    match /gameHubPreassessmentControls/{controlId} {
+      allow get: if controlId.matches('^math-starting-point-quest-[a-z]{1,30}$')
+        || controlId.matches('^skills-starting-point-[a-z]{1,30}$');
+      allow list: if isTeacherEditor();
+      allow create, update: if isValidPreassessmentControl(controlId);
+      allow delete: if isTeacherEditor();
+    }
+
+    match /gameHubScholarControls/{controlId} {
+      allow get: if true;
+      allow list: if isTeacherEditor();
+      allow create, update: if isValidScholarControl(controlId);
+      allow delete: if isTeacherEditor();
     }
 
     match /{document=**} {

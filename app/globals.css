@@ -1375,6 +1375,12 @@ button.area-card {
   background: #ffffff;
 }
 
+.curriculum-recommendation-item.is-strong-match {
+  border-color: #f6b84f;
+  background: #fffaf0;
+  box-shadow: inset 4px 0 0 #f6b84f;
+}
+
 .curriculum-recommendation-item span {
   color: var(--muted);
   font-size: 0.8rem;
@@ -1415,6 +1421,60 @@ button.area-card {
 .curriculum-recommendation-link.secondary {
   color: #2f4054;
   background: #fff0c8;
+}
+
+.small-group-match-star {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 9px;
+  color: #6f4e00;
+  background: #fff0c8;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.small-group-lesson-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.curriculum-source-upload-button {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #2f4054;
+  background: #e8f1f7;
+  font-size: 0.84rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.curriculum-source-upload-button input {
+  display: none;
+}
+
+.small-group-source-box {
+  display: grid;
+  gap: 6px;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 10px;
+}
+
+.small-group-source-box textarea {
+  width: 100%;
+  min-height: 88px;
+  border: 1px solid rgb(124 111 91 / 0.22);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.86rem;
+  resize: vertical;
 }
 
 .teacher-filter-tabs {
@@ -1771,6 +1831,109 @@ button.area-card {
   z-index: 2;
   background: #fff0c8;
   font-weight: 950;
+}
+
+.skills-data-scholar-button {
+  width: 100%;
+  min-height: 26px;
+  border: 0;
+  padding: 4px 8px;
+  color: #2f4054;
+  background: transparent;
+  font: inherit;
+  font-weight: 950;
+  text-align: left;
+  cursor: pointer;
+}
+
+.skills-data-scholar-button:hover,
+.skills-data-scholar-button:focus-visible {
+  color: #ffffff;
+  background: var(--blue);
+  outline: none;
+}
+
+.skills-data-chart-helper {
+  margin: 0;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.skills-data-scholar-detail {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgb(124 111 91 / 0.16);
+  border-radius: 14px;
+  background: #fffdf8;
+  padding: 14px;
+}
+
+.skills-data-scholar-detail h4,
+.skills-data-scholar-records h5 {
+  margin: 0;
+  color: var(--ink);
+}
+
+.skills-data-scholar-targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.skills-data-scholar-target {
+  display: grid;
+  gap: 4px;
+  min-height: 88px;
+  border: 1px solid rgb(124 111 91 / 0.16);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--ink);
+  background: #ffffff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.skills-data-scholar-target.mastered {
+  border-color: rgb(41 217 85 / 0.46);
+  background: rgb(41 217 85 / 0.12);
+}
+
+.skills-data-scholar-target.needs-review {
+  border-color: rgb(242 77 66 / 0.42);
+  background: rgb(242 77 66 / 0.1);
+}
+
+.skills-data-scholar-target.unassessed {
+  background: #f7f7f7;
+}
+
+.skills-data-scholar-target strong {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.skills-data-scholar-target span,
+.skills-data-scholar-target small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.skills-data-scholar-records {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.skills-data-scholar-records section {
+  display: grid;
+  gap: 8px;
 }
 
 .skills-data-table tbody th {

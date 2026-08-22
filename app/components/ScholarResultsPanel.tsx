@@ -210,6 +210,7 @@ type SmallGroupNeedSummary = {
   count: number;
   key: string;
   label: string;
+  searchTerms: string[];
   studentCount: number;
   students: string[];
 };
@@ -319,6 +320,10 @@ type CurriculumRecommendationResponse = {
   recommendations?: CurriculumRecommendation[];
 };
 type CurriculumRecommendationStatus = "idle" | "loading" | "success" | "error";
+type SmallGroupLessonSource = {
+  fileName: string;
+  text: string;
+};
 
 const SCHOLAR_COLLECTION = "gameHubScholars";
 const RESULT_COLLECTION = "gameHubResultSubmissions";
@@ -2191,11 +2196,48 @@ function smallGroupNeedLabel(
   record: ResultSubmission | ProgressSubmission,
   missed: MissedQuestion,
 ) {
-  const game = gameTitleFor(record.gameId, record.gameTitle);
-  const level = missed.levelName || record.levelName || "";
-  const skill = missed.category || "Needs practice";
+  const level = normalizeCurriculumNeedText(missed.levelName || record.levelName || "");
+  const skill = normalizeCurriculumNeedText(missed.category || "");
+  const target = normalizeCurriculumNeedText(
+    missed.word
+    || missed.correctAnswer
+    || ("word" in record ? record.word : "")
+    || ("currentWord" in record ? record.currentWord : ""),
+  );
 
-  return [game, level, skill].filter(Boolean).join(" - ");
+  if (target && /^[a-z]$/i.test(target) && /lowercase/i.test(level)) {
+    return `Lowercase ${target.toLowerCase()} identification`;
+  }
+
+  if (target && /^[a-z]$/i.test(target) && /uppercase/i.test(level)) {
+    return `Uppercase ${target.toUpperCase()} identification`;
+  }
+
+  if (target && skill && normalizeCurriculumNeedKey(target) !== normalizeCurriculumNeedKey(skill)) {
+    return `${target} - ${skill}`;
+  }
+
+  if (level && skill && normalizeCurriculumNeedKey(level).includes(normalizeCurriculumNeedKey(skill))) {
+    return level;
+  }
+
+  return skill || level || target || "Needs practice";
+}
+
+function smallGroupNeedSearchTerms(
+  record: ResultSubmission | ProgressSubmission,
+  missed: MissedQuestion,
+) {
+  return [
+    smallGroupNeedLabel(record, missed),
+    missed.category,
+    missed.levelName || record.levelName,
+    missed.word,
+    missed.correctAnswer,
+    "word" in record ? record.word : "",
+    "currentWord" in record ? record.currentWord : "",
+    gameTitleFor(record.gameId, record.gameTitle),
+  ].filter(Boolean);
 }
 
 function recordMissCount(record: ResultSubmission | ProgressSubmission) {
@@ -2424,6 +2466,17 @@ function curriculumRecommendationReason(
     return `Matched ${recommendation.matchedNeeds.slice(0, 4).join(", ")} in the saved Hub lesson.`;
   }
   return `Suggested for ${candidate.need} based on the current data view.`;
+}
+
+function isStrongSmallGroupLessonMatch(
+  recommendation: CurriculumRecommendation,
+  candidate: CurriculumNeedCandidate,
+  index: number,
+) {
+  const detail = curriculumRecommendationDetailsForCandidate(recommendation, candidate)[0];
+  return index === 0
+    || recommendation.score >= 56
+    || ["direct", "standard"].includes(detail?.matchType || "");
 }
 
 function curriculumGroupUploadUrl(
@@ -2713,6 +2766,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const [scholars, setScholars] = useState<Scholar[]>([]);
   const [scholarControls, setScholarControls] =
     useState<ScholarControl[]>([]);
+  const [smallGroupLessonSources, setSmallGroupLessonSources] =
+    useState<Record<string, SmallGroupLessonSource>>({});
   const [skillsDataEditNote, setSkillsDataEditNote] = useState("");
   const [skillsDataEditStatus, setSkillsDataEditStatus] =
     useState<SkillsDataStatus>("unassessed");
@@ -2726,6 +2781,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     useState<SkillsDataSortMode>("name");
   const [isSavingSkillsDataEdit, setIsSavingSkillsDataEdit] = useState(false);
   const [selectedSkillsDataCellKey, setSelectedSkillsDataCellKey] = useState("");
+  const [selectedSkillsDataScholarId, setSelectedSkillsDataScholarId] = useState("");
   const [selectedScholarId, setSelectedScholarId] = useState("");
   const [selectedSmallGroupNeedKey, setSelectedSmallGroupNeedKey] = useState("");
   const [selectedManagedGameId, setSelectedManagedGameId] = useState(
@@ -2919,6 +2975,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         : dataReportView === "math"
           ? "Math"
           : "Students";
+  const curriculumRecommendationSubject = curriculumSubjectForReportView(dataReportView);
 
   const visibleSkillsDataReports = useMemo(() => {
     const subject: SkillsDataReportSubject = dataReportView === "math" ? "math" : "skills";
@@ -3027,6 +3084,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       ),
     ) ?? null;
   }, [selectedSkillsDataCell, selectedSkillsDataReport.id, skillsDataOverrides]);
+  const selectedSkillsDataScholarRow = useMemo(
+    () => skillsDataRows.find((row) => row.scholar.id === selectedSkillsDataScholarId) ?? null,
+    [selectedSkillsDataScholarId, skillsDataRows],
+  );
   const skillsDataManualEvidenceCount = skillsDataOverrides.filter((override) =>
     override.reportId === selectedSkillsDataReport.id
     && reportScholars.some((scholar) =>
@@ -3443,7 +3504,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const dashboardStruggles = useMemo(() => {
     const summaries = new Map<
       string,
-      { count: number; label: string; students: Map<string, string> }
+      { count: number; label: string; searchTerms: Set<string>; students: Map<string, string> }
     >();
 
     const addRecord = (record: ResultSubmission | ProgressSubmission) => {
@@ -3457,10 +3518,15 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         const existing = summaries.get(key) ?? {
           count: 0,
           label: smallGroupNeedLabel(record, missed),
+          searchTerms: new Set<string>(),
           students: new Map<string, string>(),
         };
 
         existing.count += Math.max(1, missed.incorrectSelections?.length ?? 0);
+        smallGroupNeedSearchTerms(record, missed).forEach((term) => {
+          const cleanTerm = normalizeCurriculumNeedText(term);
+          if (cleanTerm) existing.searchTerms.add(cleanTerm);
+        });
         existing.students.set(studentKey, match.label);
         summaries.set(key, existing);
       });
@@ -3474,6 +3540,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         count: value.count,
         key,
         label: value.label,
+        searchTerms: Array.from(value.searchTerms),
         studentCount: value.students.size,
         students: Array.from(value.students.values()).sort((a, b) => a.localeCompare(b)),
       } satisfies SmallGroupNeedSummary))
@@ -3493,6 +3560,31 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   );
   const recentResults = dashboardResults.slice(0, 8);
   const recentProgress = dashboardProgress.slice(0, 8);
+  const selectedSkillsDataScholarResults = useMemo(() => {
+    if (!selectedSkillsDataScholarRow) {
+      return [];
+    }
+
+    return results
+      .filter((result) =>
+        gameSubjectForGameId(result.gameId) === curriculumRecommendationSubject
+        && matchResult(result, [selectedSkillsDataScholarRow.scholar]).scholar?.id === selectedSkillsDataScholarRow.scholar.id,
+      )
+      .slice(0, 8);
+  }, [curriculumRecommendationSubject, results, selectedSkillsDataScholarRow]);
+  const selectedSkillsDataScholarProgress = useMemo(() => {
+    if (!selectedSkillsDataScholarRow) {
+      return [];
+    }
+
+    return progressRecords
+      .filter((progress) =>
+        progress.status !== "completed"
+        && gameSubjectForGameId(progress.gameId) === curriculumRecommendationSubject
+        && matchResult(progress, [selectedSkillsDataScholarRow.scholar]).scholar?.id === selectedSkillsDataScholarRow.scholar.id,
+      )
+      .slice(0, 5);
+  }, [curriculumRecommendationSubject, progressRecords, selectedSkillsDataScholarRow]);
   const curriculumNeedCandidates = useMemo(() => {
     const candidates = new Map<string, CurriculumNeedCandidate>();
 
@@ -3523,7 +3615,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       addCurriculumNeedCandidate(candidates, struggle.label, {
         count: struggle.count,
         scholars: struggle.students,
-        searchTerms: [struggle.label],
+        searchTerms: struggle.searchTerms,
         source: "Small-Group Needs",
       });
     });
@@ -3581,7 +3673,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         .filter((recommendation) => recommendationMatchesNeedCandidate(recommendation, selectedSmallGroupNeed))
         .slice(0, 4)
     : [];
-  const curriculumRecommendationSubject = curriculumSubjectForReportView(dataReportView);
 
   const fetchCurriculumRecommendations = async () => {
     const needs = Array.from(new Set(
@@ -3634,6 +3725,47 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const updateSmallGroupLessonSource = (
+    recommendationId: string,
+    nextSource: Partial<SmallGroupLessonSource>,
+  ) => {
+    setSmallGroupLessonSources((currentSources) => {
+      const currentSource = currentSources[recommendationId] ?? { fileName: "", text: "" };
+      return {
+        ...currentSources,
+        [recommendationId]: {
+          ...currentSource,
+          ...nextSource,
+        },
+      };
+    });
+  };
+
+  const attachSmallGroupLessonSourceFile = async (
+    recommendation: CurriculumRecommendation,
+    file: File | null,
+  ) => {
+    if (!file) {
+      return;
+    }
+
+    updateSmallGroupLessonSource(recommendation.id, {
+      fileName: file.name,
+    });
+
+    if (file.type.startsWith("text/") || /\.(txt|md|csv)$/i.test(file.name)) {
+      const text = await file.text();
+      updateSmallGroupLessonSource(recommendation.id, {
+        fileName: file.name,
+        text,
+      });
+      setStatus(`Attached ${file.name} for ${recommendation.lessonTitle || "this lesson"}.`);
+      return;
+    }
+
+    setStatus(`Attached ${file.name}. Paste the key lesson steps or activity notes in the source box before printing.`);
+  };
+
   const openDataReportView = (view: DataReportView) => {
     setDataReportView(view);
     setGameFilter("all");
@@ -3641,6 +3773,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setScholarFilter("all");
     setSelectedSmallGroupNeedKey("");
     setSelectedSkillsDataCellKey("");
+    setSelectedSkillsDataScholarId("");
     setSkillsDataFocusMode("all");
     setCurriculumRecommendations([]);
     setCurriculumRecommendationNeeds([]);
@@ -4498,8 +4631,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const printCurriculumGroupPlan = (
     candidate: CurriculumNeedCandidate,
     recommendations: CurriculumRecommendation[],
+    lessonSource?: SmallGroupLessonSource,
   ) => {
     const reportWindow = window.open("", "_blank");
+    const sourceText = lessonSource?.text.trim() ?? "";
+    const sourceTitle = lessonSource?.fileName.trim() ?? "";
     const scholarItems = candidate.scholars.length
       ? candidate.scholars.map((scholar) => `<li>${escapeReportHtml(scholar)}</li>`).join("")
       : "<li>No roster names were attached to this need yet.</li>";
@@ -4555,6 +4691,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           <main>
             <h2>Recommended Hub Lessons</h2>
             ${recommendationsHtml}
+            ${sourceText || sourceTitle ? `
+              <article class="lesson-card">
+                <p class="match">Uploaded lesson source</p>
+                ${sourceTitle ? `<h3>${escapeReportHtml(sourceTitle)}</h3>` : ""}
+                ${sourceText ? `<p>${escapeReportHtml(sourceText.slice(0, 1800))}${sourceText.length > 1800 ? "..." : ""}</p>` : "<p>Source file attached. Add/paste key lesson steps before printing for more detail.</p>"}
+              </article>
+            ` : ""}
           </main>
         </div>
       </body>
@@ -5105,28 +5248,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         >
                           {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
                         </button>
-                        <button
-                          className="teacher-control-button secondary"
-                          onClick={() => printCurriculumGroupPlan(selectedSmallGroupNeed, selectedSmallGroupRecommendations)}
-                          type="button"
-                        >
-                          Print Group
-                        </button>
-                        <button
-                          className="teacher-control-button secondary"
-                          onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, selectedSmallGroupRecommendations)}
-                          type="button"
-                        >
-                          Print Family Help
-                        </button>
-                        <a
-                          className="curriculum-recommendation-link secondary"
-                          href={curriculumGroupUploadUrl(selectedSmallGroupNeed, curriculumRecommendationSubject)}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          Upload Lesson to Hub
-                        </a>
                       </div>
                       {selectedSmallGroupNeed.scholars.length ? (
                         <div className="small-group-student-list">
@@ -5139,27 +5260,71 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       )}
                       <div className="curriculum-recommendation-list compact">
                         {selectedSmallGroupRecommendations.length ? (
-                          selectedSmallGroupRecommendations.map((recommendation) => (
-                            <article className="curriculum-recommendation-item" key={recommendation.id}>
-                              <div>
-                                <span>{curriculumRecommendationMatchLabel(recommendation, selectedSmallGroupNeed)}</span>
-                                <h5>{recommendation.lessonTitle}</h5>
-                                <small>{curriculumRecommendationLessonLabel(recommendation)}</small>
-                              </div>
-                              <p><strong>Why this lesson:</strong> {curriculumRecommendationReason(recommendation, selectedSmallGroupNeed)}</p>
-                              <a
-                                className="curriculum-recommendation-link"
-                                href={recommendation.url || HUB_CLASS_URL}
-                                rel="noreferrer"
-                                target="_blank"
+                          selectedSmallGroupRecommendations.map((recommendation, index) => {
+                            const lessonSource = smallGroupLessonSources[recommendation.id] ?? { fileName: "", text: "" };
+                            const isStrongMatch = isStrongSmallGroupLessonMatch(recommendation, selectedSmallGroupNeed, index);
+
+                            return (
+                              <article
+                                className={`curriculum-recommendation-item ${isStrongMatch ? "is-strong-match" : ""}`}
+                                key={recommendation.id}
                               >
-                                Open Lesson in Hub
-                              </a>
-                            </article>
-                          ))
+                                <div>
+                                  <span>{curriculumRecommendationMatchLabel(recommendation, selectedSmallGroupNeed)}</span>
+                                  <h5>{recommendation.lessonTitle}</h5>
+                                  <small>{curriculumRecommendationLessonLabel(recommendation)}</small>
+                                </div>
+                                {isStrongMatch ? (
+                                  <strong className="small-group-match-star">Best small-group plan match</strong>
+                                ) : null}
+                                <p><strong>Why this lesson:</strong> {curriculumRecommendationReason(recommendation, selectedSmallGroupNeed)}</p>
+                                <div className="small-group-lesson-actions">
+                                  <button
+                                    className="teacher-text-button"
+                                    onClick={() => printCurriculumGroupPlan(selectedSmallGroupNeed, [recommendation], lessonSource)}
+                                    type="button"
+                                  >
+                                    Print Teacher Plan
+                                  </button>
+                                  <button
+                                    className="teacher-text-button"
+                                    onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, [recommendation])}
+                                    type="button"
+                                  >
+                                    Print Family Help
+                                  </button>
+                                  <label className="curriculum-source-upload-button">
+                                    Upload Source
+                                    <input
+                                      accept=".txt,.md,.csv,.pdf,application/pdf,text/*"
+                                      onChange={(event) => {
+                                        void attachSmallGroupLessonSourceFile(
+                                          recommendation,
+                                          event.currentTarget.files?.[0] ?? null,
+                                        );
+                                        event.currentTarget.value = "";
+                                      }}
+                                      type="file"
+                                    />
+                                  </label>
+                                </div>
+                                {lessonSource.fileName || lessonSource.text ? (
+                                  <div className="small-group-source-box">
+                                    {lessonSource.fileName ? <small>Source: {lessonSource.fileName}</small> : null}
+                                    <textarea
+                                      onChange={(event) => updateSmallGroupLessonSource(recommendation.id, { text: event.target.value })}
+                                      placeholder="Paste the key lesson steps, activity, or notes you want the teacher plan to use."
+                                      rows={4}
+                                      value={lessonSource.text}
+                                    />
+                                  </div>
+                                ) : null}
+                              </article>
+                            );
+                          })
                         ) : (
                           <p className="empty-results-message">
-                            Click Find Lessons to pull possible saved Hub lessons for this group, or upload a source lesson for this need.
+                            Click Find Lessons to pull saved curriculum lessons for this group.
                           </p>
                         )}
                       </div>
@@ -5205,7 +5370,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            {dataReportView === "listening" ? curriculumRecommendationSection : null}
+            {null}
           </section>
           ) : null}
 
@@ -5308,7 +5473,15 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 <tbody>
                   {visibleSkillsDataRows.map((row) => (
                     <tr key={row.scholar.id}>
-                      <th scope="row">{row.scholar.firstName}</th>
+                      <th scope="row">
+                        <button
+                          className="skills-data-scholar-button"
+                          onClick={() => setSelectedSkillsDataScholarId(row.scholar.id)}
+                          type="button"
+                        >
+                          {row.scholar.firstName}
+                        </button>
+                      </th>
                       {visibleSkillsDataTargets.map((target) => {
                         const cell = row.cells.find((nextCell) => nextCell.target === target);
                         if (!cell) {
@@ -5334,7 +5507,101 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               </table>
             </div>
 
-            {curriculumRecommendationSection}
+            {selectedSkillsDataScholarRow ? (
+              <div className="skills-data-scholar-detail">
+                <div className="result-row-head">
+                  <div>
+                    <p className="eyebrow">Scholar Evidence</p>
+                    <h4>{selectedSkillsDataScholarRow.scholar.firstName} {selectedSkillsDataScholarRow.scholar.lastName}</h4>
+                    <p className="pin-helper">
+                      {selectedSkillsDataReport.label}: {selectedSkillsDataScholarRow.masteredCount} mastered, {selectedSkillsDataScholarRow.needsReviewCount} needs review, {selectedSkillsDataScholarRow.unassessedCount} not assessed.
+                    </p>
+                  </div>
+                  <div className="small-group-popup-actions">
+                    <button
+                      className="teacher-control-button secondary"
+                      onClick={() => printStudentOverviewReport(selectedSkillsDataScholarRow.scholar)}
+                      type="button"
+                    >
+                      Print Scholar
+                    </button>
+                    <button
+                      className="teacher-control-button secondary"
+                      onClick={() => setSelectedSkillsDataScholarId("")}
+                      type="button"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                <div className="skills-data-scholar-targets">
+                  {selectedSkillsDataScholarRow.cells.map((cell) => (
+                    <button
+                      className={`skills-data-scholar-target ${cell.status}`}
+                      key={`${selectedSkillsDataScholarRow.scholar.id}-${cell.target}`}
+                      onClick={() => setSelectedSkillsDataCellKey(`${selectedSkillsDataScholarRow.scholar.id}|${cell.target}`)}
+                      type="button"
+                    >
+                      <strong>{cell.target}</strong>
+                      <span>{skillsDataStatusLabel(cell.status)}</span>
+                      {cell.latest ? (
+                        <small>
+                          {cell.latest.source}{cell.latest.date ? ` - ${cell.latest.date.toLocaleDateString()}` : ""}
+                        </small>
+                      ) : (
+                        <small>No evidence yet</small>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="skills-data-scholar-records">
+                  <section>
+                    <h5>Recent Saved Results</h5>
+                    {selectedSkillsDataScholarResults.length ? (
+                      selectedSkillsDataScholarResults.map((result) => {
+                        const completedAt = formatDate(result.completedAt);
+                        return (
+                          <article className="result-row" key={`scholar-result-${result.id}`}>
+                            <div className="result-row-head">
+                              <strong>{gameTitleFor(result.gameId, result.gameTitle)}</strong>
+                              <span className="match-pill matched">{resultModeLabel(result.mode)}</span>
+                            </div>
+                            <p>{result.levelName || "Game"} - Score {result.score}/{result.totalQuestions} - Missed {recordMissCount(result)}</p>
+                            <p>{completedAt ? completedAt.toLocaleString() : "Date pending"}</p>
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <p className="empty-results-message">No saved {activeReportLabel} results for this scholar yet.</p>
+                    )}
+                  </section>
+                  <section>
+                    <h5>Started But Not Finished</h5>
+                    {selectedSkillsDataScholarProgress.length ? (
+                      selectedSkillsDataScholarProgress.map((progress) => {
+                        const updatedAt = formatDate(progress.updatedAt);
+                        return (
+                          <article className="result-row progress-row" key={`scholar-progress-${progress.id}`}>
+                            <div className="result-row-head">
+                              <strong>{gameTitleFor(progress.gameId, progress.gameTitle)}</strong>
+                              <span className="match-pill matched">{progressStatusLabel(progress.status)}</span>
+                            </div>
+                            <p>{progress.levelName || "Game"} - question {progress.currentQuestionIndex}/{progress.totalQuestions}</p>
+                            <p>{updatedAt ? updatedAt.toLocaleString() : "Date pending"}</p>
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <p className="empty-results-message">No unfinished {activeReportLabel} sessions for this scholar.</p>
+                    )}
+                  </section>
+                </div>
+              </div>
+            ) : (
+              <p className="skills-data-chart-helper">Click a scholar name in the chart to open a larger printable evidence view.</p>
+            )}
 
             {selectedSkillsDataCell ? (
               <div className="skills-data-detail">
