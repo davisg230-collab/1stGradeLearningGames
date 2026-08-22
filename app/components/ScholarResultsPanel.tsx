@@ -310,6 +310,19 @@ type CurriculumRecommendation = {
   reason: string;
   url: string;
 };
+type CurriculumRecommendationFeedback = {
+  candidateKey: string;
+  id: string;
+  lessonTitle: string;
+  need: string;
+  reason: string;
+  recommendationId: string;
+  status: "not-match";
+  subject: "skills" | "listening" | "math";
+  teacherEmail: string;
+  updatedAt: unknown;
+  updatedBy: string;
+};
 type CurriculumNeedCandidate = {
   count: number;
   key: string;
@@ -336,12 +349,14 @@ type SmallGroupLessonAnalysis = {
   notes: string[];
   summary: string;
   target: string;
+  teacherRows?: [string, string, string][];
   words: string[];
 };
 type SmallGroupLessonSource = {
   analysis?: SmallGroupLessonAnalysis;
-  analysisStatus?: "none" | "needs-text" | "ready";
+  analysisStatus?: "none" | "needs-text" | "ready" | "mismatch";
   fileName: string;
+  mismatchReason?: string;
   text: string;
 };
 
@@ -352,6 +367,8 @@ const PREASSESSMENT_STATUS_COLLECTION = "gameHubPreassessmentStatus";
 const PREASSESSMENT_CONTROL_COLLECTION = "gameHubPreassessmentControls";
 const SCHOLAR_CONTROL_COLLECTION = "gameHubScholarControls";
 const SKILLS_DATA_OVERRIDE_COLLECTION = "gameHubSkillsDataOverrides";
+const CURRICULUM_RECOMMENDATION_FEEDBACK_COLLECTION =
+  "gameHubCurriculumRecommendationFeedback";
 const GAME_COLLECTION = "gameHubGameDefinitions";
 const MATH_PREASSESSMENT_GAME_ID = "math-starting-point-quest";
 const MATH_PREASSESSMENT_STATUS_ID_PREFIX = "math-starting-point-quest-";
@@ -1400,6 +1417,25 @@ function mapSkillsDataOverride(doc: FirestoreDocSnapshot): SkillsDataOverride {
     scholarId: asText(data.scholarId),
     status: skillsDataOverrideStatus(data.status),
     target: normalizeDataAtGlanceTarget(data.target, reportId),
+    teacherEmail: asText(data.teacherEmail),
+    updatedAt: data.updatedAt,
+    updatedBy: asText(data.updatedBy),
+  };
+}
+
+function mapCurriculumRecommendationFeedback(doc: FirestoreDocSnapshot): CurriculumRecommendationFeedback {
+  const data = doc.data() ?? {};
+  const subject = asText(data.subject);
+
+  return {
+    candidateKey: asText(data.candidateKey),
+    id: doc.id,
+    lessonTitle: asText(data.lessonTitle),
+    need: asText(data.need),
+    reason: asText(data.reason),
+    recommendationId: asText(data.recommendationId),
+    status: "not-match",
+    subject: subject === "math" || subject === "listening" ? subject : "skills",
     teacherEmail: asText(data.teacherEmail),
     updatedAt: data.updatedAt,
     updatedBy: asText(data.updatedBy),
@@ -2616,6 +2652,42 @@ function curriculumRecommendationLessonLabel(recommendation: CurriculumRecommend
   ].filter(Boolean).join(" - ");
 }
 
+function safeCurriculumFeedbackId(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80) || "item";
+}
+
+function curriculumRecommendationFeedbackId(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation,
+  subject: "skills" | "listening" | "math",
+) {
+  return [
+    subject,
+    safeCurriculumFeedbackId(candidate.key || candidate.need),
+    safeCurriculumFeedbackId(recommendation.id || recommendation.lessonTitle),
+  ].join("__").slice(0, 220);
+}
+
+function curriculumRecommendationBlockedByFeedback(
+  recommendation: CurriculumRecommendation,
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+  feedback: CurriculumRecommendationFeedback[],
+) {
+  const feedbackId = curriculumRecommendationFeedbackId(candidate, recommendation, subject);
+
+  return feedback.some((entry) =>
+    entry.status === "not-match"
+    && entry.id === feedbackId,
+  );
+}
+
 function recommendationMatchesNeedCandidate(
   recommendation: CurriculumRecommendation,
   candidate: CurriculumNeedCandidate,
@@ -3076,6 +3148,84 @@ function relevantSmallGroupSourceNotes(
   return [];
 }
 
+function sourceExplicitlySupportsLetter(sourceText: string, letter: string) {
+  const cleanLetter = letter.toLowerCase();
+  const source = cleanSmallGroupSourceText(sourceText).toLowerCase();
+  const patterns = [
+    new RegExp(`\\blowercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\buppercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\bletter\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\bname\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\bsound\\s+/?${escapeRegExp(cleanLetter)}/?\\b`, "i"),
+    new RegExp(`/${escapeRegExp(cleanLetter)}/`, "i"),
+  ];
+
+  return patterns.some((pattern) => pattern.test(source));
+}
+
+function sourceExplicitlySupportsChunk(sourceText: string, chunk: string) {
+  const cleanChunk = chunk.toLowerCase();
+  const source = cleanSmallGroupSourceText(sourceText).toLowerCase();
+  const patterns = [
+    new RegExp(`\\b${escapeRegExp(cleanChunk)}\\b`, "i"),
+    new RegExp(`/${escapeRegExp(cleanChunk)}/`, "i"),
+    new RegExp(`\\b${escapeRegExp(cleanChunk)}\\s+(?:sound|spelling|words|digraph)\\b`, "i"),
+    new RegExp(`\\b(?:sound|spelling|digraph)\\s+${escapeRegExp(cleanChunk)}\\b`, "i"),
+  ];
+
+  return patterns.some((pattern) => pattern.test(source));
+}
+
+function smallGroupSourceTargetMatch(
+  sourceText: string,
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+) {
+  const notes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const chunkNeed = smallGroupNeedChunk(candidate);
+  const terms = curriculumCandidateMatchTerms(candidate);
+  const source = cleanSmallGroupSourceText(sourceText);
+
+  if (subject === "skills" && letterNeed) {
+    const matches =
+      sourceExplicitlySupportsLetter(source, letterNeed)
+      || notes.some((note) => sourceExplicitlySupportsLetter(note, letterNeed));
+
+    return {
+      matches,
+      reason: matches
+        ? `The uploaded source includes explicit lesson evidence for ${letterNeed}.`
+        : `The uploaded source does not explicitly teach or practice ${letterNeed}. I marked this lesson as not a match for ${candidate.need}.`,
+    };
+  }
+
+  if (subject === "skills" && chunkNeed) {
+    const matches =
+      sourceExplicitlySupportsChunk(source, chunkNeed)
+      || notes.some((note) => sourceExplicitlySupportsChunk(note, chunkNeed));
+
+    return {
+      matches,
+      reason: matches
+        ? `The uploaded source includes explicit lesson evidence for ${chunkNeed}.`
+        : `The uploaded source does not explicitly teach or practice ${chunkNeed}. I marked this lesson as not a match for ${candidate.need}.`,
+    };
+  }
+
+  const matches = notes.length > 0 || terms.some((term) =>
+    term.length > 2 && curriculumNeedTermMatches(source, term),
+  );
+
+  return {
+    matches,
+    reason: matches
+      ? "The uploaded source includes lesson evidence for this target need."
+      : `The uploaded source does not show enough evidence for ${candidate.need}. I marked this lesson as not a match for that need.`,
+  };
+}
+
 function smallGroupMaterials(
   candidate: CurriculumNeedCandidate,
   recommendation: CurriculumRecommendation | undefined,
@@ -3226,6 +3376,201 @@ function smallGroupSourceLessonWords(
     .slice(0, 8);
 }
 
+const SMALL_GROUP_LETTER_EXAMPLES: Record<string, string[]> = {
+  a: ["at", "am", "map", "sat", "tap"],
+  b: ["bat", "bag", "big", "rub", "cab"],
+  c: ["cat", "cap", "cup", "can", "pic"],
+  d: ["dog", "dig", "did", "dad", "red", "mud"],
+  e: ["egg", "bed", "men", "ten", "pet"],
+  f: ["fan", "fit", "fun", "if", "off"],
+  g: ["gum", "gap", "got", "pig", "tag"],
+  h: ["hat", "hop", "hit", "him", "hot"],
+  i: ["it", "in", "sit", "pig", "pin"],
+  j: ["jet", "jam", "jog", "jump"],
+  k: ["kid", "kit", "skin", "milk"],
+  l: ["lap", "lip", "leg", "hill", "bell"],
+  m: ["map", "mat", "mom", "ham", "jam"],
+  n: ["nap", "net", "not", "sun", "pin"],
+  o: ["on", "hot", "pot", "dog", "mom"],
+  p: ["pan", "pig", "pot", "cap", "tap"],
+  q: ["quit", "quiz", "quack", "quick"],
+  r: ["rat", "run", "red", "car", "rip"],
+  s: ["sun", "sat", "sit", "bus", "mess"],
+  t: ["tap", "top", "ten", "hat", "sit"],
+  u: ["up", "sun", "cup", "bug", "mud"],
+  v: ["van", "vet", "vest", "have"],
+  w: ["wet", "win", "web", "wag"],
+  x: ["box", "fox", "six", "mix"],
+  y: ["yes", "yet", "yum", "my"],
+  z: ["zip", "zap", "zoo", "buzz"],
+};
+
+const SMALL_GROUP_DIGRAPH_EXAMPLES: Record<string, string[]> = {
+  ch: ["chip", "chin", "chop", "lunch", "rich"],
+  ck: ["duck", "sock", "back", "neck", "pick"],
+  ng: ["ring", "sing", "song", "king", "long"],
+  sh: ["ship", "shop", "fish", "wish", "shell"],
+  th: ["thin", "that", "this", "bath", "moth"],
+  wh: ["whip", "when", "which", "whale"],
+};
+
+function smallGroupNeedChunk(candidate: CurriculumNeedCandidate) {
+  const need = normalizeCurriculumNeedText(candidate.need).toLowerCase();
+  const terms = [
+    need,
+    ...candidate.searchTerms.map((term) => normalizeCurriculumNeedText(term).toLowerCase()),
+  ];
+
+  for (const term of terms) {
+    const match =
+      term.match(/\b(ch|sh|th|wh|ck|ng|qu)\b/)
+      || term.match(/\b(ch|sh|th|wh|ck|ng|qu)\s+(?:identification|sound|words|spelling)\b/);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
+function smallGroupPracticeExamples(
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+  sourceWords: string[],
+) {
+  const letterNeed = smallGroupSingleLetterNeed(candidate).toLowerCase();
+  const chunkNeed = smallGroupNeedChunk(candidate).toLowerCase();
+
+  if (subject === "math") {
+    return ["one teacher-modeled problem", "one group problem", "one independent check"];
+  }
+
+  if (letterNeed) {
+    const sourceExamples = sourceWords
+      .filter((word) => word.includes(letterNeed) && word.length <= 8)
+      .slice(0, 3);
+    return Array.from(new Set([
+      ...sourceExamples,
+      ...(SMALL_GROUP_LETTER_EXAMPLES[letterNeed] ?? []),
+    ])).slice(0, 6);
+  }
+
+  if (chunkNeed) {
+    const sourceExamples = sourceWords
+      .filter((word) => word.includes(chunkNeed) && word.length <= 12)
+      .slice(0, 3);
+    return Array.from(new Set([
+      ...sourceExamples,
+      ...(SMALL_GROUP_DIGRAPH_EXAMPLES[chunkNeed] ?? []),
+    ])).slice(0, 6);
+  }
+
+  return sourceWords.slice(0, 6);
+}
+
+function smallGroupLessonConnection(
+  recommendation: CurriculumRecommendation | undefined,
+) {
+  if (!recommendation) {
+    return "the uploaded lesson";
+  }
+
+  return `${curriculumRecommendationLessonLabel(recommendation)} - ${recommendation.lessonTitle}`;
+}
+
+function smallGroupUsefulSourceMoment(
+  analysisNotes: string[],
+  recommendation: CurriculumRecommendation | undefined,
+) {
+  return (
+    analysisNotes.find((note) => /read|write|spell|sound|letter|word|card|blend|segment|draw|solve|explain|retell|answer|ask|point|circle/i.test(note))
+    || recommendation?.objective
+    || recommendation?.parentSummary
+    || recommendation?.iCanStatement
+    || "Use one short, matching moment from the uploaded lesson."
+  );
+}
+
+function smallGroupTeacherPlanRowsForAnalysis(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  analysis: SmallGroupLessonAnalysis,
+): [string, string, string][] {
+  const lessonConnection = smallGroupLessonConnection(recommendation);
+  const sourceMoment = smallGroupUsefulSourceMoment(analysis.notes, recommendation);
+  const examples = analysis.words.length ? analysis.words.join(", ") : "teacher-made matching examples";
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const chunkNeed = smallGroupNeedChunk(candidate);
+
+  if (subject === "math") {
+    return [
+      ["1 min", "Name the Need", `Tell scholars: Today we are practicing ${analysis.target} Connect it to ${lessonConnection}.`],
+      ["3 min", "I Do", analysis.model],
+      ["5 min", "We Do", `${analysis.guidedPractice} Use this lesson move: ${sourceMoment}`],
+      ["4 min", "You Do", analysis.independentPractice],
+      ["2 min", "Data Check", analysis.dataCheckItems.join(" ")],
+      ["1 min", "Next Step", "Mark each scholar as got it, almost, or reteach. Reteach immediately with fewer numbers or concrete objects if needed."],
+    ];
+  }
+
+  if (subject === "listening") {
+    return [
+      ["1 min", "Name the Need", `Tell scholars: Today we are practicing ${analysis.target} Connect it to ${lessonConnection}.`],
+      ["3 min", "I Do", analysis.model],
+      ["5 min", "We Do", `${analysis.guidedPractice} Use this lesson moment: ${sourceMoment}`],
+      ["4 min", "You Do", analysis.independentPractice],
+      ["2 min", "Data Check", analysis.dataCheckItems.join(" ")],
+      ["1 min", "Next Step", "Mark each scholar as got it, almost, or reteach. Give a sentence frame to any scholar who needs one more try."],
+    ];
+  }
+
+  if (letterNeed) {
+    return [
+      ["1 min", "Name the Need", `Tell scholars: Today we are practicing lowercase ${letterNeed}. We will find it, say it, write it, and read it in words from ${lessonConnection}.`],
+      ["2 min", "Visual Match", `Show lowercase ${letterNeed} beside 3 mixed letters. Scholars point to ${letterNeed}, say "${letterNeed}", trace it in the air, then write it once.`],
+      ["3 min", "I Do", analysis.model],
+      ["5 min", "We Do", `Use these examples: ${examples}. Scholars find ${letterNeed}, say the letter/name or sound, read the word with teacher support, then write ${letterNeed} or the word on a whiteboard.`],
+      ["4 min", "You Do", analysis.independentPractice],
+      ["2 min", "Data Check", analysis.dataCheckItems.join(" ")],
+      ["1 min", "Next Step", "Circle each scholar's result: got it, almost, or reteach. If reteach is needed, repeat with only two letter choices before adding more choices."],
+    ];
+  }
+
+  if (chunkNeed) {
+    return [
+      ["1 min", "Name the Need", `Tell scholars: Today we are practicing ${chunkNeed}. We will read it, say it, write it, and use it in words from ${lessonConnection}.`],
+      ["3 min", "I Do", analysis.model],
+      ["5 min", "We Do", `Use these examples: ${examples}. Scholars underline ${chunkNeed}, say the sound, blend the word, then write one matching word.`],
+      ["4 min", "You Do", analysis.independentPractice],
+      ["2 min", "Data Check", analysis.dataCheckItems.join(" ")],
+      ["1 min", "Next Step", "Mark got it, almost, or reteach. If reteaching, go back to one word at a time and have scholars tap the sound before reading."],
+    ];
+  }
+
+  return [
+    ["1 min", "Name the Need", `Tell scholars: Today we are practicing ${analysis.target} Connect it to ${lessonConnection}.`],
+    ["3 min", "I Do", analysis.model],
+    ["5 min", "We Do", `${analysis.guidedPractice} Use this lesson move: ${sourceMoment}`],
+    ["4 min", "You Do", analysis.independentPractice],
+    ["2 min", "Data Check", analysis.dataCheckItems.join(" ")],
+    ["1 min", "Next Step", "Mark got it, almost, or reteach. Give one more quick example to scholars who are close."],
+  ];
+}
+
+function withSmallGroupTeacherRows(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  analysis: SmallGroupLessonAnalysis,
+): SmallGroupLessonAnalysis {
+  return {
+    ...analysis,
+    teacherRows: smallGroupTeacherPlanRowsForAnalysis(candidate, recommendation, subject, analysis),
+  };
+}
+
 function buildSmallGroupLessonAnalysis(
   candidate: CurriculumNeedCandidate,
   recommendation: CurriculumRecommendation | undefined,
@@ -3240,12 +3585,14 @@ function buildSmallGroupLessonAnalysis(
   const notes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation).slice(0, 4);
   const words = smallGroupSourceLessonWords(sourceText, candidate, subject);
   const sourceFeatures = smallGroupSourceFeatures(sourceText);
-  const exampleWords = words.length ? words.slice(0, 5).join(", ") : "two lesson examples";
+  const practiceExamples = smallGroupPracticeExamples(candidate, subject, words);
+  const exampleWords = practiceExamples.length ? practiceExamples.slice(0, 5).join(", ") : "two lesson examples";
   const dataCheckItems = smallGroupDataCheckItems(candidate, subject);
   const materials = smallGroupMaterials(candidate, recommendation, subject, sourceText);
+  const sourceMoment = smallGroupUsefulSourceMoment(notes, recommendation);
 
   if (subject === "math") {
-    return {
+    return withSmallGroupTeacherRows(candidate, recommendation, subject, {
       dataCheckItems,
       familyLookFor: "Your child can show the math idea with a drawing or objects and explain how they know.",
       familyPrompt: "Show it, say it, write it, and explain how you know.",
@@ -3259,14 +3606,14 @@ function buildSmallGroupLessonAnalysis(
       materials,
       model: `Model the target from ${lessonLabel}: show the story with objects or a drawing, think aloud, then connect it to the number sentence.`,
       notes,
-      summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+      summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
       target,
-      words,
-    };
+      words: practiceExamples,
+    });
   }
 
   if (subject === "listening") {
-    return {
+    return withSmallGroupTeacherRows(candidate, recommendation, subject, {
       dataCheckItems,
       familyLookFor: "Your child can answer with a detail from the story or topic instead of guessing.",
       familyPrompt: "Tell me one detail. What happened, and how do you know?",
@@ -3280,42 +3627,49 @@ function buildSmallGroupLessonAnalysis(
       materials,
       model: `Model one complete response from ${lessonLabel}. Think aloud: name the detail, explain why it matters, then say the sentence clearly.`,
       notes,
-      summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+      summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
       target,
-      words,
-    };
+      words: practiceExamples,
+    });
   }
 
   if (letterNeed) {
-    return {
+    const confusableLetters =
+      letterNeed.toLowerCase() === "d"
+        ? "b, p, q"
+        : letterNeed.toLowerCase() === "b"
+          ? "d, p, q"
+          : "2 or 3 known letters";
+
+    return withSmallGroupTeacherRows(candidate, recommendation, subject, {
       dataCheckItems,
       familyLookFor: `Your child can find ${letterNeed}, name it or say the sound, and write it without guessing.`,
       familyPrompt: `Find ${letterNeed}, say it, write it, and read it in a word.`,
       familySteps: [
-        `Write ${letterNeed} with two other known letters and ask your child to point to ${letterNeed}.`,
+        `Write ${letterNeed} with ${confusableLetters} and ask your child to point to ${letterNeed}.`,
         `Have your child say the letter name or sound, then write ${letterNeed}.`,
-        words.length
-          ? `Read or say these quick lesson words together: ${words.slice(0, 4).join(", ")}.`
+        practiceExamples.length
+          ? `Read or say these quick practice words together: ${practiceExamples.slice(0, 4).join(", ")}.`
           : `Find ${letterNeed} in one short word and say the word together.`,
       ],
-      guidedPractice: `Use ${lessonLabel} with ${exampleWords}. Scholars find ${letterNeed}, say the letter/sound, trace or write it, and read it in a short lesson word.`,
-      independentPractice: `Scholars complete three quick checks: circle ${letterNeed}, write ${letterNeed}, and read or point to ${letterNeed} in one lesson word.`,
+      guidedPractice: `Use ${lessonLabel} with ${exampleWords}. Scholars find ${letterNeed}, say the letter name or sound, trace or write it, and read it in a short word.`,
+      independentPractice: `Give scholars a short page/whiteboard with ${letterNeed}, ${confusableLetters}, and 2 practice words. They circle ${letterNeed}, write ${letterNeed}, and read one word containing ${letterNeed}.`,
       materials,
-      model: `Show lowercase ${letterNeed}. Say, "This is ${letterNeed}." Point to ${letterNeed} in ${words[0] || "a lesson word"}, say the sound/name, then write ${letterNeed}.`,
+      model: `Show lowercase ${letterNeed}. Say, "This is ${letterNeed}." Point to ${letterNeed} in ${practiceExamples[0] || "a short word"}, say the letter name or sound, then write ${letterNeed}. Connect it to this lesson source moment: ${sourceMoment}`,
       notes,
-      summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+      summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
       target,
-      words,
-    };
+      words: practiceExamples,
+    });
   }
 
-  return {
+  return withSmallGroupTeacherRows(candidate, recommendation, subject, {
     dataCheckItems,
     familyLookFor: "Your child can practice the skill accurately and explain their thinking without guessing.",
     familyPrompt: "Show me how you know, then try one more.",
     familySteps: [
       `Practice the target skill for 5 to 10 minutes: ${target}`,
-      words.length ? `Use these lesson examples if helpful: ${words.slice(0, 5).join(", ")}.` : "Use one example from class and one fresh example.",
+      practiceExamples.length ? `Use these lesson examples if helpful: ${practiceExamples.slice(0, 5).join(", ")}.` : "Use one example from class and one fresh example.",
       "Have your child explain how they know before moving on.",
     ],
     guidedPractice: sourceFeatures.hasReader || sourceFeatures.hasCards
@@ -3325,13 +3679,17 @@ function buildSmallGroupLessonAnalysis(
     materials,
     model: `Model the exact target from ${lessonLabel}. Say the thinking out loud, show the response, then have scholars echo the key step.`,
     notes,
-    summary: `Uploaded source analyzed. Use ${lessonLabel} as the lesson routine and narrow it to: ${target}`,
+    summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
     target,
-    words,
-  };
+    words: practiceExamples,
+  });
 }
 
 function smallGroupTeacherPlanRowsFromAnalysis(analysis: SmallGroupLessonAnalysis) {
+  if (analysis.teacherRows?.length) {
+    return analysis.teacherRows;
+  }
+
   return [
     ["1-2 min", "Name the Need", analysis.summary],
     ["3 min", "Teacher Model", analysis.model],
@@ -3827,6 +4185,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     useState<Record<string, string>>({});
   const [curriculumRecommendationStatusesByNeedKey, setCurriculumRecommendationStatusesByNeedKey] =
     useState<Record<string, CurriculumRecommendationStatus>>({});
+  const [curriculumRecommendationFeedback, setCurriculumRecommendationFeedback] =
+    useState<CurriculumRecommendationFeedback[]>([]);
   const [dashboardFocus, setDashboardFocus] =
     useState<DashboardFocus>("mostWrong");
   const [dashboardSubject, setDashboardSubject] =
@@ -3932,6 +4292,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         controlSnapshot,
         preassessmentControlSnapshot,
         skillsDataOverrideSnapshot,
+        curriculumRecommendationFeedbackSnapshot,
         nextManagedGames,
       ] = await Promise.all([
         db.collection(SCHOLAR_COLLECTION).get(),
@@ -3940,6 +4301,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         db.collection(SCHOLAR_CONTROL_COLLECTION).get(),
         db.collection(PREASSESSMENT_CONTROL_COLLECTION).get(),
         db.collection(SKILLS_DATA_OVERRIDE_COLLECTION).get(),
+        db.collection(CURRICULUM_RECOMMENDATION_FEEDBACK_COLLECTION).get(),
         loadManagedGameMetadata(db),
       ]);
 
@@ -3960,6 +4322,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         skillsDataOverrideSnapshot.docs
           .map(mapSkillsDataOverride)
           .filter((override) => Boolean(override.target)),
+      );
+      setCurriculumRecommendationFeedback(
+        curriculumRecommendationFeedbackSnapshot.docs
+          .map(mapCurriculumRecommendationFeedback)
+          .filter((feedback) => feedback.status === "not-match"),
       );
       setManagedGames(nextManagedGames);
       setResults(
@@ -4801,15 +5168,32 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const curriculumRecommendationGroups = useMemo(() => {
     return curriculumNeedCandidates.map((candidate) => ({
       candidate,
-      recommendations: recommendationsForNeedCandidate(curriculumRecommendations, candidate),
+      recommendations: recommendationsForNeedCandidate(curriculumRecommendations, candidate)
+        .filter((recommendation) =>
+          !curriculumRecommendationBlockedByFeedback(
+            recommendation,
+            candidate,
+            curriculumRecommendationSubject,
+            curriculumRecommendationFeedback,
+          ),
+        ),
     }));
-  }, [curriculumNeedCandidates, curriculumRecommendations]);
+  }, [curriculumNeedCandidates, curriculumRecommendationFeedback, curriculumRecommendationSubject, curriculumRecommendations]);
   const selectedSmallGroupNeed =
     curriculumNeedCandidates.find((need) => need.key === selectedSmallGroupNeedKey)
     ?? null;
   const selectedSmallGroupRecommendations = selectedSmallGroupNeed
-    ? curriculumRecommendationsByNeedKey[selectedSmallGroupNeed.key]
-      ?? recommendationsForNeedCandidate(curriculumRecommendations, selectedSmallGroupNeed)
+    ? (
+      curriculumRecommendationsByNeedKey[selectedSmallGroupNeed.key]
+        ?? recommendationsForNeedCandidate(curriculumRecommendations, selectedSmallGroupNeed)
+    ).filter((recommendation) =>
+      !curriculumRecommendationBlockedByFeedback(
+        recommendation,
+        selectedSmallGroupNeed,
+        curriculumRecommendationSubject,
+        curriculumRecommendationFeedback,
+      ),
+    )
     : [];
   const selectedSmallGroupRecommendationStatus = selectedSmallGroupNeed
     ? curriculumRecommendationStatusesByNeedKey[selectedSmallGroupNeed.key] ?? "idle"
@@ -4950,7 +5334,61 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     });
   };
 
-  const analyzeSmallGroupLessonSource = (
+  const saveCurriculumRecommendationNotMatch = async (
+    candidate: CurriculumNeedCandidate,
+    recommendation: CurriculumRecommendation,
+    reason: string,
+  ) => {
+    const { auth, db, firebase } = await loadFirebase();
+    const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? teacherAccount;
+
+    if (!isAuthorizedTeacherEmail(signedInEmail)) {
+      throw new Error("Sign in with an authorized teacher account before saving recommendation feedback.");
+    }
+
+    const feedbackId = curriculumRecommendationFeedbackId(
+      candidate,
+      recommendation,
+      curriculumRecommendationSubject,
+    );
+    const serverTime = firebase.firestore.FieldValue.serverTimestamp();
+    const feedback: CurriculumRecommendationFeedback = {
+      candidateKey: candidate.key,
+      id: feedbackId,
+      lessonTitle: recommendation.lessonTitle,
+      need: candidate.need,
+      reason,
+      recommendationId: recommendation.id,
+      status: "not-match",
+      subject: curriculumRecommendationSubject,
+      teacherEmail: signedInEmail,
+      updatedAt: serverTime,
+      updatedBy: signedInEmail,
+    };
+
+    await db.collection(CURRICULUM_RECOMMENDATION_FEEDBACK_COLLECTION)
+      .doc(feedbackId)
+      .set({
+        candidateKey: candidate.key,
+        createdAt: serverTime,
+        lessonTitle: recommendation.lessonTitle,
+        need: candidate.need,
+        reason,
+        recommendationId: recommendation.id,
+        status: "not-match",
+        subject: curriculumRecommendationSubject,
+        teacherEmail: signedInEmail,
+        updatedAt: serverTime,
+        updatedBy: signedInEmail,
+      }, { merge: true });
+
+    setCurriculumRecommendationFeedback((current) => [
+      ...current.filter((entry) => entry.id !== feedbackId),
+      feedback,
+    ]);
+  };
+
+  const analyzeSmallGroupLessonSource = async (
     candidate: CurriculumNeedCandidate,
     recommendation: CurriculumRecommendation,
     sourceTextOverride?: string,
@@ -4971,6 +5409,33 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       return null;
     }
 
+    const targetMatch = smallGroupSourceTargetMatch(
+      text,
+      candidate,
+      recommendation,
+      curriculumRecommendationSubject,
+    );
+
+    if (!targetMatch.matches) {
+      updateSmallGroupLessonSource(recommendation.id, {
+        analysis: undefined,
+        analysisStatus: "mismatch",
+        fileName,
+        mismatchReason: targetMatch.reason,
+        text,
+      });
+
+      try {
+        await saveCurriculumRecommendationNotMatch(candidate, recommendation, targetMatch.reason);
+        setStatus(`${recommendation.lessonTitle} does not match ${candidate.need}. I saved that note and will stop suggesting it for this need.`);
+      } catch (nextError) {
+        setStatus(targetMatch.reason);
+        setError(nextError instanceof Error ? nextError.message : "The not-a-match note could not be saved yet.");
+      }
+
+      return null;
+    }
+
     const analysis = buildSmallGroupLessonAnalysis(
       candidate,
       recommendation,
@@ -4984,7 +5449,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       fileName,
       text,
     });
-    setStatus(`Analyzed ${fileName || recommendation.lessonTitle}. Teacher and family print plans will use the lesson routine.`);
+    setStatus(`Analyzed ${fileName || recommendation.lessonTitle}. Teacher and family print plans were rebuilt from the source and this group's target need.`);
     return analysis;
   };
 
@@ -5013,7 +5478,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           fileName: file.name,
           text,
         });
-        analyzeSmallGroupLessonSource(candidate, recommendation, text, file.name);
+        await analyzeSmallGroupLessonSource(candidate, recommendation, text, file.name);
         return;
       }
 
@@ -6080,8 +6545,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const reportWindow = window.open("", "_blank");
     const sourceText = lessonSource?.text.trim() ?? "";
     const sourceTitle = lessonSource?.fileName.trim() ?? "";
-    const sourceAnalysis = lessonSource?.analysis;
     const bestLesson = recommendations[0];
+    const sourceAnalysis = lessonSource?.analysis ?? (
+      isReadableLessonSourceText(sourceText, 8, 40)
+        ? buildSmallGroupLessonAnalysis(candidate, bestLesson, curriculumRecommendationSubject, sourceText)
+        : undefined
+    );
     const objective = smallGroupPlanObjective(candidate, bestLesson, curriculumRecommendationSubject);
     const materials = sourceAnalysis?.materials ?? smallGroupMaterials(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
     const planRows = sourceAnalysis
@@ -6204,7 +6673,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const reportWindow = window.open("", "_blank");
     const bestLesson = recommendations[0];
     const sourceText = lessonSource?.text.trim() ?? "";
-    const sourceAnalysis = lessonSource?.analysis;
+    const sourceAnalysis = lessonSource?.analysis ?? (
+      isReadableLessonSourceText(sourceText, 8, 40)
+        ? buildSmallGroupLessonAnalysis(candidate, bestLesson, curriculumRecommendationSubject, sourceText)
+        : undefined
+    );
     const practice = sourceAnalysis
       ? {
         focus: sourceAnalysis.target,
@@ -6849,7 +7322,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                   <button
                                     className="teacher-text-button"
                                     disabled={!lessonSource.text.trim()}
-                                    onClick={() => analyzeSmallGroupLessonSource(selectedSmallGroupNeed, recommendation)}
+                                    onClick={() => void analyzeSmallGroupLessonSource(selectedSmallGroupNeed, recommendation)}
                                     type="button"
                                   >
                                     Analyze Source
@@ -6860,6 +7333,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                     {lessonSource.fileName ? <small>Source: {lessonSource.fileName}</small> : null}
                                     {lessonSource.analysisStatus === "ready" ? (
                                       <small className="source-analysis-status ready">Analyzed source will shape the teacher and family print plans.</small>
+                                    ) : lessonSource.analysisStatus === "mismatch" ? (
+                                      <small className="source-analysis-status warning">{lessonSource.mismatchReason || "This uploaded source does not match the selected target need."}</small>
                                     ) : lessonSource.analysisStatus === "needs-text" ? (
                                       <small className="source-analysis-status warning">Readable lesson text is needed before this can make a stronger plan.</small>
                                     ) : (
@@ -6869,6 +7344,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                       onChange={(event) => updateSmallGroupLessonSource(recommendation.id, {
                                         analysis: undefined,
                                         analysisStatus: "none",
+                                        mismatchReason: "",
                                         text: event.target.value,
                                       })}
                                       placeholder="Lesson source text will appear here when the upload can be read. You can edit it before printing."
