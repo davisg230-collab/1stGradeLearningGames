@@ -11,6 +11,7 @@ import {
 
 type FirebaseUser = {
   email: string | null;
+  getIdToken?: () => Promise<string>;
 };
 
 type FirebaseAuth = {
@@ -385,6 +386,8 @@ const QPS_SCREENER_GAME_ID = "qps-screener";
 const HUB_CLASS_URL = "https://first-grade-news-hub-mrdavis.web.app/";
 const HUB_CURRICULUM_RECOMMENDATION_URL =
   "https://us-central1-first-grade-news-hub.cloudfunctions.net/recommendCurriculumLessons";
+const HUB_TEACHER_WORKSPACE_SAVE_URL =
+  "https://us-central1-first-grade-news-hub.cloudfunctions.net/saveTeacherWorkspaceResource";
 const HUB_FIREBASE_APP_NAME = "first-grade-hub-bridge";
 const HUB_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBVFcyBYlz3DmCkOervIswwjPf6wwFZlhU",
@@ -852,6 +855,39 @@ async function loadHubFirebaseBridge() {
     firebase,
     user,
   };
+}
+
+async function saveHubTeacherWorkspaceResource(bundle: {
+  folderTitle: string;
+  resource: HubTeacherWorkspaceResource;
+}) {
+  const { auth } = await loadFirebase();
+  const user = auth.currentUser;
+
+  if (!user || !isAuthorizedTeacherEmail(user.email)) {
+    throw new Error("Sign in to Teacher Edit before saving to the Hub Teacher Workspace.");
+  }
+
+  if (!user.getIdToken) {
+    throw new Error("Your teacher sign-in needs to refresh before saving to the Hub.");
+  }
+
+  const idToken = await user.getIdToken();
+  const response = await fetch(HUB_TEACHER_WORKSPACE_SAVE_URL, {
+    body: JSON.stringify(bundle),
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(asText(result.error) || "The Hub could not save that Teacher Workspace item yet.");
+  }
+
+  return result as { folderTitle?: string; saved?: boolean };
 }
 
 function normalizeNameKey(name: string) {
@@ -2794,16 +2830,7 @@ function recommendationExplicitlyTeachesLetter(
     .join(" ")
     .toLowerCase();
 
-  const explicitPatterns = [
-    new RegExp(`\\blowercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\buppercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\bletter\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\bname\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\bsound\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`/${escapeRegExp(cleanLetter)}/`, "i"),
-  ];
-
-  return explicitPatterns.some((pattern) => pattern.test(metadataText));
+  return sourceExplicitlySupportsLetter(metadataText, cleanLetter);
 }
 
 function curriculumNeedScholarCount(candidate: CurriculumNeedCandidate) {
@@ -3144,9 +3171,8 @@ function smallGroupSourceSentenceSupportsLesson(
   }
 
   if (target) {
-    const targetPattern = new RegExp(`(^|[^a-z])${target}([^a-z]|$)`, "i");
     const hasUsefulLessonAction = /read|write|spell|sound|letter|word|card|blend|segment|circle|point|tap|say|name/i.test(sentence);
-    return targetPattern.test(sentence) && hasUsefulLessonAction;
+    return sourceExplicitlySupportsLetter(sentence, target) && hasUsefulLessonAction;
   }
 
   return Boolean(recommendation) || curriculumCandidateMatchTerms(candidate).some((term) =>
@@ -3203,17 +3229,32 @@ function relevantSmallGroupSourceNotes(
 
 function sourceExplicitlySupportsLetter(sourceText: string, letter: string) {
   const cleanLetter = letter.toLowerCase();
-  const source = cleanSmallGroupSourceText(sourceText).toLowerCase();
+  const source = stripCurriculumCodeArtifacts(cleanSmallGroupSourceText(sourceText)).toLowerCase();
+  const letterToken = `(?:${escapeRegExp(cleanLetter)}|["'“‘]${escapeRegExp(cleanLetter)}["'”’])`;
+  const afterToken = `(?=$|[^a-z])`;
   const patterns = [
-    new RegExp(`\\blowercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\buppercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\bletter\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\bname\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
-    new RegExp(`\\bsound\\s+/?${escapeRegExp(cleanLetter)}/?\\b`, "i"),
-    new RegExp(`/${escapeRegExp(cleanLetter)}/`, "i"),
+    new RegExp(`\\blowercase\\s+${letterToken}${afterToken}`, "i"),
+    new RegExp(`\\buppercase\\s+${letterToken}${afterToken}`, "i"),
+    new RegExp(`\\bletter\\s+${letterToken}${afterToken}`, "i"),
+    new RegExp(`(?:^|[^a-z])${letterToken}\\s+letter\\b`, "i"),
+    new RegExp(`(?:^|[^a-z])${letterToken}\\s+card\\b`, "i"),
+    new RegExp(`\\bletter\\s+card\\s+${letterToken}${afterToken}`, "i"),
+    new RegExp(`\\b(?:spelling|letter-sound|sound-spelling)\\s+${letterToken}${afterToken}`, "i"),
+    new RegExp(`\\b(?:spellings?|sound-spellings?)\\s+(?:for\\s+)?/${escapeRegExp(cleanLetter)}/${afterToken}`, "i"),
+    new RegExp(`\\bsounds?\\b[^.?!]{0,80}/${escapeRegExp(cleanLetter)}/${afterToken}`, "i"),
+    new RegExp(`\\bspellings?\\b[^.?!]{0,80}/${escapeRegExp(cleanLetter)}/${afterToken}`, "i"),
+    new RegExp(`\\b(?:sound|say|name)\\s+/${escapeRegExp(cleanLetter)}/${afterToken}`, "i"),
+    new RegExp(`/${escapeRegExp(cleanLetter)}/\\s+(?:sound|spelling|letter)\\b`, "i"),
   ];
 
   return patterns.some((pattern) => pattern.test(source));
+}
+
+function stripCurriculumCodeArtifacts(text: string) {
+  return text
+    .replace(/\b(?:RF|RL|RI|SL|L)\.\d+\.\d+[a-z]?\b/gi, " ")
+    .replace(/\b(?:K|\d+)\.[A-Z]+\.[A-Z]+\.\d+[A-Za-z]?\b/g, " ")
+    .replace(/\b[A-Z]{1,4}\.\d+[A-Za-z]?\b/g, " ");
 }
 
 function sourceExplicitlySupportsChunk(sourceText: string, chunk: string) {
@@ -3394,6 +3435,27 @@ const SMALL_GROUP_SOURCE_WORD_STOPWORDS = new Set([
   "write",
 ]);
 
+const SMALL_GROUP_SOURCE_WORD_REJECTS = new Set([
+  "add",
+  "med",
+  "od",
+  "pictur",
+  "rd",
+  "sta",
+  "tion",
+  "wor",
+]);
+
+function isCleanSmallGroupExampleWord(word: string) {
+  const cleanWord = word.trim().toLowerCase();
+  return (
+    /^[a-z]{2,8}$/.test(cleanWord)
+    && !SMALL_GROUP_SOURCE_WORD_STOPWORDS.has(cleanWord)
+    && !SMALL_GROUP_SOURCE_WORD_REJECTS.has(cleanWord)
+    && !/(.)\1{3,}/.test(cleanWord)
+  );
+}
+
 function smallGroupSourceLessonWords(
   sourceText: string,
   candidate: CurriculumNeedCandidate,
@@ -3501,17 +3563,17 @@ function smallGroupPracticeExamples(
 
   if (letterNeed) {
     const sourceExamples = sourceWords
-      .filter((word) => word.includes(letterNeed) && word.length <= 8)
+      .filter((word) => word.includes(letterNeed) && isCleanSmallGroupExampleWord(word))
       .slice(0, 3);
     return Array.from(new Set([
-      ...sourceExamples,
       ...(SMALL_GROUP_LETTER_EXAMPLES[letterNeed] ?? []),
+      ...sourceExamples,
     ])).slice(0, 6);
   }
 
   if (chunkNeed) {
     const sourceExamples = sourceWords
-      .filter((word) => word.includes(chunkNeed) && word.length <= 12)
+      .filter((word) => word.includes(chunkNeed) && isCleanSmallGroupExampleWord(word))
       .slice(0, 3);
     return Array.from(new Set([
       ...sourceExamples,
@@ -6091,11 +6153,119 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setTimeout(() => reportWindow.print(), 100);
   };
 
+  const qpsRecordsForSelectedRange = () => qpsReportRecords.filter((result) =>
+    resultIsWithinDateInputs(result, qpsPrintStartDate, qpsPrintEndDate),
+  );
+
+  const buildQpsHubSummaryResource = (
+    qpsRecordsForSave: QpsReportRecord[],
+    rangeLabel: string,
+  ) => {
+    const summaryLines = qpsRecordsForSave.map((result) => {
+      const match = matchResult(result, reportScholars);
+      const completedAt = reportRecordDate(result);
+      const resultPercent = result.totalQuestions ? Math.round((result.score / result.totalQuestions) * 100) : 0;
+      const topNeeds = result.missedQuestions
+        .slice(0, 6)
+        .map((missed, index) => {
+          const note = missedQuestionNote(result, missed, index);
+          const label = missed.word || missed.correctAnswer || missed.category || `Item ${missed.questionIndex ?? index + 1}`;
+          const response = missed.incorrectSelections?.join(", ") || "needs review";
+          return `${label}: said ${response}${note ? ` (Note: ${note})` : ""}`;
+        })
+        .join("; ");
+
+      return [
+        `- ${match.label}`,
+        `  Date: ${completedAt ? completedAt.toLocaleDateString() : "Date pending"}`,
+        `  Status: ${reportRecordStatus(result)}`,
+        `  Score: ${result.score}/${result.totalQuestions} (${resultPercent}%)`,
+        `  Needs Review: ${result.missedCount}`,
+        topNeeds ? `  Notes: ${topNeeds}` : "  Notes: No missed QPS items recorded.",
+      ].join("\n");
+    });
+    const detailLines = qpsRecordsForSave.flatMap((result) => {
+      const match = matchResult(result, reportScholars);
+      const sectionLines = Object.entries(result.categoryScores ?? {}).map(([section, score]) => {
+        const sectionPercent = score.total ? Math.round((score.correct / score.total) * 100) : 0;
+        return `  - ${section}: ${score.correct}/${score.total}, ${score.missed} needs review, ${sectionPercent}%`;
+      });
+      const needLines = result.missedQuestions.length
+        ? result.missedQuestions.map((missed, index) => {
+          const label = missed.word || missed.correctAnswer || missed.category || `Item ${missed.questionIndex ?? index + 1}`;
+          const response = missed.incorrectSelections?.join(", ") || "needs review";
+          const note = missedQuestionNote(result, missed, index);
+          return `  - ${missed.levelName || missed.category || `Item ${index + 1}`}: ${label}; said ${response}${note ? `; note: ${note}` : ""}`;
+        })
+        : ["  - No missed QPS items recorded."];
+
+      return [
+        "",
+        match.label.toUpperCase(),
+        "Section Scores:",
+        ...(sectionLines.length ? sectionLines : ["  - No section breakdown saved for this QPS session."]),
+        "Needs Review Items:",
+        ...needLines,
+      ];
+    });
+    const titleRange = rangeLabel.replace(/^QPS\s+/i, "");
+
+    return {
+      folderTitle: "QPS",
+      resource: {
+        createdAtLocal: new Date().toISOString(),
+        folderId: "",
+        id: [
+          "qps-summary",
+          safeCurriculumFeedbackId(teacherFilter || "all"),
+          safeCurriculumFeedbackId(qpsPrintStartDate || "all"),
+          safeCurriculumFeedbackId(qpsPrintEndDate || "all"),
+        ].join("-").slice(0, 180),
+        notes: [
+          "QPS SCREENER SUMMARY",
+          "",
+          `Date range: ${rangeLabel}`,
+          `Roster: ${teacherFilter === "all" ? "All rosters" : teacherLabelForEmail(teacherFilter)}`,
+          `Records: ${qpsRecordsForSave.length}`,
+          `Saved from Learning Games on ${new Date().toLocaleDateString()}.`,
+          "",
+          "CLASS SUMMARY",
+          ...(summaryLines.length ? summaryLines : ["No QPS records were saved for this date range."]),
+          "",
+          "DETAILS",
+          ...(detailLines.length ? detailLines : ["No QPS details were available for this date range."]),
+        ].join("\n"),
+        title: `QPS Screener Results - ${titleRange}`,
+        type: "data" as const,
+        updatedAtLocal: new Date().toISOString(),
+        url: HUB_CLASS_URL,
+      },
+    };
+  };
+
+  const saveQpsSummaryToHub = async () => {
+    const qpsRecordsForSave = qpsRecordsForSelectedRange();
+    const rangeLabel = qpsDateRangeLabel(qpsPrintStartDate, qpsPrintEndDate);
+
+    if (!qpsRecordsForSave.length) {
+      setStatus("No QPS records are in that date range, so nothing was sent to the Hub.");
+      return;
+    }
+
+    try {
+      setError("");
+      setStatus("Saving QPS summary to the Hub Teacher Workspace...");
+      const bundle = buildQpsHubSummaryResource(qpsRecordsForSave, rangeLabel);
+      await saveHubTeacherWorkspaceResource(bundle);
+      setStatus(`Saved "${bundle.resource.title}" to Hub Teacher Workspace > ${bundle.folderTitle}.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The QPS summary could not be saved to the Hub yet.");
+    }
+  };
+
   const printQpsSummaryReport = () => {
     const reportWindow = window.open("", "_blank");
-    const qpsResultsForPrint = qpsReportRecords.filter((result) =>
-      resultIsWithinDateInputs(result, qpsPrintStartDate, qpsPrintEndDate),
-    );
+    const qpsResultsForPrint = qpsRecordsForSelectedRange();
     const rangeLabel = qpsDateRangeLabel(qpsPrintStartDate, qpsPrintEndDate);
     const rowsHtml = qpsResultsForPrint.map((result) => {
       const match = matchResult(result, reportScholars);
@@ -6819,42 +6989,15 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
     try {
       setStatus("Saving small-group plan to the Hub Teacher Workspace...");
-      const { db: hubDb, firebase: hubFirebase, user } = await loadHubFirebaseBridge();
       const bundle = buildSmallGroupHubPlanResource(
         candidate,
         recommendations,
         curriculumRecommendationSubject,
         lessonSource,
       );
-      const docRef = hubDb
-        .collection(HUB_TEACHER_WORKSPACE_COLLECTION)
-        .doc(HUB_TEACHER_WORKSPACE_DOC_ID);
-      const snapshot = await docRef.get();
-      const workspaceData = normalizeHubTeacherWorkspaceData(snapshot.exists ? snapshot.data() : {});
-      const folderId = ensureHubWorkspaceFolder(workspaceData, bundle.folderTitle);
-      const existingIndex = workspaceData.resources.findIndex((resource) => resource.id === bundle.resource.id);
-      const existing = existingIndex >= 0 ? workspaceData.resources[existingIndex] : null;
-      const resource = {
-        ...bundle.resource,
-        createdAtLocal: existing?.createdAtLocal || bundle.resource.createdAtLocal,
-        folderId,
-        updatedAtLocal: new Date().toISOString(),
-      };
+      await saveHubTeacherWorkspaceResource(bundle);
 
-      if (existingIndex >= 0) {
-        workspaceData.resources[existingIndex] = resource;
-      } else {
-        workspaceData.resources.unshift(resource);
-      }
-
-      await docRef.set({
-        ...workspaceData,
-        updatedAt: hubFirebase.firestore.FieldValue.serverTimestamp(),
-        updatedBy: user.email,
-        version: 1,
-      }, { merge: true });
-
-      setStatus(`Saved "${resource.title}" to Hub Teacher Workspace > ${bundle.folderTitle}.`);
+      setStatus(`Saved "${bundle.resource.title}" to Hub Teacher Workspace > ${bundle.folderTitle}.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "The plan could not be saved to the Hub yet.");
     }
@@ -6865,6 +7008,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     recommendations: CurriculumRecommendation[],
     lessonSource?: SmallGroupLessonSource,
   ) => {
+    if (lessonSource?.analysisStatus === "mismatch") {
+      setStatus(lessonSource.mismatchReason || "This uploaded source does not match the selected target need, so I did not print a plan from it.");
+      return;
+    }
+
     const reportWindow = window.open("", "_blank");
     const sourceText = lessonSource?.text.trim() ?? "";
     const sourceTitle = lessonSource?.fileName.trim() ?? "";
@@ -6993,6 +7141,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     recommendations: CurriculumRecommendation[],
     lessonSource?: SmallGroupLessonSource,
   ) => {
+    if (lessonSource?.analysisStatus === "mismatch") {
+      setStatus(lessonSource.mismatchReason || "This uploaded source does not match the selected target need, so I did not print a family plan from it.");
+      return;
+    }
+
     const reportWindow = window.open("", "_blank");
     const bestLesson = recommendations[0];
     const sourceText = lessonSource?.text.trim() ?? "";
@@ -7768,6 +7921,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     <a className="teacher-control-button secondary" href="/games/skills/qps-screener">
                       Open QPS
                     </a>
+                    <button className="teacher-control-button secondary" onClick={() => void saveQpsSummaryToHub()} type="button">
+                      Save to Hub
+                    </button>
                     <button className="teacher-control-button secondary" onClick={printQpsSummaryReport} type="button">
                       Print QPS
                     </button>
