@@ -492,6 +492,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             ZONES = builtInContent.levels;
             QUESTIONS = builtInContent.questions;
             SUPPLEMENTAL_QUESTIONS = builtInContent.supplementalQuestions || [];
+            rapidGuessingVoice = builtInContent.rapidGuessingVoice || rapidGuessingVoice;
             if (builtInContent.zoneEncouragements?.length) ZONE_ENCOURAGEMENTS = builtInContent.zoneEncouragements;
             refreshQuestionCollections();
           }
@@ -506,6 +507,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ZONES = savedContent.levels;
     QUESTIONS = savedContent.questions;
     SUPPLEMENTAL_QUESTIONS = savedContent.supplementalQuestions || [];
+    rapidGuessingVoice = savedContent.rapidGuessingVoice || rapidGuessingVoice;
     if (savedContent.zoneEncouragements?.length) ZONE_ENCOURAGEMENTS = savedContent.zoneEncouragements;
     refreshQuestionCollections();
   }
@@ -753,6 +755,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let wholeClassMode = false;
   let activeTeacherEmail = "";
   let pendingClassMiss = null;
+  let rapidGuessPauseUntil = 0;
+  let rapidGuessingVoice = null;
   let sessionActive = false;
   let sessionCompleted = false;
   let progressStarted = false;
@@ -760,12 +764,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   let sessionId = createSessionId();
   const AUDIO_MANIFEST_URL = "/audio/manifest.json";
   const AUDIO_MANIFEST_VERSION = "2026-07-17-unit1-lesson-sequence";
+  const RAPID_GUESSING_SPEAKER_ID = "rapid-guessing-voice";
+  const DEFAULT_RAPID_GUESSING_MESSAGE = "Please don't rush. Take your time. You are rocking it.";
   const PRELOAD_SPEECH_TEXTS = [
     "Type your first name, then start the game. Your teacher can see your score after you finish.",
     "Sound Safari is ready. Choose a lesson level and show what you know.",
     "Trail star earned! Great listening.",
     "Whole Class Mode is on. Pick any stop or question together.",
     "Great job. Let's play.",
+    DEFAULT_RAPID_GUESSING_MESSAGE,
     "Sound Safari Complete!",
     ...ZONE_ENCOURAGEMENTS
   ];
@@ -1001,6 +1008,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     const text = ZONE_ENCOURAGEMENTS[zoneIndex];
     if (text) speak(text);
   }
+  function rapidGuessingMessage() {
+    if (
+      rapidGuessingVoice
+      && typeof rapidGuessingVoice === "object"
+      && rapidGuessingVoice.enabled !== false
+    ) {
+      return (
+        speechText(
+          rapidGuessingVoice.audioSourceText
+          || rapidGuessingVoice.audioText
+          || rapidGuessingVoice.text
+        )
+        || DEFAULT_RAPID_GUESSING_MESSAGE
+      );
+    }
+    return DEFAULT_RAPID_GUESSING_MESSAGE;
+  }
+  function rapidGuessingAudioUrl() {
+    if (
+      rapidGuessingVoice
+      && typeof rapidGuessingVoice === "object"
+      && rapidGuessingVoice.enabled !== false
+    ) {
+      return typeof rapidGuessingVoice.audioUrl === "string"
+        ? rapidGuessingVoice.audioUrl.trim()
+        : "";
+    }
+    return "";
+  }
+  function speakRapidGuessingMessage() {
+    const message = rapidGuessingMessage();
+    const audioUrl = rapidGuessingAudioUrl();
+    if (audioUrl) {
+      void playAudioSource(audioUrl).then((played) => {
+        if (!played) speak(message);
+      });
+      return;
+    }
+    speak(message);
+  }
+  function shouldPauseForRapidGuessing(state) {
+    return state.attempts >= 3 || state.incorrectSelections.length >= 3;
+  }
+  function rapidGuessingCategory(category) {
+    return `Rapid Guessing - ${category || "Needs review"}`;
+  }
+  function pauseForRapidGuessing(state) {
+    state.rapidGuessing = true;
+    state.rapidGuessingCount = (state.rapidGuessingCount || 0) + 1;
+    rapidGuessPauseUntil = Date.now() + 3200;
+    showFeedback(rapidGuessingMessage(), false, rapidGuessingMessage());
+    speakRapidGuessingMessage();
+    renderQuestion();
+    refreshUI();
+    saveProgress("in-progress");
+  }
   function tone(kind, octave = 1) {
     if (muted) return;
     try {
@@ -1123,6 +1186,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         complete: Boolean(state?.complete),
         firstChecked: Boolean(state?.firstChecked),
         incorrectSelections: Array.isArray(state?.incorrectSelections) ? state.incorrectSelections : [],
+        rapidGuessing: Boolean(state?.rapidGuessing),
+        rapidGuessingCount: Math.max(0, Number(state?.rapidGuessingCount || 0)),
         scored: Boolean(state?.scored),
         selected: typeof state?.selected === "string" ? state.selected : null,
         skipped: Boolean(state?.skipped)
@@ -1166,7 +1231,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function resetQuestionSet(levelIndex = selectedLevelIndex) {
     selectedLevelIndex = levelIndex;
     activeQuestions = buildQuestionSet(levelIndex);
-    states = activeQuestions.map(() => ({ selected:null, firstChecked:false, scored:false, complete:false, skipped:false, attempts:0, incorrectSelections:[] }));
+    states = activeQuestions.map(() => ({ selected:null, firstChecked:false, scored:false, complete:false, skipped:false, attempts:0, incorrectSelections:[], rapidGuessing:false, rapidGuessingCount:0 }));
   }
   function markSoundSafariCompleteIfNeeded(progress) {
     if (wholeClassMode || !scholarFirstNameKey || !progress.completed) return;
@@ -2676,8 +2741,9 @@ ${showLandingNumber && number === finish ? "" : number}
     const missedQuestions = activeQuestions.flatMap((question, index) => {
       const state = states[index];
       if (!state.incorrectSelections.length) return [];
+      const category = labelForQuestion(question);
       return [{
-        category: labelForQuestion(question),
+        category: state.rapidGuessing ? rapidGuessingCategory(category) : category,
         correctAnswer: choiceLabel(question, question.answer),
         gameId: GAME_ID,
         gameTitle: GAME_TITLE,
@@ -2686,6 +2752,8 @@ ${showLandingNumber && number === finish ? "" : number}
         levelName: level.name,
         levelQuestionIndex: index + 1,
         questionIndex: index + 1,
+        rapidGuessing: Boolean(state.rapidGuessing),
+        rapidGuessingCount: state.rapidGuessingCount || 0,
         word: question.word || question.correctAnswer || question.answer
       }];
     });
@@ -2748,6 +2816,7 @@ ${showLandingNumber && number === finish ? "" : number}
   }
   function showQuestion(index) {
     current = Number(index);
+    rapidGuessPauseUntil = 0;
     feedback.className = "feedback";
     feedback.textContent = "";
     renderQuestion();
@@ -2756,6 +2825,10 @@ ${showLandingNumber && number === finish ? "" : number}
   }
   function selectChoice(choice) {
     const state = states[current];
+    if (Date.now() < rapidGuessPauseUntil) {
+      speakRapidGuessingMessage();
+      return;
+    }
     if (state.complete) return;
 
     state.selected = choice;
@@ -2783,6 +2856,10 @@ ${showLandingNumber && number === finish ? "" : number}
   function checkAnswer() {
     const q = activeQuestions[current];
     const state = states[current];
+    if (Date.now() < rapidGuessPauseUntil) {
+      speakRapidGuessingMessage();
+      return;
+    }
     if (!state.selected || state.complete) return;
     const correct = state.selected === q.answer;
     state.attempts++;
@@ -2797,6 +2874,26 @@ ${showLandingNumber && number === finish ? "" : number}
       tone("correct");
     } else {
       state.incorrectSelections.push(choiceLabel(q, state.selected));
+      if (shouldPauseForRapidGuessing(state)) {
+        if (wholeClassMode) {
+          const level = LEVELS[selectedLevelIndex];
+          openAssignMiss({
+            category: rapidGuessingCategory(labelForQuestion(q)),
+            correctAnswer: choiceReportLabel(q, q.answer),
+            incorrectSelection: choiceLabel(q, state.selected),
+            levelId: level.id,
+            levelName: level.name,
+            levelQuestionIndex: current + 1,
+            questionIndex: current + 1,
+            rapidGuessing: true,
+            rapidGuessingCount: (state.rapidGuessingCount || 0) + 1,
+            word: q.word || q.correctAnswer || q.answer
+          });
+        }
+        state.selected = null;
+        pauseForRapidGuessing(state);
+        return;
+      }
       const revealAnswer = state.attempts >= 2;
       showFeedback(
         revealAnswer ? questionFeedbackText(q) : retryFeedbackText(),
@@ -2844,8 +2941,9 @@ ${showLandingNumber && number === finish ? "" : number}
     return activeQuestions.flatMap((q, index) => {
       const state = states[index];
       if (state.scored) return [];
+      const category = labelForQuestion(q);
       return [{
-        category: labelForQuestion(q),
+        category: state.rapidGuessing ? rapidGuessingCategory(category) : category,
         correctAnswer: choiceReportLabel(q, q.answer),
         gameId: GAME_ID,
         gameTitle: GAME_TITLE,
@@ -2854,6 +2952,8 @@ ${showLandingNumber && number === finish ? "" : number}
         levelName: level.name,
         levelQuestionIndex: index + 1,
         questionIndex: index + 1,
+        rapidGuessing: Boolean(state.rapidGuessing),
+        rapidGuessingCount: state.rapidGuessingCount || 0,
         word: q.word || q.correctAnswer || q.answer
       }];
     });
@@ -2862,8 +2962,9 @@ ${showLandingNumber && number === finish ? "" : number}
     const level = LEVELS[selectedLevelIndex];
     return states.flatMap((state, index) => {
       const q = activeQuestions[index];
+      const category = labelForQuestion(q);
       return state.incorrectSelections.map(choice => ({
-        category: labelForQuestion(q),
+        category: state.rapidGuessing ? rapidGuessingCategory(category) : category,
         correctAnswer: choiceReportLabel(q, q.answer),
         gameId: GAME_ID,
         gameTitle: GAME_TITLE,
@@ -2872,6 +2973,8 @@ ${showLandingNumber && number === finish ? "" : number}
         levelName: level.name,
         levelQuestionIndex: index + 1,
         questionIndex: index + 1,
+        rapidGuessing: Boolean(state.rapidGuessing),
+        rapidGuessingCount: state.rapidGuessingCount || 0,
         word: q.word || q.correctAnswer || q.answer
       }));
     });
@@ -3132,6 +3235,8 @@ ${showLandingNumber && number === finish ? "" : number}
           levelName: pendingClassMiss.levelName,
           levelQuestionIndex: pendingClassMiss.levelQuestionIndex,
           questionIndex: pendingClassMiss.questionIndex,
+          rapidGuessing: Boolean(pendingClassMiss.rapidGuessing),
+          rapidGuessingCount: pendingClassMiss.rapidGuessingCount || 0,
           word: pendingClassMiss.word
         }],
         missedCount: 1,
@@ -3145,6 +3250,8 @@ ${showLandingNumber && number === finish ? "" : number}
           levelName: pendingClassMiss.levelName,
           levelQuestionIndex: pendingClassMiss.levelQuestionIndex,
           questionIndex: pendingClassMiss.questionIndex,
+          rapidGuessing: Boolean(pendingClassMiss.rapidGuessing),
+          rapidGuessingCount: pendingClassMiss.rapidGuessingCount || 0,
           word: pendingClassMiss.word
         }],
         mode: "whole-class-miss",

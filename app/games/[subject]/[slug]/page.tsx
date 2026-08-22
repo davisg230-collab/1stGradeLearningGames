@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { QpsScreenerGame } from "../../../components/QpsScreenerGame";
 import { SiteHeader } from "../../../components/SiteHeader";
 import { mathGames, skillsGames } from "../../../game-data";
 
@@ -22,6 +23,9 @@ export default async function GamePage({ params }: GamePageProps) {
   return (
     <main>
       <SiteHeader current={subject === "math" ? "math" : "skills"} />
+      {game.adventure === "qps-screener" ? (
+        <QpsScreenerGame />
+      ) : (
       <section className="coming-soon-page">
         <div className={`coming-soon-card theme-${game.theme}`}>
           <span className="game-picture" aria-hidden="true">
@@ -35,6 +39,7 @@ export default async function GamePage({ params }: GamePageProps) {
           </Link>
         </div>
       </section>
+      )}
     </main>
   );
 }

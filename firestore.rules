@@ -29,7 +29,7 @@ service cloud.firestore {
     }
 
     function isValidCardId(cardId) {
-      return cardId.matches('^(CKLA Skills:(starting-point|letter-search-safari|unit-[0-9]+)|CKLA Listening & Learning:unit-[0-9]+|Eureka Math:module-[0-9]+|Math:(starting-point|number-search-safari))$');
+      return cardId.matches('^(CKLA Skills:(qps-screener|starting-point|letter-search-safari|unit-[0-9]+)|CKLA Listening & Learning:unit-[0-9]+|Eureka Math:module-[0-9]+|Math:(starting-point|number-search-safari))$');
     }
 
     function isValidName(value) {
@@ -155,6 +155,7 @@ service cloud.firestore {
         && request.resource.data.content.keys().hasOnly([
           'levels',
           'questions',
+          'rapidGuessingVoice',
           'schemaVersion',
           'supplementalQuestions',
           'unitTitle',
@@ -184,6 +185,10 @@ service cloud.firestore {
             request.resource.data.content.unitTitle is string
             && request.resource.data.content.unitTitle.size() <= 120
           )
+        )
+        && (
+          !request.resource.data.content.keys().hasAny(['rapidGuessingVoice'])
+          || request.resource.data.content.rapidGuessingVoice is map
         )
         && (
           !request.resource.data.content.keys().hasAny(['zoneEncouragements'])
@@ -675,6 +680,105 @@ service cloud.firestore {
         && isValidOptionalLearningLocation()
         && isValidOptionalQuestionResponses()
         && isValidOptionalResponseTimes();
+    }
+
+    function isValidQpsResult() {
+      return isTeacherEditor()
+        && request.resource.data.keys().hasOnly([
+          'assessmentId',
+          'assessmentVersion',
+          'attempts',
+          'categoryScores',
+          'completedAt',
+          'createdAt',
+          'gameId',
+          'gameTitle',
+          'incorrectSelections',
+          'learningLocation',
+          'levelId',
+          'levelIndex',
+          'levelName',
+          'missedCount',
+          'missedQuestions',
+          'mode',
+          'percent',
+          'questionResponses',
+          'responseTimesMs',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'teacherEmail',
+          'totalQuestions'
+        ])
+        && request.resource.data.keys().hasAll([
+          'assessmentId',
+          'assessmentVersion',
+          'attempts',
+          'categoryScores',
+          'completedAt',
+          'createdAt',
+          'gameId',
+          'gameTitle',
+          'incorrectSelections',
+          'learningLocation',
+          'levelId',
+          'levelIndex',
+          'levelName',
+          'missedCount',
+          'missedQuestions',
+          'mode',
+          'percent',
+          'questionResponses',
+          'responseTimesMs',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'score',
+          'teacherEmail',
+          'totalQuestions'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.assessmentId == 'qps-screener'
+        && request.resource.data.gameId == 'qps-screener'
+        && request.resource.data.gameTitle == 'QPS Screener'
+        && request.resource.data.mode == 'teacher-qps-screener'
+        && request.resource.data.learningLocation == 'school'
+        && request.resource.data.levelId == 'qps-full-screener'
+        && request.resource.data.levelIndex == 0
+        && request.resource.data.levelName == 'QPS Screener'
+        && request.resource.data.attempts == 1
+        && isValidName(request.resource.data.scholarFirstName)
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && request.resource.data.scholarId is string
+        && request.resource.data.scholarId.size() > 0
+        && request.resource.data.scholarId.size() <= 150
+        && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions >= 1
+        && request.resource.data.totalQuestions <= 220
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.percent is int
+        && request.resource.data.percent >= 0
+        && request.resource.data.percent <= 100
+        && request.resource.data.missedCount is int
+        && request.resource.data.missedCount >= 0
+        && request.resource.data.missedCount <= request.resource.data.totalQuestions
+        && request.resource.data.incorrectSelections is list
+        && request.resource.data.incorrectSelections.size() <= request.resource.data.totalQuestions
+        && request.resource.data.missedQuestions is list
+        && request.resource.data.missedQuestions.size() == request.resource.data.missedCount
+        && request.resource.data.questionResponses is list
+        && request.resource.data.questionResponses.size() == request.resource.data.totalQuestions
+        && request.resource.data.responseTimesMs is list
+        && request.resource.data.responseTimesMs.size() <= 220
+        && request.resource.data.categoryScores is map
+        && request.resource.data.completedAt is timestamp
+        && request.resource.data.createdAt is timestamp;
     }
 
     function isValidWholeClassMiss() {
@@ -1259,6 +1363,7 @@ service cloud.firestore {
 
     match /gameHubResultSubmissions/{resultId} {
       allow create: if isValidIndividualResult()
+        || isValidQpsResult()
         || isValidWholeClassMiss();
       allow read, delete: if canReadResult();
       allow update: if false;

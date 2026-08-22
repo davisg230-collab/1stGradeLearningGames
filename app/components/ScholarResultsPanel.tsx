@@ -339,6 +339,7 @@ const SKILLS_PREASSESSMENT_GAME_ID = "skills-starting-point";
 const SKILLS_PREASSESSMENT_STATUS_ID_PREFIX = "skills-starting-point-";
 const LETTER_SEARCH_SAFARI_GAME_ID = "letter-search-safari";
 const NUMBER_SEARCH_SAFARI_GAME_ID = "number-search-safari";
+const QPS_SCREENER_GAME_ID = "qps-screener";
 const HUB_CLASS_URL = "https://first-grade-news-hub-mrdavis.web.app/";
 const HUB_CURRICULUM_RECOMMENDATION_URL =
   "https://us-central1-first-grade-news-hub.cloudfunctions.net/recommendCurriculumLessons";
@@ -435,6 +436,7 @@ const GAME_LABELS: Record<string, string> = {
   "letter-search-safari": "Letter Search Safari",
   "math-starting-point-quest": "Math Starting Point Quest",
   "number-search-safari": "Number Search Safari",
+  "qps-screener": "QPS Screener",
   "skills-starting-point": "Skills Starting Point",
   "unit1-zone1-sound-safari": "CKLA Unit 1 - Sound Safari",
   "unit1-zone2-team-trail": "CKLA Unit 1 - Team Trail",
@@ -1493,6 +1495,7 @@ function isSkillsDataSourceGameId(gameId: string) {
     || gameId === LETTER_SEARCH_SAFARI_GAME_ID
     || gameId === MATH_PREASSESSMENT_GAME_ID
     || gameId === NUMBER_SEARCH_SAFARI_GAME_ID
+    || gameId === QPS_SCREENER_GAME_ID
     || gameId.startsWith("unit1-zone")
     || /^ckla-unit-[3-7]-skills-quest$/.test(gameId);
 }
@@ -2185,10 +2188,20 @@ function smallGroupNeedKey(
   record: ResultSubmission | ProgressSubmission,
   missed: MissedQuestion,
 ) {
+  const target =
+    normalizeCurriculumNeedText(
+      missed.word
+      || missed.correctAnswer
+      || ("word" in record ? record.word : "")
+      || ("currentWord" in record ? record.currentWord : ""),
+    )
+    || normalizeCurriculumNeedText(missed.category || "");
+
   return [
     record.gameId,
     missed.levelName || record.levelName || "",
     missed.category || "Needs practice",
+    target,
   ].join("|");
 }
 
@@ -2236,7 +2249,6 @@ function smallGroupNeedSearchTerms(
     missed.correctAnswer,
     "word" in record ? record.word : "",
     "currentWord" in record ? record.currentWord : "",
-    gameTitleFor(record.gameId, record.gameTitle),
   ].filter(Boolean);
 }
 
@@ -2291,6 +2303,50 @@ function normalizeCurriculumNeedText(value: unknown) {
 
 function normalizeCurriculumNeedKey(value: unknown) {
   return normalizeCurriculumNeedText(value).toLowerCase();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function curriculumNeedTermMatches(text: string, term: string) {
+  const cleanText = normalizeCurriculumNeedKey(text);
+  const cleanTerm = normalizeCurriculumNeedKey(term);
+
+  if (!cleanText || !cleanTerm) return false;
+  if (cleanText === cleanTerm) return true;
+
+  if (cleanTerm.length <= 2) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(cleanTerm)}([^a-z0-9]|$)`, "i").test(cleanText);
+  }
+
+  return cleanText.includes(cleanTerm) || cleanTerm.includes(cleanText);
+}
+
+function curriculumCandidateMatchTerms(candidate: CurriculumNeedCandidate) {
+  const need = normalizeCurriculumNeedKey(candidate.need);
+  const terms = [candidate.need, ...candidate.searchTerms]
+    .map(normalizeCurriculumNeedKey)
+    .filter(Boolean)
+    .filter((term, index, allTerms) => allTerms.indexOf(term) === index);
+
+  if (need.length <= 2) {
+    return terms.filter((term) =>
+      term === need
+      || (
+        term.length <= 45
+        && curriculumNeedTermMatches(term, need)
+        && !/game|safari|assessment|quest|needs practice/i.test(term)
+      ),
+    );
+  }
+
+  return terms.filter((term) =>
+    !/game|safari|assessment|quest/i.test(term)
+    && term !== "letter identification"
+    && term !== "lowercase letter identification"
+    && term !== "uppercase letter identification",
+  );
 }
 
 function addCurriculumNeed(needs: string[], value: unknown) {
@@ -2357,7 +2413,6 @@ function curriculumNeedsFromRecord(record: ResultSubmission | ProgressSubmission
     addCurriculumNeed(needs, missed.category);
     addCurriculumNeed(needs, missed.word);
     addCurriculumNeed(needs, missed.correctAnswer);
-    missed.incorrectSelections?.forEach((selection) => addCurriculumNeed(needs, selection));
   });
 
   Object.entries(record.categoryScores ?? {}).forEach(([category, score]) => {
@@ -2395,19 +2450,13 @@ function recommendationMatchesNeedCandidate(
   recommendation: CurriculumRecommendation,
   candidate: CurriculumNeedCandidate,
 ) {
-  const terms = [candidate.need, ...candidate.searchTerms]
-    .map(normalizeCurriculumNeedKey)
-    .filter(Boolean);
+  const terms = curriculumCandidateMatchTerms(candidate);
   const matchedNeeds = recommendation.matchedNeeds
     .map(normalizeCurriculumNeedKey)
     .filter(Boolean);
 
   return matchedNeeds.some((matchedNeed) =>
-    terms.some((term) =>
-      matchedNeed === term
-      || matchedNeed.includes(term)
-      || term.includes(matchedNeed),
-    ),
+    terms.some((term) => curriculumNeedTermMatches(matchedNeed, term)),
   );
 }
 
@@ -2426,17 +2475,11 @@ function curriculumRecommendationDetailsForCandidate(
   recommendation: CurriculumRecommendation,
   candidate: CurriculumNeedCandidate,
 ) {
-  const terms = [candidate.need, ...candidate.searchTerms]
-    .map(normalizeCurriculumNeedKey)
-    .filter(Boolean);
+  const terms = curriculumCandidateMatchTerms(candidate);
 
   return (recommendation.matchDetails ?? []).filter((detail) => {
     const detailNeed = normalizeCurriculumNeedKey(detail.need);
-    return terms.some((term) =>
-      detailNeed === term
-      || detailNeed.includes(term)
-      || term.includes(detailNeed),
-    );
+    return terms.some((term) => curriculumNeedTermMatches(detailNeed, term));
   });
 }
 
@@ -2473,10 +2516,15 @@ function isStrongSmallGroupLessonMatch(
   candidate: CurriculumNeedCandidate,
   index: number,
 ) {
+  if (index > 1) return false;
+
   const detail = curriculumRecommendationDetailsForCandidate(recommendation, candidate)[0];
-  return index === 0
-    || recommendation.score >= 56
-    || ["direct", "standard"].includes(detail?.matchType || "");
+  const matchType = detail?.matchType || "";
+
+  if (["direct", "source"].includes(matchType)) return true;
+  if (index === 0 && ["lesson", "related"].includes(matchType) && recommendation.score >= 48) return true;
+
+  return false;
 }
 
 function curriculumGroupUploadUrl(
@@ -2571,6 +2619,384 @@ function curriculumFamilyPracticeTips(
   };
 }
 
+function smallGroupTeachingTarget(
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+) {
+  const need = normalizeCurriculumNeedText(candidate.need);
+
+  if (subject === "math") {
+    return need ? `Practice ${need} with objects, drawings, numbers, and words.` : "Practice the target math skill.";
+  }
+
+  if (subject === "listening") {
+    return need ? `Use details from a story or topic to practice ${need}.` : "Practice the target Listening & Learning skill.";
+  }
+
+  if (/^[a-z]$/i.test(need)) {
+    return `Identify, say, read, and write the letter ${need}.`;
+  }
+
+  if (/^[a-z]{2,4}$/i.test(need)) {
+    return `Read, say, and write words with ${need}.`;
+  }
+
+  return need ? `Practice ${need}.` : "Practice the target Skills need.";
+}
+
+function smallGroupPlanObjective(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+) {
+  const target = smallGroupTeachingTarget(candidate, subject);
+  const lessonConnection =
+    recommendation?.lessonTitle
+      ? ` This connects to ${curriculumRecommendationLessonLabel(recommendation)} - ${recommendation.lessonTitle}.`
+      : "";
+
+  return `${target}${lessonConnection}`;
+}
+
+function cleanSmallGroupSourceText(text: string) {
+  return text
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, 30000);
+}
+
+function sourceSentences(text: string) {
+  return cleanSmallGroupSourceText(text)
+    .replace(/\r/g, "\n")
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length >= 24 && sentence.length <= 260);
+}
+
+function relevantSmallGroupSourceNotes(
+  sourceText: string,
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+) {
+  const sentences = sourceSentences(sourceText);
+  const terms = [
+    ...curriculumCandidateMatchTerms(candidate),
+    recommendation?.lessonTitle,
+    recommendation?.iCanStatement,
+    recommendation?.objective,
+  ]
+    .map(normalizeCurriculumNeedText)
+    .filter(Boolean);
+
+  const scored = sentences.map((sentence, index) => {
+    const score = terms.reduce((total, term) => (
+      curriculumNeedTermMatches(sentence, term) ? total + Math.max(2, Math.min(8, term.length)) : total
+    ), 0);
+    return { index, score, sentence };
+  });
+
+  const best = scored
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, 5)
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.sentence);
+
+  if (best.length) return best;
+
+  return sentences.slice(0, 4);
+}
+
+function smallGroupMaterials(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  sourceText: string,
+) {
+  const sourceNotes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation);
+  const lowerSource = sourceText.toLowerCase();
+  const materials = new Set<string>();
+
+  if (subject === "math") {
+    ["small objects/counters", "whiteboards or paper", "pencils"].forEach((item) => materials.add(item));
+  } else if (subject === "listening") {
+    ["lesson text or read-aloud", "picture card or anchor chart", "paper/pencil response"].forEach((item) => materials.add(item));
+  } else {
+    ["letter/word cards", "whiteboards or paper", "pencils"].forEach((item) => materials.add(item));
+  }
+
+  if (lowerSource.includes("worksheet")) materials.add("lesson worksheet");
+  if (lowerSource.includes("reader")) materials.add("reader or decodable text");
+  if (lowerSource.includes("chart")) materials.add("chart paper or board");
+  if (lowerSource.includes("card")) materials.add("lesson cards");
+
+  sourceNotes
+    .filter((note) => /materials?|worksheet|reader|card|chart|board|pencil|paper/i.test(note))
+    .slice(0, 2)
+    .forEach((note) => materials.add(note));
+
+  return Array.from(materials).slice(0, 7);
+}
+
+function smallGroupDataCheckItems(
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+) {
+  const need = normalizeCurriculumNeedText(candidate.need);
+
+  if (subject === "math") {
+    return [
+      `Show ${need || "the target math idea"} with objects or a drawing.`,
+      "Write or say the matching number sentence.",
+      "Explain how you know in one sentence.",
+    ];
+  }
+
+  if (subject === "listening") {
+    return [
+      `Tell one important detail connected to ${need || "today's story or topic"}.`,
+      "Answer one who/what/where/why/how question in a complete sentence.",
+      "Use one lesson word or story detail in the answer.",
+    ];
+  }
+
+  if (/^[a-z]$/i.test(need)) {
+    return [
+      `Point to or circle ${need} from a small set of letters.`,
+      `Say the name/sound for ${need}.`,
+      `Write ${need} and read it back to the teacher.`,
+    ];
+  }
+
+  if (/^[a-z]{2,4}$/i.test(need)) {
+    return [
+      `Read one word with ${need}.`,
+      `Build or write one word with ${need}.`,
+      `Use the word in a spoken sentence.`,
+    ];
+  }
+
+  return [
+    `Show ${need || "the target skill"} with teacher support.`,
+    "Try one example independently.",
+    "Explain how you know or read the answer back.",
+  ];
+}
+
+function smallGroupTeacherPlanRows(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+  sourceText: string,
+) {
+  const target = smallGroupTeachingTarget(candidate, subject);
+  const sourceNotes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation);
+  const lessonTitle = recommendation?.lessonTitle || "the connected lesson";
+  const sourcePractice = sourceNotes[0]
+    ? `Use this lesson source moment: ${sourceNotes[0]}`
+    : `Use ${lessonTitle} as the connected classroom lesson while keeping the practice focused on ${candidate.need}.`;
+
+  if (subject === "math") {
+    return [
+      ["1-2 min", "Name the Need", `Tell scholars the target: ${target} Show one quick teacher model.`],
+      ["3 min", "Model", "Use objects or a drawing. Say the math story out loud, then connect it to numbers or a number sentence."],
+      ["5 min", "Guided Practice", sourcePractice],
+      ["4 min", "Independent Check", smallGroupDataCheckItems(candidate, subject).join(" ")],
+      ["1 min", "Next Step", "Mark each scholar as got it, almost, or reteach. Reteach with smaller numbers or fewer parts if needed."],
+    ];
+  }
+
+  if (subject === "listening") {
+    return [
+      ["1-2 min", "Name the Need", `Tell scholars the target: ${target}`],
+      ["3 min", "Model", "Read or retell a short part of the lesson. Think aloud using one detail and one complete sentence."],
+      ["5 min", "Guided Practice", sourcePractice],
+      ["4 min", "Independent Check", smallGroupDataCheckItems(candidate, subject).join(" ")],
+      ["1 min", "Next Step", "Mark each scholar as got it, almost, or reteach. Prompt with sentence frames if needed."],
+    ];
+  }
+
+  return [
+    ["1-2 min", "Name the Need", `Tell scholars the target: ${target}`],
+    ["3 min", "Teacher Model", `Model the exact response: say it, point to it, read it in a word if possible, and write it.`],
+    ["5 min", "Guided Practice", sourcePractice],
+    ["4 min", "Independent Check", smallGroupDataCheckItems(candidate, subject).join(" ")],
+    ["1 min", "Next Step", "Mark each scholar as got it, almost, or reteach. Give one more quick example to any scholar who is close."],
+  ];
+}
+
+function smallGroupFamilyPractice(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+) {
+  const tips = curriculumFamilyPracticeTips(candidate, subject);
+  const target = smallGroupTeachingTarget(candidate, subject);
+  const need = normalizeCurriculumNeedText(candidate.need);
+
+  if (subject === "skills" && /^[a-z]$/i.test(need)) {
+    return {
+      focus: target,
+      lookFor: `Your child can find ${need}, name or say it, and write it without guessing.`,
+      steps: [
+        `Write ${need} on a card or paper. Say: "This is ${need}."`,
+        `Mix ${need} with 3 or 4 other letters. Ask your child to point to ${need}.`,
+        `Have your child write ${need} three times and read it back.`,
+      ],
+      prompt: `Point to ${need}, say it, write it, then find it in a book or around the house.`,
+    };
+  }
+
+  return {
+    focus:
+      target
+      || recommendation?.iCanStatement
+      || recommendation?.objective
+      || candidate.need,
+    lookFor: tips.lookFor,
+    steps: tips.steps,
+    prompt: tips.prompt,
+  };
+}
+
+function decodePdfLiteralString(value: string) {
+  let output = "";
+
+  for (let index = 1; index < value.length - 1; index += 1) {
+    const character = value[index];
+
+    if (character !== "\\") {
+      output += character;
+      continue;
+    }
+
+    const next = value[index + 1];
+    if (!next) continue;
+
+    if (next === "n") output += "\n";
+    else if (next === "r") output += "\r";
+    else if (next === "t") output += "\t";
+    else if (next === "b") output += "\b";
+    else if (next === "f") output += "\f";
+    else if (next === "(" || next === ")" || next === "\\") output += next;
+    else if (/[0-7]/.test(next)) {
+      const match = value.slice(index + 1, index + 4).match(/^[0-7]{1,3}/)?.[0] ?? "";
+      output += String.fromCharCode(parseInt(match, 8));
+      index += match.length - 1;
+      continue;
+    } else if (next === "\r" || next === "\n") {
+      if (next === "\r" && value[index + 2] === "\n") index += 1;
+    } else {
+      output += next;
+    }
+
+    index += 1;
+  }
+
+  return output;
+}
+
+function textFromPdfContent(content: string) {
+  const snippets: string[] = [];
+  const blocks = content.match(/BT[\s\S]*?ET/g) ?? [content];
+  const literalPattern = /\((?:\\[\s\S]|[^\\)])*\)/g;
+
+  blocks.forEach((block) => {
+    const pieces = Array.from(block.matchAll(literalPattern))
+      .map((match) => decodePdfLiteralString(match[0]).trim())
+      .filter(Boolean);
+
+    if (pieces.length) {
+      snippets.push(pieces.join(" "));
+    }
+  });
+
+  return cleanSmallGroupSourceText(snippets.join("\n"));
+}
+
+function latin1FromBytes(bytes: Uint8Array) {
+  return new TextDecoder("latin1").decode(bytes);
+}
+
+async function inflatePdfStreamBytes(bytes: Uint8Array) {
+  const DecompressionStreamCtor = (globalThis as unknown as {
+    DecompressionStream?: new (format: string) => TransformStream<Uint8Array, Uint8Array>;
+  }).DecompressionStream;
+
+  if (!DecompressionStreamCtor) return [];
+
+  const inflated: Uint8Array[] = [];
+  for (const format of ["deflate", "deflate-raw"]) {
+    try {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStreamCtor(format));
+      inflated.push(new Uint8Array(await new Response(stream).arrayBuffer()));
+    } catch {
+      // Try the next stream flavor. PDF creators are not consistent here.
+    }
+  }
+
+  return inflated;
+}
+
+async function extractTextFromPdfFile(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const raw = latin1FromBytes(bytes);
+  const chunks = new Set<string>();
+  const directText = textFromPdfContent(raw);
+
+  if (directText.length > 80) {
+    chunks.add(directText);
+  }
+
+  let searchIndex = 0;
+  while (searchIndex < raw.length) {
+    const streamIndex = raw.indexOf("stream", searchIndex);
+    if (streamIndex === -1) break;
+
+    let dataStart = streamIndex + "stream".length;
+    if (raw[dataStart] === "\r" && raw[dataStart + 1] === "\n") dataStart += 2;
+    else if (raw[dataStart] === "\n" || raw[dataStart] === "\r") dataStart += 1;
+
+    const endIndex = raw.indexOf("endstream", dataStart);
+    if (endIndex === -1) break;
+
+    let dataEnd = endIndex;
+    while (dataEnd > dataStart && (raw[dataEnd - 1] === "\n" || raw[dataEnd - 1] === "\r")) {
+      dataEnd -= 1;
+    }
+
+    const dictionary = raw.slice(Math.max(0, streamIndex - 1400), streamIndex);
+    const streamBytes = bytes.slice(dataStart, dataEnd);
+    const contentBytes = /FlateDecode/i.test(dictionary)
+      ? await inflatePdfStreamBytes(streamBytes)
+      : [streamBytes];
+
+    contentBytes.forEach((contentByteChunk) => {
+      const streamText = textFromPdfContent(latin1FromBytes(contentByteChunk));
+      if (streamText.length > 40) chunks.add(streamText);
+    });
+
+    searchIndex = endIndex + "endstream".length;
+  }
+
+  return cleanSmallGroupSourceText(Array.from(chunks).join("\n\n"));
+}
+
+async function readSmallGroupLessonSourceFile(file: File) {
+  if (file.type.startsWith("text/") || /\.(txt|md|csv)$/i.test(file.name)) {
+    return cleanSmallGroupSourceText(await file.text());
+  }
+
+  if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+    return extractTextFromPdfFile(file);
+  }
+
+  return "";
+}
+
 function rosterScopedTeacherEmail(email: string) {
   return rosterTeacherEmailForEmail(email) || email;
 }
@@ -2613,6 +3039,21 @@ function skillsDataStatusLabel(status: SkillsDataStatus) {
   }
 
   return "No evidence";
+}
+
+function isQpsSkillsEvidence(evidence?: SkillsDataEvidence) {
+  return evidence?.gameId === QPS_SCREENER_GAME_ID;
+}
+
+function skillsDataCellSourceClass(cell: SkillsDataCell) {
+  if (isQpsSkillsEvidence(cell.latest)) return "is-qps";
+  if (cell.latest?.source === "Teacher observation") return "is-manual";
+  return "";
+}
+
+function skillsDataCellMarker(cell: SkillsDataCell) {
+  if (isQpsSkillsEvidence(cell.latest)) return "QPS";
+  return "";
 }
 
 function escapeReportHtml(value: unknown) {
@@ -3585,6 +4026,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       )
       .slice(0, 5);
   }, [curriculumRecommendationSubject, progressRecords, selectedSkillsDataScholarRow]);
+  const qpsResults = useMemo(() => {
+    return results
+      .filter((result) =>
+        result.gameId === QPS_SCREENER_GAME_ID
+        && matchResult(result, reportScholars).scholar,
+      )
+      .slice(0, 12);
+  }, [results, reportScholars]);
   const curriculumNeedCandidates = useMemo(() => {
     const candidates = new Map<string, CurriculumNeedCandidate>();
 
@@ -3753,17 +4202,26 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       fileName: file.name,
     });
 
-    if (file.type.startsWith("text/") || /\.(txt|md|csv)$/i.test(file.name)) {
-      const text = await file.text();
+    try {
+      const text = await readSmallGroupLessonSourceFile(file);
+
+      if (text) {
+        updateSmallGroupLessonSource(recommendation.id, {
+          fileName: file.name,
+          text,
+        });
+        setStatus(`Read ${file.name}. Teacher and family print plans will use this lesson source.`);
+        return;
+      }
+
       updateSmallGroupLessonSource(recommendation.id, {
         fileName: file.name,
-        text,
+        text: "",
       });
-      setStatus(`Attached ${file.name} for ${recommendation.lessonTitle || "this lesson"}.`);
-      return;
+      setStatus(`Attached ${file.name}, but the text could not be read automatically. Try a text-based PDF or paste the lesson notes in the source box.`);
+    } catch {
+      setStatus(`Attached ${file.name}, but the text could not be read automatically. Try a text-based PDF or paste the lesson notes in the source box.`);
     }
-
-    setStatus(`Attached ${file.name}. Paste the key lesson steps or activity notes in the source box before printing.`);
   };
 
   const openDataReportView = (view: DataReportView) => {
@@ -4072,6 +4530,62 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             <tr><th>Scholar</th>${headerCells}<th>Total</th></tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
+        </table>
+      </body>
+      </html>
+    `);
+    reportWindow.document.close();
+    reportWindow.focus();
+    setTimeout(() => reportWindow.print(), 100);
+  };
+
+  const printQpsSummaryReport = () => {
+    const reportWindow = window.open("", "_blank");
+    const rowsHtml = qpsResults.map((result) => {
+      const match = matchResult(result, reportScholars);
+      const completedAt = formatDate(result.completedAt);
+      return `
+        <tr>
+          <th>${escapeReportHtml(match.label)}</th>
+          <td>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")}</td>
+          <td>${result.score}/${result.totalQuestions}</td>
+          <td>${result.missedCount}</td>
+          <td>${escapeReportHtml(result.missedQuestions.slice(0, 8).map((missed) =>
+            `${missed.word || missed.correctAnswer || missed.category}: ${missed.incorrectSelections?.join(", ") || "needs review"}`
+          ).join("; "))}</td>
+        </tr>
+      `;
+    }).join("");
+
+    if (!reportWindow) {
+      window.print();
+      return;
+    }
+
+    reportWindow.document.write(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>QPS Screener Summary</title>
+        <style>
+          body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#222}
+          h1{margin:0 0 4px;font-size:24px}
+          p{margin:0 0 16px;color:#555;font-size:13px}
+          table{width:100%;border-collapse:collapse;font-size:12px}
+          th,td{border:1px solid #222;padding:6px;text-align:left;vertical-align:top}
+          thead th{background:#eef3f8}
+          @media print{tr{break-inside:avoid}}
+        </style>
+      </head>
+      <body>
+        <h1>QPS Screener Summary</h1>
+        <p>${escapeReportHtml(new Date().toLocaleDateString())}</p>
+        <table>
+          <thead>
+            <tr><th>Scholar</th><th>Date</th><th>Score</th><th>Needs</th><th>Notes</th></tr>
+          </thead>
+          <tbody>${rowsHtml || `<tr><td colspan="5">No QPS sessions saved yet.</td></tr>`}</tbody>
         </table>
       </body>
       </html>
@@ -4636,22 +5150,25 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const reportWindow = window.open("", "_blank");
     const sourceText = lessonSource?.text.trim() ?? "";
     const sourceTitle = lessonSource?.fileName.trim() ?? "";
+    const bestLesson = recommendations[0];
+    const objective = smallGroupPlanObjective(candidate, bestLesson, curriculumRecommendationSubject);
+    const materials = smallGroupMaterials(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
+    const planRows = smallGroupTeacherPlanRows(candidate, bestLesson, curriculumRecommendationSubject, sourceText);
+    const dataCheckItems = smallGroupDataCheckItems(candidate, curriculumRecommendationSubject);
+    const sourceNotes = sourceText ? relevantSmallGroupSourceNotes(sourceText, candidate, bestLesson) : [];
     const scholarItems = candidate.scholars.length
       ? candidate.scholars.map((scholar) => `<li>${escapeReportHtml(scholar)}</li>`).join("")
       : "<li>No roster names were attached to this need yet.</li>";
-    const recommendationsHtml = recommendations.length
-      ? recommendations.map((recommendation) => `
-        <article class="lesson-card">
-          <p class="match">${escapeReportHtml(curriculumRecommendationMatchLabel(recommendation, candidate))}</p>
-          <h2>${escapeReportHtml(curriculumRecommendationLessonLabel(recommendation))}</h2>
-          <h3>${escapeReportHtml(recommendation.lessonTitle || "Saved Hub lesson")}</h3>
-          ${recommendation.priorityStandard ? `<p><strong>Standard:</strong> ${escapeReportHtml(recommendation.priorityStandard)}</p>` : ""}
-          ${recommendation.iCanStatement ? `<p><strong>I Can:</strong> ${escapeReportHtml(recommendation.iCanStatement)}</p>` : ""}
-          ${recommendation.objective || recommendation.parentSummary ? `<p>${escapeReportHtml(recommendation.objective || recommendation.parentSummary)}</p>` : ""}
-          <p><strong>Why this lesson:</strong> ${escapeReportHtml(curriculumRecommendationReason(recommendation, candidate))}</p>
-        </article>
-      `).join("")
-      : `<p>No saved Hub lesson matched this need yet. Use the upload option to add a lesson source for this group.</p>`;
+    const connectedLessonHtml = bestLesson ? `
+      <section class="box">
+        <p class="match">${escapeReportHtml(curriculumRecommendationMatchLabel(bestLesson, candidate))}</p>
+        <h2>${escapeReportHtml(curriculumRecommendationLessonLabel(bestLesson))}</h2>
+        <h3>${escapeReportHtml(bestLesson.lessonTitle || "Saved Hub lesson")}</h3>
+        ${bestLesson.priorityStandard ? `<p><strong>Standard:</strong> ${escapeReportHtml(bestLesson.priorityStandard)}</p>` : ""}
+        ${bestLesson.iCanStatement ? `<p><strong>I Can:</strong> ${escapeReportHtml(bestLesson.iCanStatement)}</p>` : ""}
+        <p><strong>Why this lesson:</strong> ${escapeReportHtml(curriculumRecommendationReason(bestLesson, candidate))}</p>
+      </section>
+    ` : "";
 
     if (!reportWindow) {
       window.print();
@@ -4672,10 +5189,15 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           p,li{font-size:13px;line-height:1.45}
           .meta{color:#555;margin:0 0 18px}
           .layout{display:grid;grid-template-columns:220px 1fr;gap:22px;align-items:start}
+          .box{break-inside:avoid;border:1px solid #ddd;border-radius:10px;padding:12px;margin:0 0 12px}
+          table{width:100%;border-collapse:collapse;margin:10px 0 14px}
+          th,td{border:1px solid #d8dee8;padding:8px;text-align:left;vertical-align:top;font-size:12px;line-height:1.35}
+          th{background:#eef3f8;color:#24364c}
           ul{margin:8px 0 0;padding-left:18px}
           .lesson-card{break-inside:avoid;border:1px solid #ddd;border-radius:10px;padding:12px;margin:0 0 12px}
           .match{margin:0 0 6px;color:#6f5b2f;font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
-          @media print{body{margin:12mm}.lesson-card{break-inside:avoid}.layout{grid-template-columns:190px 1fr}}
+          .checklist li{margin-bottom:5px}
+          @media print{body{margin:12mm}.lesson-card,.box,table{break-inside:avoid}.layout{grid-template-columns:190px 1fr}}
         </style>
       </head>
       <body>
@@ -4689,15 +5211,35 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             <ul>${scholarItems}</ul>
           </aside>
           <main>
-            <h2>Recommended Hub Lessons</h2>
-            ${recommendationsHtml}
-            ${sourceText || sourceTitle ? `
-              <article class="lesson-card">
-                <p class="match">Uploaded lesson source</p>
-                ${sourceTitle ? `<h3>${escapeReportHtml(sourceTitle)}</h3>` : ""}
-                ${sourceText ? `<p>${escapeReportHtml(sourceText.slice(0, 1800))}${sourceText.length > 1800 ? "..." : ""}</p>` : "<p>Source file attached. Add/paste key lesson steps before printing for more detail.</p>"}
-              </article>
+            <h2>Teaching Target</h2>
+            <section class="box">
+              <p>${escapeReportHtml(objective)}</p>
+            </section>
+            ${connectedLessonHtml}
+            <h2>Materials</h2>
+            <ul>${materials.map((material) => `<li>${escapeReportHtml(material)}</li>`).join("")}</ul>
+            <h2>Teach It</h2>
+            <table>
+              <thead>
+                <tr><th>Time</th><th>Part</th><th>Teacher Moves</th></tr>
+              </thead>
+              <tbody>
+                ${planRows.map(([time, part, moves]) => `
+                  <tr>
+                    <td>${escapeReportHtml(time)}</td>
+                    <td>${escapeReportHtml(part)}</td>
+                    <td>${escapeReportHtml(moves)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+            <h2>Quick Data Check</h2>
+            <ul class="checklist">${dataCheckItems.map((item) => `<li>${escapeReportHtml(item)}</li>`).join("")}</ul>
+            ${sourceNotes.length ? `
+              <h2>Lesson Source Notes</h2>
+              <ul>${sourceNotes.map((note) => `<li>${escapeReportHtml(note)}</li>`).join("")}</ul>
             ` : ""}
+            ${sourceTitle ? `<p class="meta">Source used: ${escapeReportHtml(sourceTitle)}</p>` : ""}
           </main>
         </div>
       </body>
@@ -4711,15 +5253,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const printFamilyPracticePlan = (
     candidate: CurriculumNeedCandidate,
     recommendations: CurriculumRecommendation[],
+    lessonSource?: SmallGroupLessonSource,
   ) => {
     const reportWindow = window.open("", "_blank");
     const bestLesson = recommendations[0];
-    const tips = curriculumFamilyPracticeTips(candidate, curriculumRecommendationSubject);
-    const lessonFocus =
-      bestLesson?.iCanStatement
-      || bestLesson?.objective
-      || bestLesson?.parentSummary
-      || candidate.need;
+    const sourceText = lessonSource?.text.trim() ?? "";
+    const practice = smallGroupFamilyPractice(candidate, bestLesson, curriculumRecommendationSubject);
+    const sourceNotes = sourceText ? relevantSmallGroupSourceNotes(sourceText, candidate, bestLesson).slice(0, 2) : [];
 
     if (!reportWindow) {
       window.print();
@@ -4754,22 +5294,29 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
           <section class="focus">
             <h2>What We Are Practicing</h2>
-            <p>${escapeReportHtml(lessonFocus)}</p>
+            <p>${escapeReportHtml(practice.focus)}</p>
             ${bestLesson ? `<p class="quiet">Connected classroom lesson: ${escapeReportHtml(curriculumRecommendationLessonLabel(bestLesson))}${bestLesson.lessonTitle ? ` - ${escapeReportHtml(bestLesson.lessonTitle)}` : ""}</p>` : ""}
           </section>
 
           <section class="steps">
             <h2>Try This At Home</h2>
             <ul>
-              ${tips.steps.map((step) => `<li>${escapeReportHtml(step)}</li>`).join("")}
+              ${practice.steps.map((step) => `<li>${escapeReportHtml(step)}</li>`).join("")}
             </ul>
           </section>
 
           <section>
             <h2>What To Listen Or Look For</h2>
-            <p>${escapeReportHtml(tips.lookFor)}</p>
-            <p class="prompt">${escapeReportHtml(tips.prompt)}</p>
+            <p>${escapeReportHtml(practice.lookFor)}</p>
+            <p class="prompt">${escapeReportHtml(practice.prompt)}</p>
           </section>
+
+          ${sourceNotes.length ? `
+            <section>
+              <h2>Classroom Connection</h2>
+              <ul>${sourceNotes.map((note) => `<li>${escapeReportHtml(note)}</li>`).join("")}</ul>
+            </section>
+          ` : ""}
 
           <p class="quiet">Keep practice short and encouraging. If your child gets stuck, model one example, then let them try again.</p>
         </main>
@@ -5288,7 +5835,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                   </button>
                                   <button
                                     className="teacher-text-button"
-                                    onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, [recommendation])}
+                                    onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, [recommendation], lessonSource)}
                                     type="button"
                                   >
                                     Print Family Help
@@ -5313,7 +5860,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                     {lessonSource.fileName ? <small>Source: {lessonSource.fileName}</small> : null}
                                     <textarea
                                       onChange={(event) => updateSmallGroupLessonSource(recommendation.id, { text: event.target.value })}
-                                      placeholder="Paste the key lesson steps, activity, or notes you want the teacher plan to use."
+                                      placeholder="Lesson source text will appear here when the upload can be read. You can edit it before printing."
                                       rows={4}
                                       value={lessonSource.text}
                                     />
@@ -5380,13 +5927,49 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               <div>
                 <h3>{activeReportLabel} Data at a Glance</h3>
                 <p className="pin-helper">
-                  Newest evidence wins. Game attempts and teacher observations both stay in the cell history.
+                  Newest evidence wins. Game attempts, QPS, and teacher observations all stay in the cell history.
                 </p>
               </div>
               <button className="teacher-control-button secondary" onClick={printSkillsDataReport} type="button">
                 Print Chart
               </button>
             </div>
+
+            {dataReportView === "skills" ? (
+              <section className="qps-report-panel">
+                <div className="result-row-head">
+                  <div>
+                    <p className="eyebrow">QPS</p>
+                    <h4>Quick Phonics Screener</h4>
+                    <p className="pin-helper">Teacher-run QPS sessions save as Skills evidence and show a QPS marker on the chart.</p>
+                  </div>
+                  <div className="small-group-popup-actions">
+                    <a className="teacher-control-button secondary" href="/games/skills/qps-screener">
+                      Open QPS
+                    </a>
+                    <button className="teacher-control-button secondary" onClick={printQpsSummaryReport} type="button">
+                      Print QPS
+                    </button>
+                  </div>
+                </div>
+                <div className="qps-report-list">
+                  {qpsResults.length ? qpsResults.slice(0, 5).map((result) => {
+                    const match = matchResult(result, reportScholars);
+                    const completedAt = formatDate(result.completedAt);
+                    return (
+                      <article className="qps-report-row" key={result.id}>
+                        <strong>{match.label}</strong>
+                        <span>{completedAt ? completedAt.toLocaleDateString() : "Date pending"}</span>
+                        <span>{result.score}/{result.totalQuestions}</span>
+                        <em>{result.missedCount} need{result.missedCount === 1 ? "" : "s"}</em>
+                      </article>
+                    );
+                  }) : (
+                    <p className="empty-results-message">No QPS sessions saved yet.</p>
+                  )}
+                </div>
+              </section>
+            ) : null}
 
             <div className="skills-data-toolbar">
               <label>
@@ -5442,6 +6025,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 <span className="mastered">Mastered</span>
                 <span className="needs-review">Needs review</span>
                 <span className="unassessed">No evidence</span>
+                <span className="qps">QPS</span>
                 <span className="manual">Teacher observation</span>
               </div>
             </div>
@@ -5492,11 +6076,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                           <td key={`${row.scholar.id}-${cell.target}`}>
                             <button
                               aria-label={`${row.scholar.firstName} ${cell.target}: ${skillsDataStatusLabel(cell.status)}`}
-                              className={`skills-data-cell ${cell.status} ${cell.latest?.source === "Teacher observation" ? "is-manual" : ""} ${skillsDataCellIsMuted(cell, skillsDataFocusMode) ? "is-filter-muted" : ""}`}
+                              className={`skills-data-cell ${cell.status} ${skillsDataCellSourceClass(cell)} ${skillsDataCellIsMuted(cell, skillsDataFocusMode) ? "is-filter-muted" : ""}`}
                               onClick={() => setSelectedSkillsDataCellKey(`${row.scholar.id}|${cell.target}`)}
                               title={`${row.scholar.firstName} ${cell.target}: ${skillsDataStatusLabel(cell.status)}`}
                               type="button"
-                            />
+                            >
+                              {skillsDataCellMarker(cell)}
+                            </button>
                           </td>
                         );
                       })}

@@ -960,6 +960,8 @@
     let pendingClassMiss = null;
     let lastTargetSlot = -1;
     let autoStartedControl = false;
+    const RAPID_GUESSING_SPEAKER_ID = "rapid-guessing-voice";
+    const DEFAULT_RAPID_GUESSING_MESSAGE = "Please don't rush. Take your time. You are rocking it.";
 
     const startPanel = document.getElementById("start-panel");
     const startMessage = document.getElementById("start-message");
@@ -1171,6 +1173,30 @@
       return value ? [value, value] : null;
     }
 
+    function normalizeRapidGuessingVoice(button) {
+      if (!button || typeof button !== "object" || Array.isArray(button)) {
+        return null;
+      }
+
+      const voiceText = text(button.audioSourceText || button.audioText || button.text).trim();
+      const audioUrl = text(button.audioUrl).trim();
+
+      if (!voiceText && !audioUrl) {
+        return null;
+      }
+
+      return {
+        audioKind: text(button.audioKind, "googleTts"),
+        audioSourceText: text(button.audioSourceText).trim(),
+        audioText: text(button.audioText).trim(),
+        audioUrl,
+        enabled: button.enabled !== false,
+        id: RAPID_GUESSING_SPEAKER_ID,
+        label: text(button.label, "Slow down").trim() || "Slow down",
+        text: voiceText || DEFAULT_RAPID_GUESSING_MESSAGE
+      };
+    }
+
     function isBlankLetterSearchShell(question) {
       const target = text(question.target || question.answer || question.correctAnswer || question.word || question.display).trim();
       const prompt = text(question.promptTemplate || question.prompt).trim();
@@ -1307,6 +1333,7 @@
       return {
         levels,
         questions,
+        rapidGuessingVoice: normalizeRapidGuessingVoice(raw.rapidGuessingVoice),
         schemaVersion: 1,
         supplementalQuestions: [],
         unitTitle: text(raw.unitTitle, GAME_TITLE).trim(),
@@ -1738,6 +1765,65 @@
       speak(speechText, promptAudioUrlFor(question, speechText));
     }
 
+    function rapidGuessingVoiceConfig() {
+      const button = content.rapidGuessingVoice;
+      if (!button || typeof button !== "object" || button.enabled === false) {
+        return null;
+      }
+      return button;
+    }
+
+    function rapidGuessingMessage() {
+      const button = rapidGuessingVoiceConfig();
+      return text(
+        button?.audioSourceText || button?.audioText || button?.text,
+        DEFAULT_RAPID_GUESSING_MESSAGE
+      ).trim() || DEFAULT_RAPID_GUESSING_MESSAGE;
+    }
+
+    function rapidGuessingAudioUrl() {
+      const button = rapidGuessingVoiceConfig();
+      return text(button?.audioUrl).trim();
+    }
+
+    function speakRapidGuessingMessage() {
+      speak(rapidGuessingMessage(), rapidGuessingAudioUrl());
+    }
+
+    function shouldPauseForRapidGuessing(state, now) {
+      const wrongAttempts = state.attempts.filter((attempt) => !attempt.correct);
+      if (wrongAttempts.length < 3) {
+        return false;
+      }
+
+      const recentWrongAttempts = wrongAttempts.filter((attempt) => {
+        const attemptTime = Date.parse(attempt.timestamp);
+        return Number.isFinite(attemptTime) && now - attemptTime <= 4500;
+      });
+      const repeatedRecentChoices = new Set(
+        wrongAttempts.slice(-3).map((attempt) => attempt.selected)
+      ).size <= 2;
+
+      return recentWrongAttempts.length >= 3 || repeatedRecentChoices || wrongAttempts.length >= 5;
+    }
+
+    function rapidGuessingCategory(category) {
+      return `Rapid Guessing - ${category || "Needs review"}`;
+    }
+
+    function pauseForRapidGuessing(state) {
+      state.rapidGuessing = true;
+      state.rapidGuessingCount = (state.rapidGuessingCount || 0) + 1;
+      feedback.textContent = rapidGuessingMessage();
+      feedback.className = "feedback is-try";
+      speakRapidGuessingMessage();
+      renderQuestionJumpList();
+      saveProgress("in-progress");
+      window.setTimeout(() => {
+        tapLocked = false;
+      }, 3200);
+    }
+
     function speakWithBrowser(value) {
       if (!("speechSynthesis" in window)) {
         return;
@@ -1810,6 +1896,8 @@
         attempts: [],
         complete: false,
         field: null,
+        rapidGuessing: false,
+        rapidGuessingCount: 0,
         startedAt: 0,
         targetSlot: -1
       }));
@@ -1968,6 +2056,23 @@
         return;
       }
 
+      if (shouldPauseForRapidGuessing(state, now)) {
+        if (wholeClassMode) {
+          openAssignMiss({
+            category: rapidGuessingCategory(text(question.category, text(activeLevel.name))),
+            correctAnswer: target,
+            incorrectSelection: selected,
+            levelId: levelId(activeLevel, activeLevelIndex),
+            levelName: text(activeLevel.name, `Level ${activeLevelIndex + 1}`),
+            levelQuestionIndex: currentIndex + 1,
+            questionIndex: currentIndex + 1,
+            word: target
+          });
+        }
+        pauseForRapidGuessing(state);
+        return;
+      }
+
       feedback.textContent = "Keep searching.";
       feedback.className = "feedback is-try";
       if (wholeClassMode) {
@@ -2025,6 +2130,8 @@
             questionImageAlt: text(question.questionImageAlt),
             questionImageUrl: text(question.questionImageUrl),
             questionIndex: index + 1,
+            rapidGuessing: Boolean(state.rapidGuessing),
+            rapidGuessingCount: state.rapidGuessingCount || 0,
             responseTimeMs: firstAttempt ? firstAttempt.responseMs : 0,
             sessionId,
             skill: text(question.skill),
@@ -2051,7 +2158,7 @@
     function incorrectSelectionDetails() {
       return responseRows(true).flatMap((row) =>
         row.incorrectSelections.map((incorrectSelection) => ({
-          category: row.category,
+          category: row.rapidGuessing ? rapidGuessingCategory(row.category) : row.category,
           correctAnswer: row.target,
           gameId: GAME_ID,
           gameTitle: GAME_TITLE,
@@ -2060,6 +2167,8 @@
           levelName: row.levelName,
           levelQuestionIndex: row.questionIndex,
           questionIndex: row.questionIndex,
+          rapidGuessing: row.rapidGuessing,
+          rapidGuessingCount: row.rapidGuessingCount,
           sessionId,
           word: row.target
         }))
@@ -2070,7 +2179,7 @@
       return responseRows(true)
         .filter((row) => row.incorrectSelections.length)
         .map((row) => ({
-          category: row.category,
+          category: row.rapidGuessing ? rapidGuessingCategory(row.category) : row.category,
           correctAnswer: row.target,
           gameId: GAME_ID,
           gameTitle: GAME_TITLE,
@@ -2079,6 +2188,8 @@
           levelName: row.levelName,
           levelQuestionIndex: row.questionIndex,
           questionIndex: row.questionIndex,
+          rapidGuessing: row.rapidGuessing,
+          rapidGuessingCount: row.rapidGuessingCount,
           word: row.target
         }));
     }

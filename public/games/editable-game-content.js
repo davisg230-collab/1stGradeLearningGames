@@ -10,22 +10,28 @@
   }
 
   function normalizeChoice(choice) {
-    if (!Array.isArray(choice) || choice.length < 2) {
+    let value = "";
+    let label = "";
+    let image = "";
+
+    if (Array.isArray(choice)) {
+      value = asText(choice[0]).trim();
+      label = asText(choice[1]).trim();
+      image = asText(choice[2]).trim();
+    } else if (choice && typeof choice === "object") {
+      value = asText(choice.value ?? choice[0]).trim();
+      label = asText(choice.label ?? choice[1]).trim();
+      image = asText(choice.image ?? choice[2]).trim();
+    } else {
       return null;
     }
-
-    const value = asText(choice[0]).trim();
-    const label = asText(choice[1]).trim();
 
     if (!value || !label) {
       return null;
     }
 
-    return choice.length > 2 && typeof choice[2] === "string"
-      ? [value, label, choice[2]]
-      : [value, label];
+    return image ? [value, label, image] : [value, label];
   }
-
   function normalizeLevel(level, index) {
     if (!level || typeof level !== "object" || Array.isArray(level)) {
       return null;
@@ -49,7 +55,12 @@
 
     const next = clone(question);
     const zone = Number(next.zone);
-    const answer = asText(next.answer || next.correctAnswer).trim();
+    const answer = asText(
+      next.answer || next.correctAnswer || next.target || next.word || next.display
+    ).trim();
+    const prompt = asText(
+      next.prompt || next.promptTemplate || next.promptSpeak || next.spokenDirections
+    ).trim();
     const choices = Array.isArray(next.choices)
       ? next.choices.map(normalizeChoice).filter(Boolean)
       : [];
@@ -58,7 +69,7 @@
       return null;
     }
 
-    if (!asText(next.prompt).trim() || !answer || choices.length < 2) {
+    if (!prompt || !answer || choices.length < 2) {
       return null;
     }
 
@@ -68,11 +79,40 @@
 
     next.id = asText(next.id, `question-${index + 1}`).trim();
     next.zone = zone;
+    next.prompt = prompt;
+    if (asText(next.type).trim() === "visual-search") {
+      next.promptTemplate = asText(next.promptTemplate || prompt, prompt).trim();
+      next.target = asText(next.target || answer, answer).trim();
+    }
     next.answer = answer;
     next.correctAnswer = asText(next.correctAnswer || answer, answer).trim();
     next.choices = choices;
 
     return next.id ? next : null;
+  }
+
+  function normalizeSpeakerButton(button) {
+    if (!button || typeof button !== "object" || Array.isArray(button)) {
+      return null;
+    }
+
+    const text = asText(button.text || button.audioText).trim();
+    const audioUrl = asText(button.audioUrl).trim();
+
+    if (!text && !audioUrl) {
+      return null;
+    }
+
+    return {
+      audioKind: button.audioKind === "teacherRecording" ? "teacherRecording" : "googleTts",
+      audioText: asText(button.audioText).trim() || undefined,
+      audioUrl: audioUrl || undefined,
+      enabled: button.enabled !== false,
+      id: asText(button.id, "rapid-guessing-voice").trim() || "rapid-guessing-voice",
+      label: asText(button.label, "Slow down").trim() || "Slow down",
+      storagePath: asText(button.storagePath).trim() || undefined,
+      text,
+    };
   }
 
   function normalizeGameContent(rawContent) {
@@ -101,10 +141,6 @@
           .filter(Boolean)
       : [];
 
-    if (!questions.length) {
-      return null;
-    }
-
     const supplementalQuestions = Array.isArray(content.supplementalQuestions)
       ? content.supplementalQuestions
           .map((question, index) => normalizeQuestion(question, index, levels.length))
@@ -114,6 +150,7 @@
     return {
       levels,
       questions,
+      rapidGuessingVoice: normalizeSpeakerButton(content.rapidGuessingVoice),
       schemaVersion: Number(content.schemaVersion) || 1,
       supplementalQuestions,
       unitTitle: asText(content.unitTitle),

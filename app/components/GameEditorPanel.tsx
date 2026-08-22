@@ -43,6 +43,14 @@ type FirestoreDb = {
     ignoreUndefinedProperties: boolean;
   }) => void;
 };
+
+type StorageSnapshot = {
+  ref: {
+    fullPath?: string;
+    getDownloadURL: () => Promise<string>;
+  };
+};
+
 type FirebaseStorage = {
   ref: (path: string) => {
     delete: () => Promise<void>;
@@ -100,6 +108,7 @@ type SpeakerAudioKind = "googleTts" | "teacherRecording";
 
 type SpeakerButton = {
   audioKind: SpeakerAudioKind;
+  audioSourceText?: string;
   audioText?: string;
   audioUrl?: string;
   enabled: boolean;
@@ -125,11 +134,24 @@ type EditableLevel = Record<string, unknown> & {
   lessonRange?: string;
   name: string;
   practiceLabel?: string;
+  completionMessage?: string;
+};
+
+type AssessmentChoiceVisual = {
+  count?: number;
+  crossed?: number;
+  expression?: string;
+  first?: number;
+  label?: string;
+  second?: number;
+  type?: "count" | "expression" | "join" | "takeaway";
 };
 
 type EditableQuestion = Record<string, unknown> & {
   answer: string;
   answerAudio?: Record<string, AnswerAudio>;
+  category?: string;
+  choiceVisuals?: Record<string, AssessmentChoiceVisual>;
   answerReportLabels?: Record<string, string>;
   answerStyle?: "standard" | "listening-letters";
   choices: Choice[];
@@ -142,6 +164,7 @@ type EditableQuestion = Record<string, unknown> & {
   mathVisualWholeMissing?: boolean;
   mathVisualPartOneMissing?: boolean;
   mathVisualPartTwoMissing?: boolean;
+  mathVisualCountMissing?: boolean;
   mathVisualShowLandingNumber?: boolean;
   mathVisualShowPathSentence?: boolean;
   mathVisualHideBeforeStart?: boolean;
@@ -188,6 +211,7 @@ type EditableQuestion = Record<string, unknown> & {
   questionImageStoragePath?: string;
   questionImageUrl?: string;
   prompt: string;
+  promptTemplate?: string;
   promptSpeak?: string;
   requiresSoundAudio?: boolean;
   requiresTargetAudio?: boolean;
@@ -197,7 +221,14 @@ type EditableQuestion = Record<string, unknown> & {
   spokenDirections?: string;
   spokenTarget?: string;
   soundsSpeech?: string;
+  standard?: string;
+  target?: string;
   type?: string;
+  exampleVisual?: string;
+  exampleWord?: string;
+  preferredDistractors?: string;
+  visualSearchFieldColumns?: number;
+  visualSearchFieldRows?: number;
   word?: string;
   zone: number;
 };
@@ -206,6 +237,7 @@ type EditableGame = {
   content: {
     levels: EditableLevel[];
     questions: EditableQuestion[];
+    rapidGuessingVoice?: SpeakerButton;
     schemaVersion: 1;
     supplementalQuestions: EditableQuestion[];
     unitTitle: string;
@@ -228,8 +260,19 @@ type RecordingDraft = {
 };
 
 const GAME_COLLECTION = "gameHubGameDefinitions";
+const LETTER_SEARCH_SAFARI_GAME_ID = "letter-search-safari";
+const NUMBER_SEARCH_SAFARI_GAME_ID = "number-search-safari";
+const RAPID_GUESSING_SPEAKER_ID = "rapid-guessing-voice";
+const DEFAULT_RAPID_GUESSING_MESSAGE = "Please don't rush. Take your time. You are rocking it.";
 
 function unitNumberForGameId(gameId: string) {
+  if (
+    gameId === LETTER_SEARCH_SAFARI_GAME_ID
+    || gameId === NUMBER_SEARCH_SAFARI_GAME_ID
+  ) {
+    return 0;
+  }
+
   if (gameId === "unit1-zone1-sound-safari") {
     return 1;
   }
@@ -256,10 +299,44 @@ function isListeningLearningGame(gameId: string) {
 }
 
 function isMathGame(gameId: string) {
-  return gameId.startsWith("eureka-math-module-");
+  return gameId === "math-starting-point-quest"
+    || gameId === NUMBER_SEARCH_SAFARI_GAME_ID
+    || gameId.startsWith("eureka-math-module-");
+}
+
+function isPreassessmentGame(gameId: string) {
+  return gameId === "math-starting-point-quest"
+    || gameId === "skills-starting-point";
+}
+
+function isVisualSearchGame(gameId: string) {
+  return gameId === LETTER_SEARCH_SAFARI_GAME_ID
+    || gameId === NUMBER_SEARCH_SAFARI_GAME_ID;
+}
+
+function preassessmentLabelForGameId(gameId: string) {
+  return gameId === "skills-starting-point"
+    ? "CKLA SKILLS ASSESSMENT"
+    : "MATH ASSESSMENT";
 }
 
 function cardKeyForGameId(gameId: string) {
+  if (gameId === "skills-starting-point") {
+    return "CKLA Skills:starting-point";
+  }
+
+  if (gameId === LETTER_SEARCH_SAFARI_GAME_ID) {
+    return "CKLA Skills:letter-search-safari";
+  }
+
+  if (gameId === "math-starting-point-quest") {
+    return "Math:starting-point";
+  }
+
+  if (gameId === NUMBER_SEARCH_SAFARI_GAME_ID) {
+    return "Math:number-search-safari";
+  }
+
   const unitNumber = unitNumberForGameId(gameId);
 
   if (!unitNumber) {
@@ -276,6 +353,22 @@ function cardKeyForGameId(gameId: string) {
 }
 
 function baseCardForGameId(gameId: string) {
+  if (gameId === "skills-starting-point") {
+    return skillsGames.find((game) => game.slug === "starting-point");
+  }
+
+  if (gameId === LETTER_SEARCH_SAFARI_GAME_ID) {
+    return skillsGames.find((game) => game.slug === "letter-search-safari");
+  }
+
+  if (gameId === "math-starting-point-quest") {
+    return mathGames.find((game) => game.slug === "starting-point");
+  }
+
+  if (gameId === NUMBER_SEARCH_SAFARI_GAME_ID) {
+    return mathGames.find((game) => game.slug === "number-search-safari");
+  }
+
   const unitNumber = unitNumberForGameId(gameId);
   const cards = isMathGame(gameId)
     ? mathGames
@@ -293,6 +386,14 @@ const FIREBASE_SCRIPTS = [
   "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js",
 ];
 const SEED_GAME_FILES = [
+  {
+    gameId: "skills-starting-point",
+    path: "/games/editable-content/skills-starting-point.json",
+  },
+  {
+    gameId: LETTER_SEARCH_SAFARI_GAME_ID,
+    path: "/games/editable-content/letter-search-safari.json",
+  },
   {
     gameId: "unit1-zone1-sound-safari",
     path: "/games/editable-content/unit1-zone1-sound-safari.json",
@@ -313,6 +414,14 @@ const SEED_GAME_FILES = [
         + `ckla-listening-learning-unit-${unit}.json`,
     }),
   ),
+  {
+    gameId: "math-starting-point-quest",
+    path: "/games/editable-content/math-starting-point-quest.json",
+  },
+  {
+    gameId: NUMBER_SEARCH_SAFARI_GAME_ID,
+    path: "/games/editable-content/number-search-safari.json",
+  },
   ...Array.from({length: 6}, (_, index) => index + 1).map(
     (moduleNumber) => ({
       gameId: `eureka-math-module-${moduleNumber}`,
@@ -382,6 +491,291 @@ function normalizeChoice(value: unknown): Choice | null {
   return null;
 }
 
+const LOWERCASE_LETTER_REPAIR_QUESTIONS: EditableQuestion[] = (
+  [
+    ["e", "Egg", "Choose the letter ____. ____ for __gg.", "Choose the letter E. E for Egg.", ["c", "o", "a", "s", "i"]],
+    ["g", "Goat", "Choose the letter ____. ____ for __oat.", "Choose the letter G. G for Goat.", ["q", "c", "o", "a", "d"]],
+    ["h", "Hat", "Choose the letter ____. ____ for __at.", "Choose the letter H. H for Hat.", ["n", "m", "b", "k", "r"]],
+    ["j", "Jam", "Choose the letter ____. ____ for __am.", "Choose the letter J. J for Jam.", ["i", "y", "g", "l", "t"]],
+    ["k", "Kite", "Choose the letter ____. ____ for __ite.", "Choose the letter K. K for Kite.", ["h", "l", "b", "x", "t"]],
+    ["l", "Lion", "Choose the letter ____. ____ for __ion.", "Choose the letter L. L for Lion.", ["i", "t", "f", "h", "b"]],
+    ["q", "Queen", "Choose the letter ____. ____ for __ueen.", "Choose the letter Q. Q for Queen.", ["d", "p", "b", "g", "o"]],
+    ["r", "Rabbit", "Choose the letter ____. ____ for __abbit.", "Choose the letter R. R for Rabbit.", ["n", "h", "u", "v", "m"]],
+    ["u", "Umbrella", "Choose the letter ____. ____ for __mbrella.", "Choose the letter U. U for Umbrella.", ["n", "m", "w", "v", "a"]],
+    ["v", "Van", "Choose the letter ____. ____ for __an.", "Choose the letter V. V for Van.", ["w", "y", "u", "n", "r"]],
+    ["w", "Wagon", "Choose the letter ____. ____ for __agon.", "Choose the letter W. W for Wagon.", ["m", "n", "u", "v", "y"]],
+    ["x", "X-ray", "Choose the letter ____. ____ for __-ray.", "Choose the letter X. X for X-ray.", ["k", "y", "z", "v", "w"]],
+    ["y", "Yarn", "Choose the letter ____. ____ for __arn.", "Choose the letter Y. Y for Yarn.", ["v", "w", "x", "j", "g"]],
+    ["z", "Zebra", "Choose the letter ____. ____ for __ebra.", "Choose the letter Z. Z for Zebra.", ["s", "r", "x", "y", "e"]],
+  ] as Array<[string, string, string, string, string[]]>
+).map(([letter, exampleWord, prompt, speech, distractors]) => ({
+  answer: letter,
+  category: "Letter Identification",
+  choices: [letter, ...distractors].map((value) => [value, value] as Choice),
+  correctAnswer: letter,
+  display: letter,
+  exampleWord,
+  id: `letter-search-lowercase-${letter}`,
+  preferredDistractors: distractors.join(", "),
+  prompt,
+  promptTemplate: prompt,
+  skill: "Lowercase letter identification",
+  speakerButtons: [
+    {
+      audioKind: "googleTts",
+      enabled: true,
+      id: "read-directions",
+      label: "Read directions",
+      position: "left",
+      text: speech,
+    },
+  ],
+  standard: "RF.1.3a",
+  target: letter,
+  type: "visual-search",
+  visualSearchFieldColumns: 6,
+  visualSearchFieldRows: 3,
+  word: letter,
+  zone: 0,
+}));
+
+function isPlaceholderAnswer(value: unknown) {
+  return /^answer-\d+$/i.test(asText(value).trim());
+}
+
+function letterSearchTargetCandidate(raw: Record<string, unknown>) {
+  return asText(
+    raw.target || raw.answer || raw.correctAnswer || raw.word || raw.display,
+  ).trim();
+}
+
+function isBlankLetterSearchShell(raw: Record<string, unknown>) {
+  const target = letterSearchTargetCandidate(raw);
+  const prompt = asText(raw.promptTemplate || raw.prompt).trim();
+  const skillFields = asText(raw.skill || raw.category || raw.type).trim();
+  const choices = Array.isArray(raw.choices)
+    ? raw.choices
+        .map(normalizeChoice)
+        .filter((choice): choice is Choice => Boolean(choice))
+    : [];
+  const hasPlaceholderChoice = choices.some((choice) =>
+    isPlaceholderAnswer(choice[0]) || !choice[1],
+  );
+
+  return (
+    !target
+    || isPlaceholderAnswer(target)
+    || !prompt
+    || !skillFields
+    || hasPlaceholderChoice
+  );
+}
+
+function repairLetterSearchQuestionList(
+  values: unknown[],
+  levelCount: number,
+) {
+  let repairIndex = 0;
+  const repaired = values.map((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return value;
+    }
+
+    const raw = value as Record<string, unknown>;
+    const zone = Number(raw.zone);
+    if (
+      Number.isInteger(zone)
+      && zone >= 0
+      && zone < levelCount
+      && zone === 0
+      && repairIndex < LOWERCASE_LETTER_REPAIR_QUESTIONS.length
+      && isBlankLetterSearchShell(raw)
+    ) {
+      const repairQuestion = LOWERCASE_LETTER_REPAIR_QUESTIONS[repairIndex];
+      repairIndex += 1;
+      return {
+        ...clone(raw),
+        ...clone(repairQuestion),
+      };
+    }
+
+    return value;
+  });
+
+  if (repairIndex > 0) {
+    const existingTargets = new Set(
+      repaired
+        .filter((value): value is Record<string, unknown> =>
+          Boolean(value && typeof value === "object" && !Array.isArray(value)),
+        )
+        .map((value) => letterSearchTargetCandidate(value).toLowerCase())
+        .filter(Boolean),
+    );
+
+    LOWERCASE_LETTER_REPAIR_QUESTIONS.slice(repairIndex).forEach((question) => {
+      if (!existingTargets.has(asText(question.target).toLowerCase())) {
+        repaired.push(clone(question));
+      }
+    });
+  }
+
+  return repaired;
+}
+
+function isSingleLowercaseLetterSearchQuestion(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const target = letterSearchTargetCandidate(value as Record<string, unknown>);
+  return /^[a-z]$/.test(target);
+}
+
+function uppercaseLetterSearchChoice(choice: unknown): unknown {
+  if (Array.isArray(choice)) {
+    const value = asText(choice[0]).trim();
+    const label = asText(choice[1] || choice[0]).trim();
+    const nextValue = /^[a-z]$/.test(value) ? value.toUpperCase() : value;
+    const nextLabel = /^[a-z]$/.test(label) ? label.toUpperCase() : label;
+
+    return choice.length > 2 ? [nextValue, nextLabel, choice[2]] : [nextValue, nextLabel];
+  }
+
+  if (choice && typeof choice === "object") {
+    const next = clone(choice as Record<string, unknown>);
+
+    if (/^[a-z]$/.test(asText(next.value))) {
+      next.value = asText(next.value).toUpperCase();
+    }
+    if (/^[a-z]$/.test(asText(next.label))) {
+      next.label = asText(next.label).toUpperCase();
+    }
+
+    return next;
+  }
+
+  const value = asText(choice).trim();
+  return /^[a-z]$/.test(value) ? value.toUpperCase() : choice;
+}
+
+function capitalLetterSearchQuestionFromLowercase(
+  value: Record<string, unknown>,
+  zone: number,
+) {
+  const target = letterSearchTargetCandidate(value).toLowerCase();
+  const upperTarget = target.toUpperCase();
+  const next = clone(value);
+
+  next.id = `letter-search-capital-${target}`;
+  next.zone = zone;
+  next.skill = "Capital letter identification";
+  next.category = "Capital Letter Identification";
+  next.word = upperTarget;
+  next.target = upperTarget;
+  next.display = upperTarget;
+  next.answer = upperTarget;
+  next.correctAnswer = upperTarget;
+  next.choices = Array.isArray(value.choices)
+    ? value.choices.map(uppercaseLetterSearchChoice)
+    : [[upperTarget, upperTarget]];
+
+  if (typeof value.preferredDistractors === "string") {
+    next.preferredDistractors = value.preferredDistractors
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => /^[a-z]$/.test(item) ? item.toUpperCase() : item)
+      .join(", ");
+  }
+
+  return next;
+}
+
+function ensureCapitalLetterSearchLevel(
+  levels: EditableLevel[],
+  values: unknown[],
+) {
+  const lowercaseQuestions = values
+    .filter(isSingleLowercaseLetterSearchQuestion) as Record<string, unknown>[];
+
+  const zoneZeroQuestions = lowercaseQuestions.filter(
+    (question) => Number(question.zone) === 0,
+  );
+
+  if (!zoneZeroQuestions.length) {
+    return values;
+  }
+
+  const capitalLevelIndex = levels.findIndex((level) =>
+    /capital|uppercase/i.test(
+      `${level.name} ${level.detail} ${level.learningTarget}`,
+    ),
+  );
+  const copiedLowercaseIndex = levels.findIndex((level, index) => {
+    if (index === 0 || /digraph/i.test(`${level.name} ${level.detail}`)) {
+      return false;
+    }
+
+    return lowercaseQuestions.filter(
+      (question) => Number(question.zone) === index,
+    ).length >= 20;
+  });
+  let targetIndex =
+    capitalLevelIndex >= 0 ? capitalLevelIndex : copiedLowercaseIndex;
+  const nextValues = values.map(clone);
+
+  if (targetIndex < 0) {
+    targetIndex = 1;
+    levels.splice(targetIndex, 0, {
+      completionMessage: "Capital letter search complete.",
+      detail: "Scholars listen for a capital letter, scan a mixed field, and tap the matching target.",
+      icon: "search",
+      learningTarget: "Identify capital letters in a mixed visual field.",
+      lessonRange: "Alphabet recognition",
+      name: "Capital Letter Identification",
+      practiceLabel: "Assessment",
+    });
+
+    nextValues.forEach((question) => {
+      if (
+        question
+        && typeof question === "object"
+        && !Array.isArray(question)
+        && Number((question as Record<string, unknown>).zone) >= targetIndex
+      ) {
+        (question as Record<string, unknown>).zone =
+          Number((question as Record<string, unknown>).zone) + 1;
+      }
+    });
+  } else {
+    levels[targetIndex] = {
+      ...levels[targetIndex],
+      completionMessage:
+        levels[targetIndex].completionMessage || "Capital letter search complete.",
+      detail: "Scholars listen for a capital letter, scan a mixed field, and tap the matching target.",
+      icon: levels[targetIndex].icon || "search",
+      learningTarget: "Identify capital letters in a mixed visual field.",
+      lessonRange: levels[targetIndex].lessonRange || "Alphabet recognition",
+      name: "Capital Letter Identification",
+      practiceLabel: levels[targetIndex].practiceLabel || "Assessment",
+    };
+  }
+
+  return [
+    ...nextValues.filter((question) =>
+      !(
+        question
+        && typeof question === "object"
+        && !Array.isArray(question)
+        && Number((question as Record<string, unknown>).zone) === targetIndex
+      ),
+    ),
+    ...zoneZeroQuestions.map((question) =>
+      capitalLetterSearchQuestionFromLowercase(question, targetIndex),
+    ),
+  ];
+}
+
 function normalizeSpeakerPosition(value: unknown): SpeakerPosition {
   return value === "above" || value === "below" || value === "left" || value === "right"
     ? value
@@ -419,6 +813,17 @@ function normalizeSpeakerButton(
     position: normalizeSpeakerPosition(raw.position),
     storagePath: asText(raw.storagePath).trim() || undefined,
     text,
+  };
+}
+
+function defaultRapidGuessingVoice(): SpeakerButton {
+  return {
+    audioKind: "googleTts",
+    enabled: true,
+    id: RAPID_GUESSING_SPEAKER_ID,
+    label: "Slow down",
+    position: "below",
+    text: DEFAULT_RAPID_GUESSING_MESSAGE,
   };
 }
 
@@ -548,10 +953,20 @@ function normalizeGame(value: unknown): EditableGame | null {
     raw.content && typeof raw.content === "object" && !Array.isArray(raw.content)
       ? (raw.content as Record<string, unknown>)
       : {};
+  const gameId = normalizeId(asText(raw.gameId));
   const rawLevels = Array.isArray(rawContent.levels) ? rawContent.levels : [];
   const levels = rawLevels.map(normalizeLevel);
-  const questions = Array.isArray(rawContent.questions)
+  const rawQuestions = Array.isArray(rawContent.questions)
     ? rawContent.questions
+    : [];
+  const repairedQuestionValues = gameId === LETTER_SEARCH_SAFARI_GAME_ID
+    ? repairLetterSearchQuestionList(rawQuestions, levels.length)
+    : rawQuestions;
+  const questionValues = gameId === LETTER_SEARCH_SAFARI_GAME_ID
+    ? ensureCapitalLetterSearchLevel(levels, repairedQuestionValues)
+    : repairedQuestionValues;
+  const questions = Array.isArray(rawContent.questions)
+    ? questionValues
         .map((question, index) => normalizeQuestion(question, index, levels.length))
         .filter((question): question is EditableQuestion => Boolean(question))
     : [];
@@ -561,8 +976,6 @@ function normalizeGame(value: unknown): EditableGame | null {
         .filter((question): question is EditableQuestion => Boolean(question))
     : [];
 
-  const gameId = normalizeId(asText(raw.gameId));
-
   if (!gameId || !levels.length) {
     return null;
   }
@@ -571,6 +984,9 @@ function normalizeGame(value: unknown): EditableGame | null {
     content: {
       levels,
       questions,
+      rapidGuessingVoice:
+        normalizeSpeakerButton(rawContent.rapidGuessingVoice, 0)
+        ?? defaultRapidGuessingVoice(),
       schemaVersion: 1,
       supplementalQuestions,
       unitTitle: asText(rawContent.unitTitle, asText(raw.title, gameId)).trim(),
@@ -701,6 +1117,8 @@ function versionContent(game: EditableGame) {
   const content = {
     levels: game.content.levels,
     questions: game.content.questions.map(firestoreQuestion),
+    rapidGuessingVoice:
+      game.content.rapidGuessingVoice ?? defaultRapidGuessingVoice(),
     schemaVersion: 1,
     supplementalQuestions:
       game.content.supplementalQuestions.map(firestoreQuestion),
@@ -769,6 +1187,38 @@ function deriveSpeakerButtons(question: EditableQuestion): SpeakerButton[] {
   return buttons;
 }
 
+function visualSearchTargetFor(question: EditableQuestion) {
+  return (
+    question.target
+    || question.answer
+    || question.correctAnswer
+    || question.word
+    || question.display
+    || ""
+  ).trim();
+}
+
+function renderVisualSearchTemplate(template: string, question: EditableQuestion) {
+  const target = visualSearchTargetFor(question);
+  const exampleWord = asText(question.exampleWord).trim();
+
+  return template
+    .replaceAll("{target}", target)
+    .replaceAll("{exampleWord}", exampleWord)
+    .trim();
+}
+
+function previewPromptFor(gameId: string, question: EditableQuestion) {
+  if (!isVisualSearchGame(gameId)) {
+    return question.prompt;
+  }
+
+  return renderVisualSearchTemplate(
+    question.promptTemplate || question.prompt || "",
+    question,
+  );
+}
+
 function blankQuestion(zone: number): EditableQuestion {
   return {
     answer: "answer-1",
@@ -803,6 +1253,7 @@ function blankGame(): EditableGame {
         },
       ],
       questions: [blankQuestion(0)],
+      rapidGuessingVoice: defaultRapidGuessingVoice(),
       schemaVersion: 1,
       supplementalQuestions: [],
       unitTitle: "New CKLA Unit",
@@ -850,6 +1301,173 @@ function mathVisualNumber(
   );
 }
 
+function AssessmentChoiceVisualPreview({
+  visual,
+}: {
+  visual: AssessmentChoiceVisual;
+}) {
+  const type = visual.type;
+
+  if (!type) {
+    return null;
+  }
+
+  const objectName = (visual.label || "dot").trim().toLowerCase();
+  const symbols: Record<string, string> = {
+    apple: "ðŸŽ",
+    apples: "ðŸŽ",
+    bear: "ðŸ§¸",
+    bears: "ðŸ§¸",
+    bird: "ðŸ¦",
+    birds: "ðŸ¦",
+    finger: "â˜ï¸",
+    fingers: "â˜ï¸",
+    star: "â˜…",
+    stars: "â˜…",
+  };
+  const isCube = [
+    "block",
+    "blocks",
+    "cube",
+    "cubes",
+    "square",
+    "squares",
+  ].includes(objectName);
+  const symbol = isCube ? "" : symbols[objectName] || "";
+
+  const renderGroup = (
+    amount: unknown,
+    color: string,
+    crossedAmount = 0,
+  ) => {
+    const count = mathVisualNumber(amount, 0, 20);
+    const crossed = mathVisualNumber(crossedAmount, 0, count);
+
+    return (
+      <div
+        style={{
+          background: "#ffffff",
+          border: "1px dashed #d7deea",
+          borderRadius: "12px",
+          display: "grid",
+          gap: "4px",
+          gridTemplateColumns: "repeat(5, 28px)",
+          justifyContent: "center",
+          minWidth: 0,
+          padding: "7px",
+        }}
+      >
+        {Array.from({length: count}, (_, index) => {
+          const crossedOut = index >= count - crossed;
+
+          return (
+            <span
+              aria-hidden="true"
+              key={`${objectName}-${index}`}
+              style={{
+                alignItems: "center",
+                background: symbol ? "transparent" : color,
+                border: symbol ? "none" : "2px solid #354b63",
+                borderRadius: isCube ? "6px" : "50%",
+                boxShadow: isCube
+                  ? "inset -3px -3px 0 rgba(0,0,0,.12)"
+                  : "none",
+                display: "flex",
+                fontSize: symbol ? "27px" : "14px",
+                height: "28px",
+                justifyContent: "center",
+                position: "relative",
+                width: "28px",
+              }}
+            >
+              {symbol}
+              {crossedOut ? (
+                <b
+                  style={{
+                    color: "#d53c4e",
+                    fontSize: "31px",
+                    fontWeight: 400,
+                    left: "50%",
+                    lineHeight: 1,
+                    position: "absolute",
+                    top: "50%",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  {"\u00D7"}
+                </b>
+              ) : null}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const operatorStyle = {
+    alignItems: "center",
+    background: "#ffffff",
+    borderRadius: "999px",
+    color: "#315fb8",
+    display: "flex",
+    fontSize: "20px",
+    fontWeight: 900,
+    height: "32px",
+    justifyContent: "center",
+    minWidth: "32px",
+    padding: "0 8px",
+  };
+
+  if (type === "expression") {
+    return (
+      <div style={{display: "flex", justifyContent: "center", width: "100%"}}>
+        <span style={{...operatorStyle, minWidth: "128px"}}>
+          {visual.expression || ""}
+        </span>
+      </div>
+    );
+  }
+
+  if (type === "count") {
+    return renderGroup(visual.count ?? 3, "#ff8396");
+  }
+
+  if (type === "takeaway") {
+    const count = mathVisualNumber(visual.count, 5, 20);
+    const crossed = mathVisualNumber(visual.crossed, 2, count);
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          minWidth: 0,
+          width: "100%",
+        }}
+      >
+        {renderGroup(count, "#ff8396", crossed)}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        alignItems: "center",
+        display: "grid",
+        gap: "8px",
+        gridTemplateColumns: "minmax(0, 1fr) 32px minmax(0, 1fr)",
+        justifyItems: "center",
+        minWidth: 0,
+        width: "100%",
+      }}
+    >
+      {renderGroup(visual.first ?? 2, "#70b7ff")}
+      <span style={operatorStyle}>+</span>
+      {renderGroup(visual.second ?? 3, "#ffc857")}
+    </div>
+  );
+}
 function MathVisualPreview({
   question,
 }: {
@@ -884,6 +1502,7 @@ function MathVisualPreview({
     crayons: "\uD83D\uDD8D",
     dogs: "\uD83D\uDC36",
     fish: "\uD83D\uDC1F",
+    fingers: "☝️",
     pencils: "\u270E",
     pizza: "\uD83C\uDF55",
     bears: "\uD83D\uDC3B",
@@ -946,27 +1565,32 @@ function MathVisualPreview({
         role="img"
         style={{
           ...shellStyle,
-          maxWidth: "760px",
-          overflowX: "auto",
+          maxWidth: "720px",
+          overflow: "hidden",
+          padding: "16px",
+          width: "100%",
         }}
       >
         <div
           style={{
+            maxWidth: `${svgWidth}px`,
             margin: "0 auto",
-            minWidth: `${svgWidth}px`,
+            minWidth: 0,
             paddingTop: "62px",
             position: "relative",
-            width: `${svgWidth}px`,
+            width: "100%",
           }}
         >
           <svg
             aria-hidden="true"
             height="72"
             style={{
+              height: "72px",
               left: 0,
               overflow: "visible",
               position: "absolute",
               top: 0,
+              width: "100%",
             }}
             viewBox={`0 0 ${svgWidth} 72`}
             width={svgWidth}
@@ -1015,7 +1639,8 @@ function MathVisualPreview({
             style={{
               display: "grid",
               gridTemplateColumns:
-                `repeat(${visibleNumberCount}, ${cellWidth}px)`,
+                `repeat(${visibleNumberCount}, minmax(0, 1fr))`,
+              width: "100%",
             }}
           >
             {Array.from(
@@ -1044,10 +1669,11 @@ function MathVisualPreview({
                           : "none",
                       color: "#25384c",
                       display: "flex",
-                      fontSize: "22px",
+                      fontSize: "clamp(14px, 3.2vw, 22px)",
                       fontWeight: 900,
-                      height: "54px",
+                      height: "clamp(42px, 8vw, 54px)",
                       justifyContent: "center",
+                      minWidth: 0,
                       position: "relative",
                       borderRight:
                         number === pathEnd
@@ -1114,7 +1740,7 @@ function MathVisualPreview({
     const showNumbers = question.mathVisualGraphShowNumbers !== false;
     const categoryHeader = question.mathVisualGraphCategoryHeader?.trim() || "Category";
     const totalLabel = question.mathVisualGraphTotalLabel?.trim() || "Total";
-    const gridTemplateColumns = `minmax(110px, 1fr) repeat(${maximum}, 30px)${showTotals ? " 54px" : ""}`;
+    const gridTemplateColumns = `minmax(76px, 110px) repeat(${maximum}, minmax(12px, 30px))${showTotals ? " minmax(36px, 54px)" : ""}`;
 
     return (
       <div
@@ -1123,7 +1749,9 @@ function MathVisualPreview({
         style={{
           ...shellStyle,
           maxWidth: "860px",
-          overflowX: "auto",
+          overflow: "hidden",
+          padding: "16px",
+          width: "100%",
         }}
       >
         {question.mathVisualGraphTitle ? (
@@ -1143,10 +1771,11 @@ function MathVisualPreview({
           style={{
             display: "grid",
             gridTemplateColumns,
-            minWidth: `${110 + (maximum * 30) + (showTotals ? 54 : 0)}px`,
+            minWidth: 0,
+            width: "100%",
           }}
         >
-          <strong style={{background: "#e9f4ff", padding: "8px"}}>
+          <strong style={{background: "#e9f4ff", fontSize: "clamp(10px, 2vw, 14px)", minWidth: 0, padding: "6px"}}>
             {categoryHeader}
           </strong>
           {Array.from({length: maximum}, (_, index) => (
@@ -1154,10 +1783,12 @@ function MathVisualPreview({
               key={`number-${index + 1}`}
               style={{
                 background: "#e9f4ff",
-                padding: "8px 2px",
                 boxShadow: (index + 1) % 5 === 0
                   ? "inset -3px 0 0 #7a4cc2"
                   : "none",
+                fontSize: "clamp(10px, 2vw, 14px)",
+                minWidth: 0,
+                padding: "6px 0",
                 textAlign: "center",
               }}
             >
@@ -1165,12 +1796,19 @@ function MathVisualPreview({
             </strong>
           ))}
           {showTotals ? (
-            <strong style={{background: "#e9f4ff", padding: "8px"}}>
+            <strong style={{background: "#e9f4ff", fontSize: "clamp(10px, 2vw, 14px)", minWidth: 0, padding: "6px"}}>
               {totalLabel}
             </strong>
           ) : null}
           {graphLabels.flatMap((label, rowIndex) => [
-            <strong key={`${label}-label`} style={{padding: "8px"}}>
+            <strong
+              key={`${label}-label`}
+              style={{
+                fontSize: "clamp(11px, 2.2vw, 16px)",
+                minWidth: 0,
+                padding: "6px",
+              }}
+            >
               {label}
             </strong>,
             ...Array.from({length: maximum}, (_, cellIndex) => (
@@ -1185,15 +1823,23 @@ function MathVisualPreview({
                   boxShadow: (cellIndex + 1) % 5 === 0
                     ? "inset -3px 0 0 #7a4cc2"
                     : "none",
-                  height: "28px",
-                  margin: "1px",
-                  width: "28px",
+                  aspectRatio: "1 / 1",
+                  minHeight: "12px",
+                  width: "100%",
                 }}
               />
             )),
             ...(showTotals
               ? [
-                <strong key={`${label}-total`} style={{padding: "8px", textAlign: "center"}}>
+                <strong
+                  key={`${label}-total`}
+                  style={{
+                    fontSize: "clamp(11px, 2.2vw, 16px)",
+                    minWidth: 0,
+                    padding: "6px",
+                    textAlign: "center",
+                  }}
+                >
                   {values[rowIndex]}
                 </strong>,
               ]
@@ -1307,25 +1953,28 @@ function MathVisualPreview({
   }
 
   if (visualType === "number-bond") {
-    const whole = question.mathVisualWholeMissing ? null : count;
+    const whole = question.mathVisualWholeMissing ? "?" : count;
     const partOne = question.mathVisualPartOneMissing
-      ? null
+      ? "?"
       : mathVisualNumber(
         question.mathVisualPartOne,
         Math.max(0, count - 2),
         100,
       );
+    const partOneNumber = typeof partOne === "number" ? partOne : 0;
     const partTwo = question.mathVisualPartTwoMissing
-      ? null
+      ? "?"
       : mathVisualNumber(
         question.mathVisualPartTwo,
-        Math.max(0, count - (partOne ?? 0)),
+        Math.max(0, count - (partOneNumber ?? 0)),
         100,
       );
+    const describeBondValue = (value: number | "?") =>
+      value === "?" ? "missing" : value;
 
     return (
       <div
-        aria-label={`Number bond with whole ${whole ?? "missing"}, parts ${partOne ?? "missing"} and ${partTwo ?? "missing"}`}
+        aria-label={`Number bond with whole ${describeBondValue(whole)}, parts ${describeBondValue(partOne)} and ${describeBondValue(partTwo)}`}
         role="img"
         style={shellStyle}
       >
@@ -1351,7 +2000,7 @@ function MathVisualPreview({
               width: "78px",
             }}
           >
-            {whole ?? ""}
+            {whole}
             </div>
 
           <div
@@ -1372,7 +2021,7 @@ function MathVisualPreview({
           >
             {[partOne, partTwo].map((part, index) => (
               <div
-                key={`${part ?? "missing"}-${index}`}
+                key={`${part}-${index}`}
                 style={{
                   alignItems: "center",
                   background:
@@ -1387,8 +2036,8 @@ function MathVisualPreview({
                   width: "68px",
                 }}
               >
-                {part ?? ""}
-                </div>
+                {part}
+              </div>
             ))}
           </div>
         </div>
@@ -1430,6 +2079,7 @@ function MathVisualPreview({
       crayons: "\uD83D\uDD8D",
       dogs: "\uD83D\uDC36",
       fish: "\uD83D\uDC1F",
+      fingers: "☝️",
       pencils: "\u270E",
       pizza: "\uD83C\uDF55",
       bears: "🧸",
@@ -1732,12 +2382,16 @@ function MathVisualPreview({
         <div
           style={{
             alignItems: "center",
-            display: "flex",
-            flexDirection: vertical ? "column" : "row",
+            display: "grid",
+            gap: 0,
+            gridTemplateColumns:
+              `repeat(${vertical ? 1 : Math.min(cubes.length, 10)}, minmax(22px, 50px))`,
             justifyContent: "center",
             margin: "0 auto",
+            maxWidth: `${vertical ? 50 : Math.min(cubes.length, 10) * 50}px`,
             minHeight: vertical ? "300px" : "70px",
-            overflow: "auto",
+            overflow: "visible",
+            width: "100%",
           }}
         >
           {cubes.map((color, index) => (
@@ -1745,18 +2399,14 @@ function MathVisualPreview({
               aria-hidden="true"
               key={index}
               style={{
+                aspectRatio: "1 / 1",
                 background: color,
                 border: "3px solid #354b63",
                 borderRadius: "7px",
                 boxShadow: "inset -7px -7px 0 rgba(0,0,0,.12)",
                 display: "block",
-                flex: "0 0 50px",
-                height: "50px",
-                marginLeft:
-                  !vertical && index > 0 ? "-3px" : 0,
-                marginTop:
-                  vertical && index > 0 ? "-3px" : 0,
-                width: "50px",
+                minWidth: 0,
+                width: "100%",
               }}
             />
           ))}
@@ -1839,6 +2489,7 @@ function MathVisualPreview({
       crayons: "\uD83D\uDD8D",
       dogs: "\uD83D\uDC36",
       fish: "\uD83D\uDC1F",
+      fingers: "☝️",
       pencils: "\u270E",
       pizza: "\uD83C\uDF55",
       bears: "🧸",
@@ -1854,7 +2505,12 @@ function MathVisualPreview({
         <div
           aria-label="Picture graph"
           role="img"
-          style={shellStyle}
+          style={{
+            ...shellStyle,
+            overflow: "hidden",
+            padding: "16px",
+            width: "100%",
+          }}
         >
           <div style={{display: "grid", gap: "12px"}}>
             {labels.map((label, index) => (
@@ -1863,16 +2519,22 @@ function MathVisualPreview({
                 style={{
                   alignItems: "center",
                   display: "grid",
-                  gap: "12px",
-                  gridTemplateColumns: "110px 1fr 40px",
+                  gap: "8px",
+                  gridTemplateColumns:
+                    "minmax(58px, 92px) minmax(0, 1fr) minmax(24px, 34px)",
+                  minWidth: 0,
                 }}
               >
-                <strong>{label}</strong>
+                <strong style={{minWidth: 0}}>{label}</strong>
                 <div
                   style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "6px",
+                    display: "grid",
+                    gap: "4px",
+                    gridTemplateColumns:
+                      `repeat(${Math.max(1, values[index])}, minmax(0, 1fr))`,
+                    maxWidth: `${Math.max(1, values[index]) * 34}px`,
+                    minWidth: 0,
+                    width: "100%",
                   }}
                 >
                   {Array.from(
@@ -1884,7 +2546,10 @@ function MathVisualPreview({
                           color: index % 2
                             ? "#ff8396"
                             : "#70b7ff",
-                          fontSize: "32px",
+                          display: "grid",
+                          fontSize: "clamp(20px, 3.2vw, 32px)",
+                          lineHeight: 1,
+                          placeItems: "center",
                         }}
                       >
                         {symbols[
@@ -2091,20 +2756,31 @@ function MathVisualPreview({
       1,
       mathVisualNumber(question.mathVisualEnd, 10, 30),
     );
-    const highlighted = Math.min(count, end);
+    const hasHighlightedNumber = question.mathVisualCountMissing !== true;
+    const highlighted = hasHighlightedNumber
+      ? Math.min(count, end)
+      : null;
 
     return (
       <div
-        aria-label={`Number line from 0 to ${end}, highlighting ${highlighted}`}
+        aria-label={`Number line from 0 to ${end}${hasHighlightedNumber ? `, highlighting ${highlighted}` : ", with no highlighted number"}`}
         role="img"
-        style={shellStyle}
+        style={{
+          ...shellStyle,
+          maxWidth: "720px",
+          overflow: "hidden",
+          padding: "18px",
+          width: "100%",
+        }}
       >
         <div
           style={{
             alignItems: "flex-start",
             display: "grid",
             gridTemplateColumns:
-              `repeat(${end + 1}, minmax(28px, 1fr))`,
+              `repeat(${end + 1}, minmax(0, 1fr))`,
+            minWidth: 0,
+            width: "100%",
           }}
         >
           {Array.from(
@@ -2117,8 +2793,10 @@ function MathVisualPreview({
                     number === highlighted
                       ? "#d94f64"
                       : "#354b63",
+                  fontSize: "clamp(10px, 2.5vw, 18px)",
                   fontWeight:
                     number === highlighted ? 900 : 700,
+                  minWidth: 0,
                   textAlign: "center",
                 }}
               >
@@ -2145,8 +2823,237 @@ function MathVisualPreview({
             background: "#354b63",
             height: "4px",
             marginTop: "-39px",
+            width: "100%",
           }}
         />
+      </div>
+    );
+  }
+
+  if (visualType === "linking-cubes") {
+    const splitCount = mathVisualNumber(
+      question.mathVisualShadeCount,
+      0,
+      count,
+    );
+    const explicitSecondCount = mathVisualNumber(
+      question.mathVisualSecondCount,
+      0,
+      50,
+    );
+    const colorOne =
+      typeof question.mathVisualColorOne === "string"
+        ? question.mathVisualColorOne
+        : "#70b7ff";
+    const colorTwo =
+      typeof question.mathVisualColorTwo === "string"
+        ? question.mathVisualColorTwo
+        : "#ffc857";
+    const usesShadeSplit = splitCount > 0 && splitCount < count;
+    const cubeGroups = (
+      usesShadeSplit
+        ? [
+            {
+              amount: splitCount,
+              color: colorOne,
+              label: "Part 1",
+              start: 0,
+            },
+            {
+              amount: count - splitCount,
+              color: colorTwo,
+              label: "Part 2",
+              start: splitCount,
+            },
+          ]
+        : explicitSecondCount > 0
+          ? [
+              {
+                amount: count,
+                color: colorOne,
+                label: "Part 1",
+                start: 0,
+              },
+              {
+                amount: explicitSecondCount,
+                color: colorTwo,
+                label: "Part 2",
+                start: count,
+              },
+            ]
+          : [
+              {
+                amount: count,
+                color: colorOne,
+                label: "Cubes",
+                start: 0,
+              },
+            ]
+    ).filter((group) => group.amount > 0);
+    const totalCubes = cubeGroups.reduce(
+      (total, group) => total + group.amount,
+      0,
+    );
+    const circleCount = mathVisualNumber(
+      question.mathVisualCircleCount,
+      0,
+      totalCubes,
+    );
+    const crossOutCount = mathVisualNumber(
+      question.mathVisualCrossOutCount,
+      0,
+      totalCubes,
+    );
+    const groupSize = mathVisualNumber(
+      question.mathVisualGroupSize,
+      0,
+      totalCubes,
+    );
+    const showNumbers =
+      question.mathVisualShowNumbers === true;
+    const showGroupLabels =
+      question.mathVisualShowGroupLabels === true;
+    const showTotals =
+      question.mathVisualShowTotals === true;
+
+    return (
+      <div
+        aria-label={`Linking cubes showing ${cubeGroups.map((group) => group.amount).join(" and ")}`}
+        role="img"
+        style={{
+          ...shellStyle,
+          maxWidth: "720px",
+          overflow: "hidden",
+          padding: "16px",
+          width: "100%",
+        }}
+      >
+        <div
+          style={{
+            alignItems: "flex-start",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "14px",
+            justifyContent: "center",
+            minWidth: 0,
+          }}
+        >
+          {cubeGroups.map((group) => (
+            <div
+              key={`${group.label}-${group.start}`}
+              style={{
+                flex: `1 1 ${Math.min(group.amount * 44, 260)}px`,
+                maxWidth: `${group.amount * 44}px`,
+                minWidth: 0,
+              }}
+            >
+              {showGroupLabels && cubeGroups.length > 1 ? (
+                <p
+                  style={{
+                    color: "#596b7d",
+                    fontWeight: 900,
+                    margin: "0 0 10px",
+                    textAlign: "center",
+                  }}
+                >
+                  {group.label}: {group.amount}
+                </p>
+              ) : null}
+              <div
+                style={{
+                  display: "grid",
+                  gap: 0,
+                  gridTemplateColumns:
+                    `repeat(${Math.max(1, group.amount)}, minmax(22px, 44px))`,
+                  justifyContent: "center",
+                  width: "100%",
+                }}
+              >
+                {Array.from({length: group.amount}, (_, index) => {
+                  const globalIndex = group.start + index;
+                  const circled = globalIndex < circleCount;
+                  const crossed =
+                    globalIndex >= totalCubes - crossOutCount;
+                  const grouped = globalIndex < groupSize;
+
+                  return (
+                    <span
+                      aria-hidden="true"
+                      key={globalIndex}
+                      style={{
+                        alignItems: "center",
+                        aspectRatio: "1 / 1",
+                        background: group.color,
+                        border: "3px solid #354b63",
+                        borderRadius: "9px",
+                        boxShadow: [
+                          "inset -6px -6px 0 rgba(0,0,0,.12)",
+                          circled ? "0 0 0 5px #7a4cc2" : "",
+                        ].filter(Boolean).join(", "),
+                        color: "#25384c",
+                        display: "flex",
+                        fontSize: "clamp(12px, 3vw, 20px)",
+                        fontWeight: 900,
+                        justifyContent: "center",
+                        marginLeft: index > 0 ? "-3px" : 0,
+                        minWidth: 0,
+                        outline:
+                          grouped ? "3px dashed #ef6d64" : "none",
+                        position: "relative",
+                        width: "100%",
+                      }}
+                    >
+                      {showNumbers ? globalIndex + 1 : null}
+                      {crossed ? (
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            color: "#d53c4e",
+                            fontSize: "54px",
+                            fontWeight: 400,
+                            left: "5px",
+                            lineHeight: 1,
+                            position: "absolute",
+                            top: "-2px",
+                          }}
+                        >
+                          {"\u00D7"}
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {showTotals && cubeGroups.length > 1 ? (
+          <p
+            style={{
+              color: "#354b63",
+              fontSize: "22px",
+              fontWeight: 900,
+              margin: "20px 0 0",
+              textAlign: "center",
+            }}
+          >
+            {cubeGroups.map((group) => group.amount).join(" + ")} = {totalCubes}
+          </p>
+        ) : null}
+
+        {groupSize ? (
+          <p
+            style={{
+              color: "#ef6d64",
+              fontWeight: 900,
+              margin: "14px 0 0",
+              textAlign: "center",
+            }}
+          >
+            First {groupSize} grouped together
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -2274,7 +3181,7 @@ function MathVisualPreview({
                     top: "-2px",
                   }}
                 >
-                  ×
+                  {"\u00D7"}
                 </span>
               ) : null}
             </div>
@@ -2371,6 +3278,8 @@ export function GameEditorPanel({
       ? levelQuestions[selectedLevelQuestionIndex + 1]?.question
       : undefined;
   const speakerButtons = selectedQuestion ? deriveSpeakerButtons(selectedQuestion) : [];
+  const rapidGuessingVoice =
+    selectedGame?.content.rapidGuessingVoice ?? defaultRapidGuessingVoice();
 
   useEffect(() => {
     let mounted = true;
@@ -2453,10 +3362,12 @@ export function GameEditorPanel({
               tileDescription:
                 cardEdit?.description?.trim()
                 || baseCard?.description
+                || game.tileDescription
                 || "",
               tileIcon:
                 cardEdit?.icon?.trim()
                 || baseCard?.icon
+                || game.tileIcon
                 || "",
               title,
             };
@@ -2533,15 +3444,31 @@ export function GameEditorPanel({
       return;
     }
 
+    const nextTitle = tileTitleDraft.trim() || selectedGame.title;
+    const nextDescription =
+      tileDescriptionDraft.trim() || selectedGame.tileDescription;
+    const nextIcon = tileIconDraft.trim() || selectedGame.tileIcon;
+    const cardKey = cardKeyForGameId(selectedGame.gameId);
+
     updateSelectedGame((game) => {
-      const nextTitle = tileTitleDraft.trim() || game.title;
       game.title = nextTitle;
       game.content.unitTitle = nextTitle;
-      game.tileDescription = tileDescriptionDraft.trim();
-      game.tileIcon = tileIconDraft.trim();
+      game.tileDescription = nextDescription;
+      game.tileIcon = nextIcon;
     });
 
+    if (cardKey) {
+      updateCard(cardKey, {
+        description: nextDescription,
+        icon: nextIcon,
+        sortOrder: cardEdits[cardKey]?.sortOrder,
+        title: nextTitle,
+        underConstruction: cardEdits[cardKey]?.underConstruction === true,
+      });
+    }
+
     setTileEditorOpen(false);
+    setStatus("Tile saved. Save or publish the game if you changed the unit title inside the game too.");
   }
 
   function updateGameMeta(
@@ -2681,6 +3608,48 @@ export function GameEditorPanel({
     });
   }
 
+  function updateVisualSearchPrompt(value: string) {
+    if (selectedQuestionItem === undefined) {
+      return;
+    }
+
+    updateSelectedGame((game) => {
+      const question = game.content.questions[selectedQuestionItem.index];
+      if (!question) {
+        return;
+      }
+
+      question.prompt = value;
+      question.promptTemplate = value;
+    });
+  }
+
+  function updateVisualSearchTarget(value: string) {
+    if (selectedQuestionItem === undefined) {
+      return;
+    }
+
+    const target = value.trim();
+
+    updateSelectedGame((game) => {
+      const question = game.content.questions[selectedQuestionItem.index];
+      if (!question) {
+        return;
+      }
+
+      question.target = target;
+      question.answer = target;
+      question.correctAnswer = target;
+      question.word = target;
+      question.display = target;
+
+      if (target) {
+        const existingChoices = question.choices.filter((choice) => choice[0] !== target);
+        question.choices = [[target, target], ...existingChoices].slice(0, Math.max(2, existingChoices.length + 1));
+      }
+    });
+  }
+
   function addQuestion() {
     const question = blankQuestion(selectedLevelIndex);
 
@@ -2759,6 +3728,47 @@ export function GameEditorPanel({
     updateQuestion("choices", choices);
   }
 
+  function updateChoiceVisual(
+    choiceValue: string,
+    update: Partial<AssessmentChoiceVisual>,
+  ) {
+    if (!selectedQuestion) {
+      return;
+    }
+
+    const nextVisuals = {
+      ...(selectedQuestion.choiceVisuals ?? {}),
+    };
+    const nextVisual = {
+      ...(nextVisuals[choiceValue] ?? {}),
+      ...update,
+    };
+
+    if (!nextVisual.type || nextVisual.type === "count" && !nextVisual.count) {
+      if (!nextVisual.type) {
+        delete nextVisuals[choiceValue];
+      } else {
+        nextVisuals[choiceValue] = nextVisual;
+      }
+    } else {
+      nextVisuals[choiceValue] = nextVisual;
+    }
+
+    updateQuestion("choiceVisuals", nextVisuals);
+  }
+
+  function clearChoiceVisual(choiceValue: string) {
+    if (!selectedQuestion?.choiceVisuals?.[choiceValue]) {
+      return;
+    }
+
+    const nextVisuals = {
+      ...selectedQuestion.choiceVisuals,
+    };
+    delete nextVisuals[choiceValue];
+    updateQuestion("choiceVisuals", nextVisuals);
+  }
+
   function addChoice() {
     if (!selectedQuestion) {
       return;
@@ -2783,7 +3793,21 @@ export function GameEditorPanel({
         return;
       }
       const question = game.content.questions[selectedQuestionItem.index];
+      const removedChoice = selectedQuestion.choices[choiceIndex];
       question.choices = choices;
+
+      if (removedChoice?.[0] && question.choiceVisuals) {
+        const nextChoiceVisuals = {...question.choiceVisuals};
+        delete nextChoiceVisuals[removedChoice[0]];
+        question.choiceVisuals = nextChoiceVisuals;
+      }
+
+      if (removedChoice?.[0] && question.answerAudio) {
+        const nextAnswerAudio = {...question.answerAudio};
+        delete nextAnswerAudio[removedChoice[0]];
+        question.answerAudio = nextAnswerAudio;
+      }
+
       if (!stillHasAnswer) {
         question.answer = choices[0][0];
         question.correctAnswer = choices[0][0];
@@ -3023,6 +4047,17 @@ export function GameEditorPanel({
     setSpeakerButtons(speakerButtons.filter((button) => button.id !== buttonId));
   }
 
+  function updateRapidGuessingVoice(update: Partial<SpeakerButton>) {
+    updateSelectedGame((game) => {
+      game.content.rapidGuessingVoice = {
+        ...defaultRapidGuessingVoice(),
+        ...game.content.rapidGuessingVoice,
+        ...update,
+        id: RAPID_GUESSING_SPEAKER_ID,
+      };
+    });
+  }
+
   function addNewGame() {
     const game = blankGame();
     setGames((currentGames) => [...currentGames, game]);
@@ -3209,9 +4244,11 @@ export function GameEditorPanel({
 
       updateSpeakerButton(button.id, {
         audioKind: "googleTts",
+        audioSourceText: generated.sourceText,
         audioText: generated.sourceText,
         audioUrl: generated.audioUrl,
         storagePath: generated.storagePath,
+        text: generated.sourceText,
       });
 
       setStatus("Google AI voice generated. Preview it, then save or publish.");
@@ -3455,7 +4492,10 @@ export function GameEditorPanel({
 
         if (!question.questionImageAlt?.trim()) {
           question.questionImageAlt =
-            question.prompt.trim() || "Question image";
+            question.exampleWord?.trim()
+            || question.promptTemplate?.trim()
+            || question.prompt.trim()
+            || "Question image";
         }
       });
 
@@ -3592,12 +4632,145 @@ export function GameEditorPanel({
     }
   }
 
+  async function generateRapidGuessingAudio() {
+    if (!selectedGame) {
+      return;
+    }
+
+    const text = rapidGuessingVoice.text.trim();
+
+    if (!text) {
+      setError("Enter what the slow-down voice should say first.");
+      return;
+    }
+
+    setError("");
+    setStatus("Generating slow-down voice...");
+    setIsSaving(true);
+
+    try {
+      const services = await loadFirebase();
+      await signedInTeacher(services);
+
+      if (!services.functions) {
+        throw new Error("Firebase Functions did not load.");
+      }
+
+      const generateAudio =
+        services.functions.httpsCallable("generateGameAudio");
+      const result = await generateAudio({
+        audioId: RAPID_GUESSING_SPEAKER_ID,
+        gameId: selectedGame.gameId,
+        text,
+      });
+      const generated = result.data;
+
+      updateRapidGuessingVoice({
+        audioKind: "googleTts",
+        audioSourceText: generated.sourceText,
+        audioText: generated.sourceText,
+        audioUrl: generated.audioUrl,
+        storagePath: generated.storagePath,
+        text: generated.sourceText,
+      });
+
+      setStatus("Slow-down voice generated. Preview it, then save or publish.");
+      await new Audio(generated.audioUrl).play().catch(() => undefined);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Slow-down voice could not be generated.",
+      );
+      setStatus("");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function uploadRapidGuessingRecording() {
+    const draft = recordingDrafts[RAPID_GUESSING_SPEAKER_ID];
+
+    if (!draft || !selectedGame) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+
+    try {
+      const services = await loadFirebase();
+      await signedInTeacher(services);
+
+      if (!services.storage) {
+        throw new Error("Firebase Storage is not available yet.");
+      }
+
+      const storagePath =
+        `gameAudio/${selectedGame.gameId}/${RAPID_GUESSING_SPEAKER_ID}-${Date.now()}.webm`;
+      const snapshot = await services.storage
+        .ref(storagePath)
+        .put(draft.blob, {
+          contentType: draft.blob.type || "audio/webm",
+        });
+      const audioUrl = await snapshot.ref.getDownloadURL();
+
+      updateRapidGuessingVoice({
+        audioKind: "teacherRecording",
+        audioText: rapidGuessingVoice.text.trim(),
+        audioUrl,
+        storagePath: snapshot.ref.fullPath || storagePath,
+      });
+
+      setRecordingDrafts((current) => {
+        const next = {...current};
+        delete next[RAPID_GUESSING_SPEAKER_ID];
+        return next;
+      });
+      URL.revokeObjectURL(draft.url);
+      setStatus("Slow-down recording saved to this draft.");
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Slow-down recording could not save.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function deleteRapidGuessingRecording() {
+    setError("");
+
+    try {
+      if (rapidGuessingVoice.storagePath) {
+        const services = await loadFirebase();
+        await signedInTeacher(services);
+        await services.storage
+          ?.ref(rapidGuessingVoice.storagePath)
+          .delete()
+          .catch(() => undefined);
+      }
+
+      updateRapidGuessingVoice({
+        audioKind: "googleTts",
+        audioUrl: undefined,
+        storagePath: undefined,
+      });
+      setStatus("Slow-down voice clip removed.");
+    } catch {
+      setError("Slow-down voice clip could not be removed.");
+    }
+  }
+
   async function saveGame(statusType: "draft" | "published") {
     if (!selectedGame) {
       return;
     }
 
     setError("");
+    setStatus(statusType === "published" ? "Publishing..." : "Saving...");
     setIsSaving(true);
 
     try {
@@ -3690,10 +4863,14 @@ export function GameEditorPanel({
       );
 
       setDirty(false);
+      const savedAt = new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
       setStatus(
         statusType === "published"
-          ? "Published. Students will load this version."
-          : "Draft saved.",
+          ? `Published at ${savedAt}. Students will load this version.`
+          : `Saved at ${savedAt}.`,
       );
     } catch (nextError) {
       setError(
@@ -3736,12 +4913,18 @@ export function GameEditorPanel({
           <div style={{textAlign: "center"}}>
             {selectedGame ? (
               <p className="eyebrow" style={{marginBottom: "4px"}}>
-                {selectedGame.subject === "math"
-                  ? "EUREKA MATH · MODULE "
-                  : selectedGame.subject === "ckla-listening-learning"
-                    ? "CKLA LISTENING & LEARNING · UNIT "
-                    : "CKLA UNIT "}
-                {unitNumberForGameId(selectedGame.gameId)}
+                {isVisualSearchGame(selectedGame.gameId)
+                  ? "CKLA SKILLS ASSESSMENT"
+                  : isPreassessmentGame(selectedGame.gameId)
+                  ? preassessmentLabelForGameId(selectedGame.gameId)
+                  : selectedGame.subject === "math"
+                    ? "EUREKA MATH · MODULE "
+                    : selectedGame.subject === "ckla-listening-learning"
+                      ? "CKLA LISTENING & LEARNING · UNIT "
+                      : "CKLA UNIT "}
+                {isVisualSearchGame(selectedGame.gameId) || isPreassessmentGame(selectedGame.gameId)
+                  ? ""
+                  : unitNumberForGameId(selectedGame.gameId)}
               </p>
             ) : null}
             <h2 style={{margin: 0}}>
@@ -3770,7 +4953,7 @@ export function GameEditorPanel({
         </div>
 
         {error ? <p className="teacher-message error">{error}</p> : null}
-        {status ? <p className="teacher-message success">{status}</p> : null}
+        {status ? <p aria-live="polite" className="teacher-message success">{status}</p> : null}
 
         {tileEditorOpen && selectedGame ? (
           <div
@@ -3904,8 +5087,8 @@ export function GameEditorPanel({
               <button className="teacher-control-button secondary" onClick={addNewGame} type="button">
                 New Unit
               </button>
-              <button className="teacher-control-button secondary" disabled={!dirty || isSaving} onClick={() => void saveGame("draft")} type="button">
-                Save Draft
+              <button className="teacher-control-button secondary" disabled={isSaving || !selectedGame} onClick={() => void saveGame("draft")} type="button">
+                {isSaving ? "Saving..." : "Save"}
               </button>
               <button className="teacher-control-button" disabled={isSaving} onClick={() => void saveGame("published")} type="button">
                 Publish
@@ -4014,11 +5197,130 @@ export function GameEditorPanel({
                 {selectedQuestion ? (
                   <div className="game-editor-fields">
                     <div className="game-editor-tab-panel" hidden={activeEditorTab !== "question"} role="tabpanel">
-                      <label>Directions<textarea rows={3} value={selectedQuestion.prompt} onChange={(event) => updateQuestion("prompt", event.target.value)} /></label>
+                      <label>
+                        {isVisualSearchGame(selectedGame.gameId)
+                          ? "Read-aloud directions"
+                          : "Directions"}
+                        <textarea
+                          rows={3}
+                          value={
+                            isVisualSearchGame(selectedGame.gameId)
+                              ? selectedQuestion.promptTemplate ?? selectedQuestion.prompt
+                              : selectedQuestion.prompt
+                          }
+                          onChange={(event) => {
+                            if (isVisualSearchGame(selectedGame.gameId)) {
+                              updateVisualSearchPrompt(event.target.value);
+                            } else {
+                              updateQuestion("prompt", event.target.value);
+                            }
+                          }}
+                        />
+                        {isVisualSearchGame(selectedGame.gameId) ? (
+                          <span className="field-help">
+                            Use {"{target}"} and {"{exampleWord}"} placeholders, for example: Find {"{target}"} like in {"{exampleWord}"}.
+                          </span>
+                        ) : null}
+                      </label>
                       <label>Question type<input value={selectedQuestion.type ?? ""} onChange={(event) => updateQuestion("type", event.target.value)} /></label>
                       <label>Skill label<input value={selectedQuestion.skill ?? ""} onChange={(event) => updateQuestion("skill", event.target.value)} /></label>
                       <label>Word or target<input value={selectedQuestion.word ?? ""} onChange={(event) => updateQuestion("word", event.target.value)} /></label>
                       <label>Displayed sentence or target<input value={selectedQuestion.display ?? ""} onChange={(event) => updateQuestion("display", event.target.value)} /></label>
+
+                      {isPreassessmentGame(selectedGame.gameId) || isVisualSearchGame(selectedGame.gameId) ? (
+                        <div style={{display: "grid", gap: "12px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))"}}>
+                          <label>
+                            Assessment category
+                            <input
+                              value={selectedQuestion.category ?? ""}
+                              onChange={(event) => updateQuestion("category", event.target.value)}
+                            />
+                          </label>
+                          <label>
+                            Standard
+                            <input
+                              value={selectedQuestion.standard ?? ""}
+                              onChange={(event) => {
+                                updateQuestion("standard", event.target.value);
+                                if (selectedGame.gameId === "math-starting-point-quest") {
+                                  updateQuestion("word", event.target.value);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
+
+                      {isVisualSearchGame(selectedGame.gameId) ? (
+                        <section className="game-editor-subsection">
+                          <div className="game-editor-card-head">
+                            <div>
+                              <h4>Visual Search Target</h4>
+                              <p className="pin-helper">
+                                Configure the target string, spoken prompt template, and generated field.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div style={{display: "grid", gap: "12px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))"}}>
+                            <label>
+                              Target
+                              <input
+                                value={selectedQuestion.target ?? selectedQuestion.answer}
+                                onChange={(event) => updateVisualSearchTarget(event.target.value)}
+                              />
+                            </label>
+                            <label>
+                              Example word or label
+                              <input
+                                value={selectedQuestion.exampleWord ?? ""}
+                                onChange={(event) => updateQuestion("exampleWord", event.target.value)}
+                              />
+                            </label>
+                          </div>
+
+                          <div style={{display: "grid", gap: "12px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))"}}>
+                            <label>
+                              Example visual or image URL
+                              <input
+                                placeholder="Dots, emoji, or https://..."
+                                value={selectedQuestion.exampleVisual ?? ""}
+                                onChange={(event) => updateQuestion("exampleVisual", event.target.value)}
+                              />
+                            </label>
+                            <label>
+                              Rows
+                              <input
+                                max={5}
+                                min={2}
+                                type="number"
+                                value={selectedQuestion.visualSearchFieldRows ?? 3}
+                                onChange={(event) => updateQuestion("visualSearchFieldRows", Number(event.target.value))}
+                              />
+                            </label>
+                            <label>
+                              Columns
+                              <input
+                                max={8}
+                                min={3}
+                                type="number"
+                                value={selectedQuestion.visualSearchFieldColumns ?? 6}
+                                onChange={(event) => updateQuestion("visualSearchFieldColumns", Number(event.target.value))}
+                              />
+                            </label>
+                          </div>
+
+                          <label>
+                            Preferred distractors
+                            <input
+                              placeholder="b, d, p, q"
+                              value={selectedQuestion.preferredDistractors ?? ""}
+                              onChange={(event) => updateQuestion("preferredDistractors", event.target.value)}
+                            />
+                            <span className="field-help">Separate distractors with commas. The game also adds a balanced random mix.</span>
+                          </label>
+                        </section>
+                      ) : null}
 
                       {selectedGame.subject === "math" ? (
                         <section className="game-editor-subsection">
@@ -4105,7 +5407,7 @@ export function GameEditorPanel({
                                   ? "Whole"
                                   : selectedQuestion.mathVisualType
                                       === "number-line"
-                                    ? "Highlighted number"
+                                    ? "Highlighted number (optional)"
                                     : selectedQuestion.mathVisualType
                                         === "number-path"
                                       ? "Starting number"
@@ -4121,25 +5423,58 @@ export function GameEditorPanel({
                                 <input
                                   max={100}
                                   min={0}
-                                  type="number"
+                                  placeholder={
+                                    selectedQuestion.mathVisualType === "number-bond"
+                                      ? "?"
+                                      : undefined
+                                  }
+                                  type={
+                                    selectedQuestion.mathVisualType === "number-bond"
+                                      ? "text"
+                                      : "number"
+                                  }
                                   value={
                                     selectedQuestion.mathVisualType === "number-bond"
                                     && selectedQuestion.mathVisualWholeMissing
+                                      ? ""
+                                      : selectedQuestion.mathVisualType === "number-line"
+                                    && selectedQuestion.mathVisualCountMissing
                                       ? ""
                                       : selectedQuestion.mathVisualCount
                                         ?? 5
                                   }
                                   onChange={(event) => {
-                                    const rawValue = event.target.value;
-                                    if (
-                                      selectedQuestion.mathVisualType === "number-bond"
-                                      && rawValue === ""
-                                    ) {
-                                      updateQuestion("mathVisualWholeMissing", true);
+                                    const rawValue = event.target.value.trim();
+                                    if (selectedQuestion.mathVisualType === "number-bond") {
+                                      if (rawValue === "" || rawValue === "?") {
+                                        updateQuestion("mathVisualWholeMissing", true);
+                                        return;
+                                      }
+
+                                      const nextValue = Number(rawValue);
+                                      if (!Number.isFinite(nextValue)) {
+                                        return;
+                                      }
+
+                                      updateQuestion("mathVisualWholeMissing", false);
+                                      updateQuestion("mathVisualCount", nextValue);
+                                      return;
+                                    }
+
+                                    if (rawValue === "") {
+                                      if (selectedQuestion.mathVisualType === "number-bond") {
+                                        updateQuestion("mathVisualWholeMissing", true);
+                                      }
+                                      if (selectedQuestion.mathVisualType === "number-line") {
+                                        updateQuestion("mathVisualCountMissing", true);
+                                      }
                                       return;
                                     }
                                     if (selectedQuestion.mathVisualType === "number-bond") {
                                       updateQuestion("mathVisualWholeMissing", false);
+                                    }
+                                    if (selectedQuestion.mathVisualType === "number-line") {
+                                      updateQuestion("mathVisualCountMissing", false);
                                     }
                                     updateQuestion("mathVisualCount", Number(rawValue));
                                   }}
@@ -4397,7 +5732,9 @@ export function GameEditorPanel({
                               {(selectedQuestion.mathVisualType
                                 === "two-groups"
                                 || selectedQuestion.mathVisualType
-                                  === "cube-train") ? (
+                                  === "cube-train"
+                                || selectedQuestion.mathVisualType
+                                  === "linking-cubes") ? (
                                 <div
                                   style={{
                                     display: "grid",
@@ -4683,6 +6020,7 @@ export function GameEditorPanel({
                                               <option value="dogs">Dogs</option>
                                               <option value="fish">Fish</option>
                                               <option value="birds">Birds</option>
+                                              <option value="fingers">Fingers</option>
                                             </optgroup>
                                             <optgroup label="School items">
                                               <option value="pencils">Pencils</option>
@@ -4717,7 +6055,8 @@ export function GameEditorPanel({
                                     <input
                                       max={100}
                                       min={0}
-                                      type="number"
+                                      placeholder="?"
+                                      type="text"
                                       value={
                                         selectedQuestion.mathVisualPartOneMissing
                                           ? ""
@@ -4726,13 +6065,19 @@ export function GameEditorPanel({
                                             ?? 3
                                       }
                                       onChange={(event) => {
-                                        const rawValue = event.target.value;
-                                        if (rawValue === "") {
+                                        const rawValue = event.target.value.trim();
+                                        if (rawValue === "" || rawValue === "?") {
                                           updateQuestion("mathVisualPartOneMissing", true);
                                           return;
                                         }
+
+                                        const nextValue = Number(rawValue);
+                                        if (!Number.isFinite(nextValue)) {
+                                          return;
+                                        }
+
                                         updateQuestion("mathVisualPartOneMissing", false);
-                                        updateQuestion("mathVisualPartOne", Number(rawValue));
+                                        updateQuestion("mathVisualPartOne", nextValue);
                                       }}
                                     />
                                   </label>
@@ -4742,7 +6087,8 @@ export function GameEditorPanel({
                                     <input
                                       max={100}
                                       min={0}
-                                      type="number"
+                                      placeholder="?"
+                                      type="text"
                                       value={
                                         selectedQuestion.mathVisualPartTwoMissing
                                           ? ""
@@ -4751,13 +6097,19 @@ export function GameEditorPanel({
                                             ?? 2
                                       }
                                       onChange={(event) => {
-                                        const rawValue = event.target.value;
-                                        if (rawValue === "") {
+                                        const rawValue = event.target.value.trim();
+                                        if (rawValue === "" || rawValue === "?") {
                                           updateQuestion("mathVisualPartTwoMissing", true);
                                           return;
                                         }
+
+                                        const nextValue = Number(rawValue);
+                                        if (!Number.isFinite(nextValue)) {
+                                          return;
+                                        }
+
                                         updateQuestion("mathVisualPartTwoMissing", false);
-                                        updateQuestion("mathVisualPartTwo", Number(rawValue));
+                                        updateQuestion("mathVisualPartTwo", nextValue);
                                       }}
                                     />
                                   </label>
@@ -4909,6 +6261,9 @@ export function GameEditorPanel({
                                       </option>
                                       <option value="birds">
                                         Birds
+                                      </option>
+                                      <option value="fingers">
+                                        Fingers
                                       </option>
                                     </optgroup>
                                     <optgroup label="School items">
@@ -5062,7 +6417,8 @@ export function GameEditorPanel({
                       ) : null}
 
                       {selectedGame.subject === "ckla-listening-learning"
-                        || selectedGame.subject === "math" ? (
+                        || selectedGame.subject === "math"
+                        || isVisualSearchGame(selectedGame.gameId) ? (
                         <section className="game-editor-subsection">
                           <div className="game-editor-card-head">
                             <div>
@@ -5190,6 +6546,185 @@ export function GameEditorPanel({
                               Delete
                             </button>
                           </div>
+
+                          {selectedGame.gameId === "math-starting-point-quest" ? (
+                            <div className="game-editor-subsection">
+                              <label>
+                                Answer picture template
+                                <select
+                                  value={selectedQuestion.choiceVisuals?.[choice[0]]?.type ?? ""}
+                                  onChange={(event) => {
+                                    const nextType = event.target.value as AssessmentChoiceVisual["type"] | "";
+                                    if (!nextType) {
+                                      clearChoiceVisual(choice[0]);
+                                      return;
+                                    }
+
+                                    const currentVisual = selectedQuestion.choiceVisuals?.[choice[0]];
+                                    const objectLabel = currentVisual?.label || "dot";
+
+                                    if (nextType === "count") {
+                                      updateChoiceVisual(choice[0], {
+                                        count: currentVisual?.count ?? 3,
+                                        label: objectLabel,
+                                        type: nextType,
+                                      });
+                                      return;
+                                    }
+
+                                    if (nextType === "join") {
+                                      updateChoiceVisual(choice[0], {
+                                        first: currentVisual?.first ?? 2,
+                                        label: objectLabel,
+                                        second: currentVisual?.second ?? 3,
+                                        type: nextType,
+                                      });
+                                      return;
+                                    }
+
+                                    if (nextType === "takeaway") {
+                                      const count = mathVisualNumber(
+                                        currentVisual?.count,
+                                        5,
+                                        20,
+                                      );
+                                      const crossed = mathVisualNumber(
+                                        currentVisual?.crossed,
+                                        2,
+                                        count,
+                                      );
+                                      updateChoiceVisual(choice[0], {
+                                        count,
+                                        crossed,
+                                        label: objectLabel,
+                                        type: nextType,
+                                      });
+                                      return;
+                                    }
+
+                                    updateChoiceVisual(choice[0], {
+                                      expression: currentVisual?.expression || "3 + 2",
+                                      type: nextType,
+                                    });
+                                  }}
+                                >
+                                  <option value="">No answer picture</option>
+                                  <option value="count">Objects</option>
+                                  <option value="join">Two groups joining</option>
+                                  <option value="takeaway">Objects crossed out</option>
+                                  <option value="expression">Math expression</option>
+                                </select>
+                              </label>
+
+                              {selectedQuestion.choiceVisuals?.[choice[0]]?.type === "expression" ? (
+                                <label>
+                                  Expression shown
+                                  <input
+                                    value={selectedQuestion.choiceVisuals?.[choice[0]]?.expression ?? ""}
+                                    onChange={(event) => updateChoiceVisual(choice[0], {expression: event.target.value})}
+                                  />
+                                </label>
+                              ) : null}
+
+                              {selectedQuestion.choiceVisuals?.[choice[0]]?.type
+                                && selectedQuestion.choiceVisuals?.[choice[0]]?.type !== "expression" ? (
+                                <label>
+                                  Object
+                                  <select
+                                    value={selectedQuestion.choiceVisuals?.[choice[0]]?.label ?? "dot"}
+                                    onChange={(event) => updateChoiceVisual(choice[0], {label: event.target.value})}
+                                  >
+                                    <option value="dot">Dots</option>
+                                    <option value="bear">Bears</option>
+                                    <option value="cube">Cubes</option>
+                                    <option value="finger">Fingers</option>
+                                    <option value="apple">Apples</option>
+                                    <option value="bird">Birds</option>
+                                    <option value="star">Stars</option>
+                                    <option value="block">Blocks</option>
+                                  </select>
+                                </label>
+                              ) : null}
+
+                              {selectedQuestion.choiceVisuals?.[choice[0]]?.type === "count" ? (
+                                <label>
+                                  Number of objects
+                                  <input
+                                    min={0}
+                                    max={20}
+                                    type="number"
+                                    value={selectedQuestion.choiceVisuals?.[choice[0]]?.count ?? 3}
+                                    onChange={(event) => updateChoiceVisual(choice[0], {count: Number(event.target.value)})}
+                                  />
+                                </label>
+                              ) : null}
+
+                              {selectedQuestion.choiceVisuals?.[choice[0]]?.type === "join" ? (
+                                <div style={{display: "grid", gap: "12px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))"}}>
+                                  <label>
+                                    First group
+                                    <input
+                                      min={0}
+                                      max={20}
+                                      type="number"
+                                      value={selectedQuestion.choiceVisuals?.[choice[0]]?.first ?? 2}
+                                      onChange={(event) => updateChoiceVisual(choice[0], {first: Number(event.target.value)})}
+                                    />
+                                  </label>
+                                  <label>
+                                    Second group
+                                    <input
+                                      min={0}
+                                      max={20}
+                                      type="number"
+                                      value={selectedQuestion.choiceVisuals?.[choice[0]]?.second ?? 3}
+                                      onChange={(event) => updateChoiceVisual(choice[0], {second: Number(event.target.value)})}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+
+                              {selectedQuestion.choiceVisuals?.[choice[0]]?.type === "takeaway" ? (
+                                <div style={{display: "grid", gap: "12px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))"}}>
+                                  <label>
+                                    Total objects before taking away
+                                    <input
+                                      min={0}
+                                      max={20}
+                                      type="number"
+                                      value={selectedQuestion.choiceVisuals?.[choice[0]]?.count ?? 5}
+                                      onChange={(event) => {
+                                        const nextCount = Math.max(0, Number(event.target.value));
+                                        const currentCrossed = selectedQuestion.choiceVisuals?.[choice[0]]?.crossed ?? 2;
+                                        updateChoiceVisual(choice[0], {
+                                          count: nextCount,
+                                          crossed: Math.min(currentCrossed, nextCount),
+                                        });
+                                      }}
+                                    />
+                                  </label>
+                                  <label>
+                                    Objects crossed out from that group
+                                    <input
+                                      min={0}
+                                      max={Math.max(0, selectedQuestion.choiceVisuals?.[choice[0]]?.count ?? 5)}
+                                      type="number"
+                                      value={Math.min(
+                                        selectedQuestion.choiceVisuals?.[choice[0]]?.crossed ?? 2,
+                                        selectedQuestion.choiceVisuals?.[choice[0]]?.count ?? 5,
+                                      )}
+                                      onChange={(event) => {
+                                        const count = selectedQuestion.choiceVisuals?.[choice[0]]?.count ?? 5;
+                                        updateChoiceVisual(choice[0], {
+                                          crossed: Math.max(0, Math.min(Number(event.target.value), count)),
+                                        });
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
 
                           {expandedAnswerAudio === choice[0] ? (
                             <div className="answer-audio-editor">
@@ -5380,6 +6915,78 @@ export function GameEditorPanel({
                     <div className="game-editor-tab-panel" hidden={activeEditorTab !== "voice"} role="tabpanel">
                     <div className="game-editor-subsection">
                       <div className="game-editor-card-head">
+                        <div>
+                          <h4>Slow-Down Voice</h4>
+                          <p className="pin-helper">
+                            This plays when a scholar is rapidly guessing.
+                          </p>
+                        </div>
+                      </div>
+                      <article className="speaker-editor-card">
+                        <div className="speaker-editor-top">
+                          <label className="inline-check">
+                            <input
+                              checked={rapidGuessingVoice.enabled}
+                              onChange={(event) => updateRapidGuessingVoice({ enabled: event.target.checked })}
+                              type="checkbox"
+                            />
+                            On
+                          </label>
+                        </div>
+                        <div className="speaker-editor-grid">
+                          <label>Label<input value={rapidGuessingVoice.label} onChange={(event) => updateRapidGuessingVoice({ label: event.target.value })} /></label>
+                          <label>
+                            Audio
+                            <select value={rapidGuessingVoice.audioKind} onChange={(event) => updateRapidGuessingVoice({ audioKind: event.target.value as SpeakerAudioKind })}>
+                              <option value="googleTts">Google AI voice</option>
+                              <option value="teacherRecording">Teacher recording</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label>What this voice says<textarea rows={2} value={rapidGuessingVoice.text} onChange={(event) => updateRapidGuessingVoice({ text: event.target.value })} /></label>
+                        <div className="recording-actions">
+                          <button className="teacher-text-button" onClick={() => void previewSpeaker(rapidGuessingVoice)} type="button">Preview Audio</button>
+                          <button
+                            className="teacher-text-button"
+                            disabled={isSaving || !rapidGuessingVoice.text.trim()}
+                            onClick={() => void generateRapidGuessingAudio()}
+                            type="button"
+                          >
+                            {rapidGuessingVoice.audioKind === "googleTts" && rapidGuessingVoice.audioUrl
+                              ? "Regenerate AI Voice"
+                              : "Generate AI Voice"}
+                          </button>
+                          {recordingSpeakerId === rapidGuessingVoice.id ? (
+                            <button
+                              className="teacher-text-button danger"
+                              onClick={stopRecording}
+                              type="button"
+                            >
+                              Stop Recording
+                            </button>
+                          ) : (
+                            <button
+                              className="teacher-text-button"
+                              onClick={() => void startRecording(rapidGuessingVoice.id)}
+                              type="button"
+                            >
+                              Record
+                            </button>
+                          )}
+                          {recordingDrafts[rapidGuessingVoice.id] ? (
+                            <>
+                              <button className="teacher-text-button" onClick={() => void new Audio(recordingDrafts[rapidGuessingVoice.id].url).play()} type="button">Preview Recording</button>
+                              <button className="teacher-text-button" disabled={isSaving} onClick={() => void uploadRapidGuessingRecording()} type="button">Save Recording</button>
+                            </>
+                          ) : null}
+                          {rapidGuessingVoice.audioUrl ? (
+                            <button className="teacher-text-button danger" onClick={() => void deleteRapidGuessingRecording()} type="button">Delete Clip</button>
+                          ) : null}
+                        </div>
+                      </article>
+                    </div>
+                    <div className="game-editor-subsection">
+                      <div className="game-editor-card-head">
                         <h4>Speaker Buttons</h4>
                         <button className="teacher-text-button" onClick={addSpeakerButton} type="button">Add Speaker</button>
                       </div>
@@ -5478,7 +7085,7 @@ export function GameEditorPanel({
                         {speakerButtons.filter((button) => button.enabled && button.position === "left").map((button) => (
                           <button key={button.id} onClick={() => void previewSpeaker(button)} type="button">{button.label}</button>
                         ))}
-                        <p>{selectedQuestion.prompt}</p>
+                        <p>{previewPromptFor(selectedGame.gameId, selectedQuestion)}</p>
                         {speakerButtons.filter((button) => button.enabled && button.position === "right").map((button) => (
                           <button key={button.id} onClick={() => void previewSpeaker(button)} type="button">{button.label}</button>
                         ))}
@@ -5516,17 +7123,59 @@ export function GameEditorPanel({
                         ) : null}
                       </div>
                     </div>
-                    <div className="preview-answers">
-                      {selectedQuestion.choices.map((choice) => (
-                        <button
-                          className={previewChoice === choice[0] ? (choice[0] === selectedQuestion.answer ? "is-correct" : "is-wrong") : ""}
-                          key={choice[0]}
-                          onClick={() => selectPreviewAnswer(choice[0])}                          
-                          type="button"
-                        >
-                          {choice[1]}
-                        </button>
-                      ))}
+                    <div
+                      className="preview-answers"
+                      style={
+                        selectedGame.gameId === "math-starting-point-quest"
+                        && selectedQuestion.choices.some(
+                          (choice) => selectedQuestion.choiceVisuals?.[choice[0]],
+                        )
+                          ? {
+                              display: "grid",
+                              gap: "12px",
+                              gridTemplateColumns: "minmax(0, 1fr)",
+                            }
+                          : undefined
+                      }
+                    >
+                      {selectedQuestion.choices.map((choice) => {
+                        const choiceVisual =
+                          selectedGame.gameId === "math-starting-point-quest"
+                            ? selectedQuestion.choiceVisuals?.[choice[0]]
+                            : undefined;
+
+                        return (
+                          <button
+                            className={previewChoice === choice[0] ? (choice[0] === selectedQuestion.answer ? "is-correct" : "is-wrong") : ""}
+                            key={choice[0]}
+                            onClick={() => selectPreviewAnswer(choice[0])}
+                            style={choiceVisual ? {
+                              alignItems: "center",
+                              display: "grid",
+                              gap: "14px",
+                              gridTemplateColumns: "minmax(0, 1fr) minmax(10rem, 14rem)",
+                              minHeight: "118px",
+                              overflow: "visible",
+                              padding: "12px 16px",
+                              textAlign: "left",
+                              width: "100%",
+                            } : undefined}
+                            type="button"
+                          >
+                            {choiceVisual ? (
+                              <AssessmentChoiceVisualPreview visual={choiceVisual} />
+                            ) : null}
+                            <span style={choiceVisual ? {
+                              fontSize: "16px",
+                              fontWeight: 800,
+                              lineHeight: 1.2,
+                              textAlign: "center",
+                            } : undefined}>
+                              {choice[1]}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </article>
                 ) : null}
