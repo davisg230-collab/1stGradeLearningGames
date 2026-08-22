@@ -3305,65 +3305,119 @@ function addCurriculumNeedCandidate(
   });
 }
 
-function smallGroupNeedFamily(candidate: CurriculumNeedCandidate) {
+function smallGroupUniqueSorted(values: string[]) {
+  return Array.from(new Set(
+    values
+      .map((value) => normalizeCurriculumNeedText(value))
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b));
+}
+
+function smallGroupReadablePattern(pattern: string) {
+  return pattern
+    .replace(/_/g, "-")
+    .replace(/\b([aeiou])-e\b/gi, "$1_e")
+    .trim();
+}
+
+function smallGroupNeedTargetForStack(candidate: CurriculumNeedCandidate) {
   const need = normalizeCurriculumNeedKey(candidate.need);
   const letterNeed = smallGroupSingleLetterNeed(candidate);
   const chunkNeed = smallGroupNeedChunk(candidate);
   const ufliPatterns = ufliPatternTermsForCandidate(candidate);
 
   if (letterNeed) {
+    if (/uppercase/.test(need)) return `uppercase ${letterNeed.toUpperCase()}`;
+    if (/lowercase/.test(need)) return `lowercase ${letterNeed.toLowerCase()}`;
+    return `letter ${letterNeed.toLowerCase()}`;
+  }
+
+  if (chunkNeed) return chunkNeed;
+  if (ufliPatterns.length) return smallGroupReadablePattern(ufliPatterns[0]);
+  return candidate.need;
+}
+
+function smallGroupUfliFocusForCandidate(candidate: CurriculumNeedCandidate) {
+  const recommendation = findUfliRecommendationsForNeedCandidate(candidate)[0];
+  const target = smallGroupNeedTargetForStack(candidate);
+
+  if (!recommendation) {
+    return {
+      key: `needs-${normalizeCurriculumNeedKey(target)}`,
+      label: "UFLI small-group needs",
+      target,
+      unit: "",
+    };
+  }
+
+  return {
+    key: normalizeCurriculumNeedKey(recommendation.unitOrModule),
+    label: recommendation.unitOrModule.replace(/\s+Unit$/i, ""),
+    target,
+    unit: recommendation.unitOrModule,
+  };
+}
+
+function smallGroupNeedFamily(candidate: CurriculumNeedCandidate) {
+  const need = normalizeCurriculumNeedKey(candidate.need);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const chunkNeed = smallGroupNeedChunk(candidate);
+  const ufliPatterns = ufliPatternTermsForCandidate(candidate);
+  const ufliFocus = smallGroupUfliFocusForCandidate(candidate);
+
+  if (letterNeed) {
     if (/uppercase/.test(need)) {
       return {
-        key: "uppercase-letter-identification",
-        label: "Uppercase letter needs",
+        key: `ufli-${ufliFocus.key}-uppercase-letter-identification`,
+        label: `UFLI ${ufliFocus.label}: uppercase letter identification`,
       };
     }
 
     return {
-      key: "letter-identification",
-      label: /lowercase/.test(need) ? "Lowercase letter needs" : "Letter needs",
+      key: `ufli-${ufliFocus.key}-letter-identification`,
+      label: `UFLI ${ufliFocus.label}: ${/lowercase/.test(need) ? "lowercase letter identification" : "letter identification"}`,
     };
   }
 
   if (chunkNeed) {
     return {
-      key: "digraph-and-patterns",
-      label: "Digraph and spelling-pattern needs",
+      key: `ufli-${ufliFocus.key}-digraph-and-patterns`,
+      label: `UFLI ${ufliFocus.label}: digraph and spelling-pattern needs`,
     };
   }
 
   if (ufliPatterns.some((pattern) => /short [aeiou]|short vowels|nasalized a/.test(pattern))) {
     return {
-      key: "short-vowel-needs",
-      label: "Short-vowel needs",
+      key: `ufli-${ufliFocus.key}-short-vowel-needs`,
+      label: `UFLI ${ufliFocus.label}: short-vowel needs`,
     };
   }
 
   if (ufliPatterns.some((pattern) => /vce|a_e|i_e|o_e|u_e|e_e|silent e/.test(pattern))) {
     return {
-      key: "silent-e-needs",
-      label: "Silent-e needs",
+      key: `ufli-${ufliFocus.key}-silent-e-needs`,
+      label: `UFLI ${ufliFocus.label}: silent-e needs`,
     };
   }
 
   if (ufliPatterns.some((pattern) => /vowel teams|ai|ee|oa|ie|oo|ew|au|oi|ou/.test(pattern))) {
     return {
-      key: "vowel-team-needs",
-      label: "Vowel-team needs",
+      key: `ufli-${ufliFocus.key}-vowel-team-needs`,
+      label: `UFLI ${ufliFocus.label}: vowel-team needs`,
     };
   }
 
   if (ufliPatterns.some((pattern) => /r-controlled|ar|or|er/.test(pattern))) {
     return {
-      key: "r-controlled-needs",
-      label: "R-controlled vowel needs",
+      key: `ufli-${ufliFocus.key}-r-controlled-needs`,
+      label: `UFLI ${ufliFocus.label}: r-controlled vowel needs`,
     };
   }
 
   if (ufliPatterns.some((pattern) => /suffix|prefix|doubling|drop e|y to i|sion|tion|ture|ness|ment|able|ible/.test(pattern))) {
     return {
-      key: "affix-needs",
-      label: "Prefix and suffix needs",
+      key: `ufli-${ufliFocus.key}-affix-needs`,
+      label: `UFLI ${ufliFocus.label}: prefix and suffix needs`,
     };
   }
 
@@ -3402,9 +3456,28 @@ function smallGroupNeedStackLabel(candidates: CurriculumNeedCandidate[]) {
   if (!candidates.length) return "Small-group needs";
   const family = smallGroupNeedFamily(candidates[0]);
   const labels = new Set(candidates.map((candidate) => smallGroupNeedFamily(candidate).label));
+  const focusTargets = smallGroupUniqueSorted(
+    candidates.map((candidate) => smallGroupUfliFocusForCandidate(candidate).target),
+  );
+  const targetText = focusTargets.length
+    ? focusTargets.slice(0, 6).join(", ")
+    : "";
+
+  if (labels.size === 1 && targetText) {
+    return `${family.label}: ${targetText}`;
+  }
+
+  if (targetText) {
+    const ufliUnits = smallGroupUniqueSorted(
+      candidates.map((candidate) => smallGroupUfliFocusForCandidate(candidate).label),
+    );
+    const unitLabel = ufliUnits.length === 1 ? ufliUnits[0] : "Intervention";
+
+    return `UFLI ${unitLabel}: ${targetText}`;
+  }
 
   if (labels.size === 1) return family.label;
-  return "Related small-group needs";
+  return "UFLI intervention needs";
 }
 
 function buildSmallGroupNeedStacks(candidates: CurriculumNeedCandidate[]) {
@@ -8484,10 +8557,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                             <span>scholar{stack.scholarCount === 1 ? "" : "s"}</span>
                             <em>{stack.label}</em>
                             <small>
-                              {stack.candidates.length} related need{stack.candidates.length === 1 ? "" : "s"} - {stack.count} evidence point{stack.count === 1 ? "" : "s"}
+                              {stack.candidates.length} UFLI need{stack.candidates.length === 1 ? "" : "s"} - {stack.count} evidence point{stack.count === 1 ? "" : "s"}
                             </small>
                             {stack.candidates.length > 1 ? (
-                              <small>Stacked by similar skill type and overlapping scholars.</small>
+                              <small>Stacked by UFLI focus and overlapping scholars.</small>
                             ) : null}
                           </div>
                           <div className="small-group-stack-items">
