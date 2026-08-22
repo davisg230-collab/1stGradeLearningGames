@@ -1,14 +1,18 @@
 type SiteHeaderProps = {
-  current: "home" | "skills" | "math";
+  current: "home" | "skills" | "listening-learning" | "math";
 };
+
+const CLASS_HUB_URL = "https://first-grade-news-hub-mrdavis.web.app/";
 
 export function SiteHeader({ current }: SiteHeaderProps) {
   const eyebrow =
     current === "skills"
       ? "CKLA Skills Games"
-      : current === "math"
-        ? "Math Games"
-        : "Game Hub";
+      : current === "listening-learning"
+        ? "CKLA Listening & Learning Games"
+        : current === "math"
+          ? "Math Games"
+          : "Game Hub";
 
   return (
     <header className="site-shell">
@@ -17,6 +21,11 @@ export function SiteHeader({ current }: SiteHeaderProps) {
           <p className="hero-pill">{eyebrow}</p>
           <h1>Hey Hey First Grade!</h1>
         </div>
+        <nav className="site-header-actions" aria-label="Class website">
+          <a className="class-hub-link" href={CLASS_HUB_URL}>
+            Class Hub
+          </a>
+        </nav>
       </section>
     </header>
   );

@@ -113,6 +113,7 @@
     <header class="w-full px-4 pt-5 sm:px-8 sm:pt-7">
       <div class="mx-auto flex w-full max-w-[1450px] flex-wrap items-center justify-between gap-4">
         <a class="game-home-link" href="/math">Back to Math Modules</a>
+        <a class="game-home-link" href="https://first-grade-news-hub-mrdavis.web.app/">Class Hub</a>
         <div class="max-w-2xl">
           <p id="unit-kicker" class="mb-1" style="color:var(--coral);font-weight:900;letter-spacing:.12rem">EUREKA MATH · MODULE 1</p>
           <h1 id="unit-heading" class="leading-tight" style="font-size:clamp(2rem,4vw,2.55rem);font-weight:900">Module 1</h1>
@@ -294,9 +295,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const TEACHER_LOCK_PREFIX = `first-grade-learning-games-${GAME_ID}-locked:`;
   const SCHOLAR_PROFILE_STORAGE_KEY = "first-grade-learning-games-scholar-profile";
   const CKLA_ACCESS_STORAGE_KEY = "first-grade-learning-games-ckla-access";
+  const LEARNING_LOCATION_STORAGE_KEY = "first-grade-learning-games-learning-location";
   const AUTHORIZED_TEACHERS = [
     { email: "davisg230@gmail.com", label: "Mr. Davis" },
-    { email: "lvest1@crossroadsschoolskc.org", label: "Ms. Vest" }
+    { email: "lvest1@crossroadsschoolskc.org", label: "Ms. Vest", aliases: ["lvest1010@gmail.com", "lvest@crossroadsschoolskc.org"] }
   ];
   const firebaseConfig = {
     apiKey: "AIzaSyDKzxn9EHkjRTEAYNBuFtoIRH4ZB2r8vi8",
@@ -747,6 +749,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let audioContext = null;
   let scholarFirstName = "";
   let scholarFirstNameKey = "";
+  let learningLocation = "";
   let wholeClassMode = false;
   let activeTeacherEmail = "";
   let pendingClassMiss = null;
@@ -778,13 +781,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[char]));
   }
+  function cleanFeedbackText(value) {
+    if (typeof value !== "string") return "";
+    const text = value.trim();
+    return text && text.toLowerCase() !== "undefined" ? text : "";
+  }
+  function questionFeedbackText(question) {
+    const answer = choiceLabel(question, question.answer);
+    return cleanFeedbackText(question.visibleExplanation)
+      || cleanFeedbackText(question.hint)
+      || cleanFeedbackText(question.spokenExplanation)
+      || (answer ? `The correct answer is ${answer}.` : "Try again. Look closely and choose the best answer.");
+  }
+  function questionFeedbackSpeakText(question) {
+    return cleanFeedbackText(question.spokenExplanation) || questionFeedbackText(question);
+  }
+  function retryFeedbackText() {
+    return "Try again. Look closely and choose the best answer.";
+  }
   function normalizeNameKey(value) {
     return value.trim().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 30);
+  }
+  function normalizeLearningLocation(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "home" || normalized === "school" ? normalized : "";
+  }
+  function readStoredLearningLocation() {
+    try {
+      return normalizeLearningLocation(localStorage.getItem(LEARNING_LOCATION_STORAGE_KEY));
+    } catch {}
+    return "";
+  }
+  function writeStoredLearningLocation(value) {
+    const normalized = normalizeLearningLocation(value);
+    if (!normalized) return;
+    try {
+      localStorage.setItem(LEARNING_LOCATION_STORAGE_KEY, normalized);
+    } catch {}
+  }
+  function learningLocationFromParams(params = new URLSearchParams(window.location.search)) {
+    return normalizeLearningLocation(params.get("learningLocation") || params.get("location"));
+  }
+  function withLearningLocation(profile, params) {
+    const nextLocation =
+      learningLocationFromParams(params)
+      || normalizeLearningLocation(profile?.learningLocation)
+      || readStoredLearningLocation();
+    if (!nextLocation) return profile;
+    writeStoredLearningLocation(nextLocation);
+    return { ...profile, learningLocation: nextLocation };
+  }
+  function learningLocationFields() {
+    return learningLocation && !wholeClassMode ? { learningLocation } : {};
   }
   function readScholarProfile() {
     try {
       const stored = JSON.parse(localStorage.getItem(SCHOLAR_PROFILE_STORAGE_KEY) || "null");
-      if (stored?.firstName && stored?.firstNameKey && normalizeNameKey(stored.firstName) === stored.firstNameKey) return stored;
+      if (stored?.firstName && stored?.firstNameKey && normalizeNameKey(stored.firstName) === stored.firstNameKey) return withLearningLocation(stored);
     } catch {}
     return null;
   }
@@ -793,7 +846,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const firstName = (params.get("player") || "").trim().replace(/\s+/g, " ");
     const firstNameKey = (params.get("key") || "").trim();
     if (!firstName || !firstNameKey || normalizeNameKey(firstName) !== firstNameKey) return null;
-    const profile = { firstName, firstNameKey };
+    const profile = withLearningLocation({ firstName, firstNameKey }, params);
     try {
       localStorage.setItem(SCHOLAR_PROFILE_STORAGE_KEY, JSON.stringify(profile));
     } catch {}
@@ -804,7 +857,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const stored = JSON.parse(localStorage.getItem(CKLA_ACCESS_STORAGE_KEY) || "null");
       if (stored?.mode === "teacher") return { mode:"teacher" };
       if (stored?.mode === "scholar" && stored?.firstName && stored?.firstNameKey && normalizeNameKey(stored.firstName) === stored.firstNameKey) {
-        return { firstName:stored.firstName, firstNameKey:stored.firstNameKey, mode:"scholar" };
+        return withLearningLocation({ firstName:stored.firstName, firstNameKey:stored.firstNameKey, mode:"scholar" });
       }
     } catch {}
     return null;
@@ -822,12 +875,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const services = getFirebaseServices();
     return (services?.auth.currentUser?.email || "").trim().toLowerCase();
   }
+  function findAuthorizedTeacher(email) {
+    const normalized = (email || "").trim().toLowerCase();
+    return AUTHORIZED_TEACHERS.find(teacher => teacher.email === normalized || (teacher.aliases || []).includes(normalized));
+  }
   function teacherForClassMode() {
     const signedInEmail = currentTeacherEmail();
-    return AUTHORIZED_TEACHERS.find(option => option.email === signedInEmail) || { email: "unassigned", label: "Whole Class" };
+    return findAuthorizedTeacher(signedInEmail) || { email: "unassigned", label: "Whole Class" };
   }
   function validClassMissTeacherEmail(email) {
-    return email === "unassigned" || AUTHORIZED_TEACHERS.some(teacher => teacher.email === email);
+    return email === "unassigned" || Boolean(findAuthorizedTeacher(email));
   }
   function speechText(text) {
     return (text || "")
@@ -1494,10 +1551,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                   : "none"};
                 color:#25384c;
                 display:flex;
-                font-size:22px;
+                font-size:clamp(14px, 3.2vw, 22px);
                 font-weight:900;
-                height:54px;
+                height:clamp(42px, 8vw, 54px);
                 justify-content:center;
+                min-width:0;
               "
             >
 ${showLandingNumber && number === finish ? "" : number}
@@ -1516,28 +1574,32 @@ ${showLandingNumber && number === finish ? "" : number}
             border:2px solid #eadfce;
             border-radius:20px;
             margin:18px auto;
-            max-width:760px;
-            overflow-x:auto;
-            padding:20px;
+            max-width:720px;
+            overflow:hidden;
+            padding:16px;
+            width:100%;
           "
         >
           <div
             style="
               margin:0 auto;
-              min-width:${svgWidth}px;
+              max-width:${svgWidth}px;
+              min-width:0;
               padding-top:62px;
               position:relative;
-              width:${svgWidth}px;
+              width:100%;
             "
           >
             <svg
               aria-hidden="true"
               height="72"
               style="
+                height:72px;
                 left:0;
                 overflow:visible;
                 position:absolute;
                 top:0;
+                width:100%;
               "
               viewBox="0 0 ${svgWidth} 72"
               width="${svgWidth}"
@@ -1566,8 +1628,9 @@ ${showLandingNumber && number === finish ? "" : number}
                 display:grid;
                 grid-template-columns:repeat(
                   ${visibleNumberCount},
-                  ${cellWidth}px
+                  minmax(0, 1fr)
                 );
+                width:100%;
               "
             >
               ${cells}
@@ -1619,26 +1682,26 @@ ${showLandingNumber && number === finish ? "" : number}
         ? q.mathVisualGraphTotalLabel.trim()
         : "Total";
       const header = `
-        <strong style="background:#e9f4ff;padding:8px">${escapeHtml(categoryHeader)}</strong>
+        <strong style="background:#e9f4ff;font-size:clamp(10px, 2vw, 14px);min-width:0;padding:6px">${escapeHtml(categoryHeader)}</strong>
         ${Array.from(
           {length: maximum},
-          (_, index) => `<strong style="background:#e9f4ff;box-shadow:${(index + 1) % 5 === 0 ? "inset -3px 0 0 #7a4cc2" : "none"};padding:8px 2px;text-align:center">${showNumbers ? index + 1 : ""}</strong>`,
+          (_, index) => `<strong style="background:#e9f4ff;box-shadow:${(index + 1) % 5 === 0 ? "inset -3px 0 0 #7a4cc2" : "none"};font-size:clamp(10px, 2vw, 14px);min-width:0;padding:6px 0;text-align:center">${showNumbers ? index + 1 : ""}</strong>`,
         ).join("")}
-        ${showTotals ? `<strong style="background:#e9f4ff;padding:8px">${escapeHtml(totalLabel)}</strong>` : ""}
+        ${showTotals ? `<strong style="background:#e9f4ff;font-size:clamp(10px, 2vw, 14px);min-width:0;padding:6px">${escapeHtml(totalLabel)}</strong>` : ""}
       `;
       const rows = graphLabels.map(
         (label, rowIndex) => `
-          <strong style="padding:8px">${escapeHtml(label)}</strong>
+          <strong style="font-size:clamp(11px, 2.2vw, 16px);min-width:0;padding:6px">${escapeHtml(label)}</strong>
           ${Array.from(
             {length: maximum},
             (_, cellIndex) => `
               <span
                 aria-label="${escapeHtml(`${label} ${cellIndex + 1}: ${cellIndex < values[rowIndex] ? "filled" : "empty"}`)}"
-                style="background:${cellIndex < values[rowIndex] ? colors[rowIndex] : "#ffffff"};border:2px solid #354b63;box-shadow:${(cellIndex + 1) % 5 === 0 ? "inset -3px 0 0 #7a4cc2" : "none"};height:28px;margin:1px;width:28px"
+                style="aspect-ratio:1 / 1;background:${cellIndex < values[rowIndex] ? colors[rowIndex] : "#ffffff"};border:2px solid #354b63;box-shadow:${(cellIndex + 1) % 5 === 0 ? "inset -3px 0 0 #7a4cc2" : "none"};min-height:12px;width:100%"
               ></span>
             `,
           ).join("")}
-          ${showTotals ? `<strong style="padding:8px;text-align:center">${values[rowIndex]}</strong>` : ""}
+          ${showTotals ? `<strong style="font-size:clamp(11px, 2.2vw, 16px);min-width:0;padding:6px;text-align:center">${values[rowIndex]}</strong>` : ""}
         `,
       ).join("");
       return `
@@ -1646,10 +1709,10 @@ ${showLandingNumber && number === finish ? "" : number}
           aria-label="Categorical number path graph showing ${escapeHtml(graphLabels.join(", "))}"
           class="math-visual math-categorical-number-path-graph"
           role="img"
-          style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:860px;overflow-x:auto;padding:20px"
+          style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:860px;overflow:hidden;padding:16px;width:100%"
         >
           ${q.mathVisualGraphTitle ? `<h3 style="color:#354b63;font-size:22px;font-weight:900;margin:0 0 16px;text-align:center">${escapeHtml(q.mathVisualGraphTitle)}</h3>` : ""}
-          <div style="display:grid;grid-template-columns:minmax(110px,1fr) repeat(${maximum},30px)${showTotals ? " 54px" : ""};min-width:${110 + (maximum * 30) + (showTotals ? 54 : 0)}px">
+          <div style="display:grid;grid-template-columns:minmax(76px,110px) repeat(${maximum},minmax(12px,30px))${showTotals ? " minmax(36px,54px)" : ""};min-width:0;width:100%">
             ${header}
             ${rows}
           </div>
@@ -1705,38 +1768,42 @@ ${showLandingNumber && number === finish ? "" : number}
     }
 
     if (type === "number-bond") {
-      const whole = q.mathVisualWholeMissing ? null : count;
-      const partOne = q.mathVisualPartOneMissing
+      const whole = q.mathVisualWholeMissing ? "?" : count;
+      const partOneNumber = q.mathVisualPartOneMissing
         ? null
         : safeNumber(
           q.mathVisualPartOne,
           Math.max(0, count - 2),
         );
+      const partOne = q.mathVisualPartOneMissing
+        ? "?"
+        : partOneNumber;
       const partTwo = q.mathVisualPartTwoMissing
-        ? null
+        ? "?"
         : safeNumber(
           q.mathVisualPartTwo,
-          Math.max(0, count - (partOne || 0)),
+          Math.max(0, count - (partOneNumber || 0)),
         );
+      const describeBondValue = (value) => value === "?" ? "missing" : value;
 
       return `
         <div
-          aria-label="Number bond with whole ${whole ?? "missing"}, parts ${partOne ?? "missing"} and ${partTwo ?? "missing"}"
+          aria-label="Number bond with whole ${escapeHtml(String(describeBondValue(whole)))}, parts ${escapeHtml(String(describeBondValue(partOne)))} and ${escapeHtml(String(describeBondValue(partTwo)))}"
           class="math-visual math-number-bond"
           role="img"
           style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px"
         >
           <div style="align-items:center;display:flex;flex-direction:column;gap:12px">
             <div style="align-items:center;background:#ffe59a;border:3px solid #354b63;border-radius:50%;display:flex;font-size:28px;font-weight:900;height:78px;justify-content:center;width:78px">
-              ${whole ?? ""}
+              ${escapeHtml(String(whole))}
             </div>
             <div aria-hidden="true" style="font-size:30px;font-weight:900">↙ ↘</div>
             <div style="display:flex;gap:64px">
               <div style="align-items:center;background:#bde4ff;border:3px solid #354b63;border-radius:50%;display:flex;font-size:24px;font-weight:900;height:68px;justify-content:center;width:68px">
-                ${partOne ?? ""}
+                ${escapeHtml(String(partOne))}
               </div>
               <div style="align-items:center;background:#ffd1dc;border:3px solid #354b63;border-radius:50%;display:flex;font-size:24px;font-weight:900;height:68px;justify-content:center;width:68px">
-                ${partTwo ?? ""}
+                ${escapeHtml(String(partTwo))}
               </div>
             </div>
           </div>
@@ -2002,16 +2069,14 @@ ${showLandingNumber && number === finish ? "" : number}
           <span
             aria-hidden="true"
             style="
+              aspect-ratio:1 / 1;
               background:${color};
               border:3px solid #354b63;
               border-radius:7px;
               box-shadow:inset -7px -7px 0 rgba(0,0,0,.12);
               display:block;
-              flex:0 0 50px;
-              height:50px;
-              margin-left:${!vertical && index > 0 ? "-3px" : "0"};
-              margin-top:${vertical && index > 0 ? "-3px" : "0"};
-              width:50px;
+              min-width:0;
+              width:100%;
             "
           ></span>
         `,
@@ -2027,12 +2092,15 @@ ${showLandingNumber && number === finish ? "" : number}
           <div
             style="
               align-items:center;
-              display:flex;
-              flex-direction:${vertical ? "column" : "row"};
+              display:grid;
+              gap:0;
+              grid-template-columns:repeat(${vertical ? 1 : Math.min(colors.length, 10)}, minmax(22px, 50px));
               justify-content:center;
               margin:0 auto;
+              max-width:${vertical ? 50 : Math.min(colors.length, 10) * 50}px;
               min-height:${vertical ? "300px" : "70px"};
-              overflow:auto;
+              overflow:visible;
+              width:100%;
             "
           >
             ${cubes}
@@ -2102,12 +2170,12 @@ ${showLandingNumber && number === finish ? "" : number}
       if (type === "picture-graph") {
         const rows = labels.map(
           (label, index) => `
-            <div style="align-items:center;display:grid;gap:12px;grid-template-columns:110px 1fr 40px">
-              <strong>${escapeHtml(label)}</strong>
-              <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <div style="align-items:center;display:grid;gap:8px;grid-template-columns:minmax(58px,92px) minmax(0,1fr) minmax(24px,34px);min-width:0">
+              <strong style="min-width:0">${escapeHtml(label)}</strong>
+              <div style="display:grid;gap:4px;grid-template-columns:repeat(${Math.max(1, values[index])}, minmax(0, 1fr));max-width:${Math.max(1, values[index]) * 34}px;min-width:0;width:100%">
                 ${Array.from(
                   {length: values[index]},
-                  () => `<span style="color:${index % 2 ? "#ff8396" : "#70b7ff"};font-size:32px">${symbolForCategory(index)}</span>`,
+                  () => `<span style="color:${index % 2 ? "#ff8396" : "#70b7ff"};display:grid;font-size:clamp(20px, 3.2vw, 32px);line-height:1;place-items:center">${symbolForCategory(index)}</span>`,
                 ).join("")}
               </div>
               <strong>${values[index]}</strong>
@@ -2117,7 +2185,7 @@ ${showLandingNumber && number === finish ? "" : number}
 
         return `
           <div class="math-visual math-picture-graph" role="img"
-            style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;padding:20px">
+            style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:620px;overflow:hidden;padding:16px;width:100%">
             <div style="display:grid;gap:12px">${rows}</div>
           </div>
         `;
@@ -2250,13 +2318,16 @@ ${showLandingNumber && number === finish ? "" : number}
         1,
         safeNumber(q.mathVisualEnd, 10, 30),
       );
-      const highlighted = Math.min(count, end);
+      const hasHighlightedNumber = q.mathVisualCountMissing !== true;
+      const highlighted = hasHighlightedNumber
+        ? Math.min(count, end)
+        : null;
 
       const points = Array.from(
         {length: end + 1},
         (_, number) => `
           <div
-            style="color:${number === highlighted ? "#d94f64" : "#354b63"};font-weight:${number === highlighted ? "900" : "700"};text-align:center"
+            style="color:${number === highlighted ? "#d94f64" : "#354b63"};font-size:clamp(10px, 2.5vw, 18px);font-weight:${number === highlighted ? "900" : "700"};min-width:0;text-align:center"
           >
             <div
               style="background:${number === highlighted ? "#d94f64" : "#354b63"};height:${number === highlighted ? "24px" : "15px"};margin:0 auto 8px;width:3px"
@@ -2268,18 +2339,160 @@ ${showLandingNumber && number === finish ? "" : number}
 
       return `
         <div
-          aria-label="Number line from 0 to ${end}, highlighting ${highlighted}"
+          aria-label="Number line from 0 to ${end}${hasHighlightedNumber ? `, highlighting ${highlighted}` : ", with no highlighted number"}"
           class="math-visual math-number-line"
           role="img"
-          style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:720px;overflow-x:auto;padding:24px"
+          style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:720px;overflow:hidden;padding:18px;width:100%"
         >
-          <div style="align-items:start;display:grid;grid-template-columns:repeat(${end + 1},minmax(32px,1fr));min-width:${Math.max(360, (end + 1) * 34)}px">
+          <div style="align-items:start;display:grid;grid-template-columns:repeat(${end + 1},minmax(0,1fr));min-width:0;width:100%">
             ${points}
           </div>
           <div
             aria-hidden="true"
-            style="background:#354b63;height:4px;margin-top:-39px;min-width:${Math.max(360, (end + 1) * 34)}px"
+            style="background:#354b63;height:4px;margin-top:-39px;width:100%"
           ></div>
+        </div>
+      `;
+    }
+
+    if (type === "linking-cubes") {
+      const splitCount = safeNumber(
+        q.mathVisualShadeCount,
+        0,
+        count,
+      );
+      const explicitSecondCount = safeNumber(
+        q.mathVisualSecondCount,
+        0,
+        50,
+      );
+      const colorOne =
+        typeof q.mathVisualColorOne === "string"
+          ? q.mathVisualColorOne
+          : "#70b7ff";
+      const colorTwo =
+        typeof q.mathVisualColorTwo === "string"
+          ? q.mathVisualColorTwo
+          : "#ffc857";
+      const usesShadeSplit = splitCount > 0 && splitCount < count;
+      const cubeGroups = (
+        usesShadeSplit
+          ? [
+              {amount: splitCount, color: colorOne, label: "Part 1", start: 0},
+              {amount: count - splitCount, color: colorTwo, label: "Part 2", start: splitCount},
+            ]
+          : explicitSecondCount > 0
+            ? [
+                {amount: count, color: colorOne, label: "Part 1", start: 0},
+                {amount: explicitSecondCount, color: colorTwo, label: "Part 2", start: count},
+              ]
+            : [
+                {amount: count, color: colorOne, label: "Cubes", start: 0},
+              ]
+      ).filter(group => group.amount > 0);
+      const totalCubes = cubeGroups.reduce(
+        (total, group) => total + group.amount,
+        0,
+      );
+      const circleCount = safeNumber(
+        q.mathVisualCircleCount,
+        0,
+        totalCubes,
+      );
+      const crossOutCount = safeNumber(
+        q.mathVisualCrossOutCount,
+        0,
+        totalCubes,
+      );
+      const groupSize = safeNumber(
+        q.mathVisualGroupSize,
+        0,
+        totalCubes,
+      );
+      const showNumbers = q.mathVisualShowNumbers === true;
+      const showGroupLabels = q.mathVisualShowGroupLabels === true;
+      const showTotals = q.mathVisualShowTotals === true;
+
+      const cubeMarkup = cubeGroups.map(
+        group => `
+          <div style="flex:1 1 ${Math.min(group.amount * 44, 260)}px;max-width:${group.amount * 44}px;min-width:0">
+            ${showGroupLabels && cubeGroups.length > 1
+              ? `<p style="color:#596b7d;font-weight:900;margin:0 0 10px;text-align:center">${escapeHtml(group.label)}: ${group.amount}</p>`
+              : ""}
+            <div
+              style="
+                display:grid;
+                gap:0;
+                grid-template-columns:repeat(${Math.max(1, group.amount)}, minmax(22px, 44px));
+                justify-content:center;
+                width:100%;
+              "
+            >
+              ${Array.from(
+                {length: group.amount},
+                (_, index) => {
+                  const globalIndex = group.start + index;
+                  const circled = globalIndex < circleCount;
+                  const crossed = globalIndex >= totalCubes - crossOutCount;
+                  const grouped = globalIndex < groupSize;
+                  const boxShadow = [
+                    "inset -6px -6px 0 rgba(0,0,0,.12)",
+                    circled ? "0 0 0 5px #7a4cc2" : "",
+                  ].filter(Boolean).join(", ");
+
+                  return `
+                    <span
+                      aria-hidden="true"
+                      style="
+                        align-items:center;
+                        aspect-ratio:1 / 1;
+                        background:${group.color};
+                        border:3px solid #354b63;
+                        border-radius:9px;
+                        box-shadow:${boxShadow};
+                        color:#25384c;
+                        display:flex;
+                        font-size:clamp(12px, 3vw, 20px);
+                        font-weight:900;
+                        justify-content:center;
+                        margin-left:${index > 0 ? "-3px" : "0"};
+                        min-width:0;
+                        outline:${grouped ? "3px dashed #ef6d64" : "none"};
+                        position:relative;
+                        width:100%;
+                      "
+                    >
+                      ${showNumbers ? globalIndex + 1 : ""}
+                      ${crossed
+                        ? '<b style="color:#d53c4e;font-size:54px;font-weight:400;left:5px;line-height:1;position:absolute;top:-2px">×</b>'
+                        : ""}
+                    </span>
+                  `;
+                },
+              ).join("")}
+            </div>
+          </div>
+        `,
+      ).join("");
+
+      return `
+        <div
+          aria-label="Linking cubes showing ${escapeHtml(cubeGroups.map(group => group.amount).join(" and "))}"
+          class="math-visual math-linking-cubes"
+          role="img"
+          style="background:#fffdf8;border:2px solid #eadfce;border-radius:20px;margin:18px auto;max-width:720px;overflow:hidden;padding:16px;width:100%"
+        >
+          <div style="align-items:flex-start;display:flex;flex-wrap:wrap;gap:14px;justify-content:center;min-width:0">
+            ${cubeMarkup}
+          </div>
+          ${showTotals && cubeGroups.length > 1
+            ? `<p style="color:#354b63;font-size:22px;font-weight:900;margin:20px 0 0;text-align:center">
+              ${cubeGroups.map(group => group.amount).join(" + ")} = ${totalCubes}
+            </p>`
+            : ""}
+          ${groupSize
+            ? `<p style="color:#ef6d64;font-weight:900;margin:14px 0 0;text-align:center">First ${groupSize} grouped together</p>`
+            : ""}
         </div>
       `;
     }
@@ -2493,6 +2706,7 @@ ${showLandingNumber && number === finish ? "" : number}
       percentComplete: Math.round((completed / activeQuestions.length) * 100),
       questionsCompleted: completed,
       schemaVersion: 1,
+      ...learningLocationFields(),
       scholarFirstName,
       scholarFirstNameKey,
       scholarId: null,
@@ -2561,8 +2775,10 @@ ${showLandingNumber && number === finish ? "" : number}
     refreshUI();
   }
   function showFeedback(text, good, speakText = text) {
+    const visibleText = cleanFeedbackText(text) || "Try again. Look closely and choose the best answer.";
+    const audioText = cleanFeedbackText(speakText) || visibleText;
     feedback.className = `feedback is-visible ${good ? "is-good" : ""}`;
-    feedback.innerHTML = `<span>${escapeHtml(text)}</span><button class="speak-button" type="button" data-speak="${escapeHtml(speakText)}">Read feedback</button>`;
+    feedback.innerHTML = `<span>${escapeHtml(visibleText)}</span><button class="speak-button" type="button" data-speak="${escapeHtml(audioText)}">Read feedback</button>`;
   }
   function checkAnswer() {
     const q = activeQuestions[current];
@@ -2577,11 +2793,16 @@ ${showLandingNumber && number === finish ? "" : number}
     }
     if (correct) {
       state.complete = true;
-      showFeedback(`Trail star earned! ${q.visibleExplanation || q.hint}`, true, `Trail star earned! ${q.spokenExplanation || q.visibleExplanation || q.hint}`);
+      showFeedback(`Trail star earned! ${questionFeedbackText(q)}`, true, `Trail star earned! ${questionFeedbackSpeakText(q)}`);
       tone("correct");
     } else {
       state.incorrectSelections.push(choiceLabel(q, state.selected));
-      showFeedback(q.visibleExplanation || q.hint, false, q.spokenExplanation || q.visibleExplanation || q.hint);
+      const revealAnswer = state.attempts >= 2;
+      showFeedback(
+        revealAnswer ? questionFeedbackText(q) : retryFeedbackText(),
+        false,
+        revealAnswer ? questionFeedbackSpeakText(q) : retryFeedbackText(),
+      );
       tone("wrong");
       if (wholeClassMode) {
         const level = LEVELS[selectedLevelIndex];
@@ -2687,6 +2908,7 @@ ${showLandingNumber && number === finish ? "" : number}
         mode: "individual-complete",
         percent,
         schemaVersion: 1,
+        ...learningLocationFields(),
         scholarFirstName,
         scholarFirstNameKey,
         scholarId: null,
@@ -3156,6 +3378,7 @@ ${showLandingNumber && number === finish ? "" : number}
       activeTeacherEmail = teacher.email;
       scholarFirstName = "Whole Class";
       scholarFirstNameKey = "wholeclass";
+      learningLocation = "";
       beginGame("class");
       return true;
     }
@@ -3175,6 +3398,7 @@ ${showLandingNumber && number === finish ? "" : number}
       scholarFirstName = validation.firstName || profile.firstName;
       scholarFirstNameKey =
         validation.firstNameKey || profile.firstNameKey;
+      learningLocation = normalizeLearningLocation(profile.learningLocation) || readStoredLearningLocation();
       firstNameInput.value = scholarFirstName;
       await applyTeacherControl();
       beginGame("individual");

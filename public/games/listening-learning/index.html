@@ -112,12 +112,12 @@
     <div class="dot-field" aria-hidden="true"></div>
     <header class="w-full px-4 pt-5 sm:px-8 sm:pt-7">
       <div class="mx-auto flex w-full max-w-[1450px] flex-wrap items-center justify-between gap-4">
-        <a class="game-home-link" href="/skills">Back to CKLA Units</a>
+        <a class="game-home-link" href="/listening-learning">Back to Listening &amp; Learning Units</a>
         <a class="game-home-link" href="https://first-grade-news-hub-mrdavis.web.app/">Class Hub</a>
         <div class="max-w-2xl">
-          <p id="unit-kicker" class="mb-1" style="color:var(--coral);font-weight:900;letter-spacing:.12rem">CKLA UNIT 1</p>
-          <h1 id="unit-heading" class="leading-tight" style="font-size:clamp(2rem,4vw,2.55rem);font-weight:900">Sound Safari</h1>
-          <p id="unit-description" class="mt-1" style="color:var(--muted);font-weight:800">Practice this CKLA Skills unit.</p>
+          <p id="unit-kicker" class="mb-1" style="color:var(--coral);font-weight:900;letter-spacing:.12rem">CKLA LISTENING &amp; LEARNING · UNIT 1</p>
+          <h1 id="unit-heading" class="leading-tight" style="font-size:clamp(2rem,4vw,2.55rem);font-weight:900">Unit 1</h1>
+          <p id="unit-description" class="mt-1" style="color:var(--muted);font-weight:800">Practice this CKLA Listening &amp; Learning unit.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <div class="status-pill rounded-full px-5 py-3">
@@ -225,7 +225,7 @@
             <div class="result-actions">
               <button id="print-results-button" type="button" class="primary-action print-results-button">Print Results</button>
               <button id="restart-button" type="button" class="primary-action">Play Again</button>
-              <a id="back-to-unit-button" class="primary-action secondary" href="/skills">Back to CKLA Units</a>
+              <a id="back-to-unit-button" class="primary-action secondary" href="/listening-learning">Back to Listening &amp; Learning Units</a>
             </div>
           </div>
         </div>
@@ -254,22 +254,29 @@
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
 
-  const UNIT_NUMBER = Math.max(1, Math.min(7, Number(new URLSearchParams(window.location.search).get("unit") || 1)));
-  const UNIT_CONFIGS = {
-    1: { gameId:"unit1-zone1-sound-safari", title:"CKLA Unit 1 Sound Safari", heading:"Sound Safari", description:"Practice Unit 1 letters, sounds, spellings, Tricky Words, nouns, and punctuation." },
-    2: { gameId:"ckla-unit-2-long-vowel-quest", title:"CKLA Unit 2 Long Vowel Quest", heading:"Long Vowel Quest", description:"Practice Unit 2 long vowels, separated vowel teams, Tricky Words, nouns, and reading." },
-    3: { gameId:"ckla-unit-3-skills-quest", title:"CKLA Unit 3 Skills Adventure", heading:"Unit 3 Skills Adventure", description:"Practice the reading skills your teacher adds for Unit 3." },
-    4: { gameId:"ckla-unit-4-skills-quest", title:"CKLA Unit 4 Skills Adventure", heading:"Unit 4 Skills Adventure", description:"Practice the reading skills your teacher adds for Unit 4." },
-    5: { gameId:"ckla-unit-5-skills-quest", title:"CKLA Unit 5 Skills Adventure", heading:"Unit 5 Skills Adventure", description:"Practice the reading skills your teacher adds for Unit 5." },
-    6: { gameId:"ckla-unit-6-skills-quest", title:"CKLA Unit 6 Skills Adventure", heading:"Unit 6 Skills Adventure", description:"Practice the reading skills your teacher adds for Unit 6." },
-    7: { gameId:"ckla-unit-7-skills-quest", title:"CKLA Unit 7 Skills Adventure", heading:"Unit 7 Skills Adventure", description:"Practice the reading skills your teacher adds for Unit 7." }
-  };
+  const UNIT_NUMBER = Math.max(1, Math.min(11, Number(new URLSearchParams(window.location.search).get("unit") || 1)));
+  const UNIT_CONFIGS = Object.fromEntries(
+    Array.from({length: 11}, (_, index) => {
+      const unit = index + 1;
+
+      return [
+        unit,
+        {
+          gameId: `ckla-listening-learning-unit-${unit}`,
+          title: `CKLA Listening & Learning Unit ${unit}`,
+          heading: `Unit ${unit}`,
+          description:
+            `Practice CKLA Listening & Learning Unit ${unit}.`
+        }
+      ];
+    })
+  );
   const UNIT_CONFIG = UNIT_CONFIGS[UNIT_NUMBER];
   const GAME_ID = UNIT_CONFIG.gameId;
   let GAME_TITLE = UNIT_CONFIG.title;
   const RESULT_COLLECTION = "gameHubResultSubmissions";
   const PROGRESS_COLLECTION = "gameHubProgressSubmissions";
-  const UNIT_PROGRESS_PREFIX = `first-grade-learning-games-unit${UNIT_NUMBER}-progress:`;
+  const UNIT_PROGRESS_PREFIX = `first-grade-learning-games-listening-learning-unit${UNIT_NUMBER}-progress:`;
   const ACTIVE_SESSION_PREFIX = `first-grade-learning-games-${GAME_ID}-active:`;
   const SCHOLAR_CONTROL_COLLECTION = "gameHubScholarControls";
   const APPLIED_CONTROL_PREFIX = `first-grade-learning-games-${GAME_ID}-control:`;
@@ -465,7 +472,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     LEVELS = buildLevels();
   }
   async function loadEditableGameContent() {
-    if (UNIT_NUMBER > 1) {
+    if (UNIT_NUMBER >= 1) {
       try {
         const response = await fetch(`/games/editable-content/${GAME_ID}.json`, { cache:"no-store" });
         if (response.ok) {
@@ -498,7 +505,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      const cardKey = `CKLA Skills:unit-${UNIT_NUMBER}`;
+      const cardKey = `CKLA Listening & Learning:unit-${UNIT_NUMBER}`;
       const snapshot = await window.firebase
         .firestore()
         .collection("gameHubCards")
@@ -522,7 +529,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (publishedTitle) {
         UNIT_CONFIG.heading = publishedTitle;
         UNIT_CONFIG.title =
-          `CKLA Unit ${UNIT_NUMBER} ${publishedTitle}`;
+          `CKLA Listening & Learning Unit ${UNIT_NUMBER} ${publishedTitle}`;
         GAME_TITLE = UNIT_CONFIG.title;
       }
 
@@ -1400,6 +1407,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     return pictureMarkup(q);
   }
+  function questionImageMarkup(q) {
+    const imageUrl =
+      typeof q.questionImageUrl === "string"
+        ? q.questionImageUrl.trim()
+        : "";
+
+    if (!imageUrl) {
+      return "";
+    }
+
+    const imageAlt =
+      typeof q.questionImageAlt === "string"
+        ? q.questionImageAlt.trim()
+        : "";
+
+    return `
+      <div
+        class="question-image-wrap"
+        style="display:flex;justify-content:center;margin:18px 0"
+      >
+        <img
+          alt="${escapeHtml(imageAlt || "Question image")}"
+          src="${escapeHtml(imageUrl)}"
+          style="border-radius:20px;max-height:360px;max-width:100%;object-fit:contain"
+        />
+      </div>
+    `;
+  }
+
   function renderQuestion() {
     const q = activeQuestions[current];
     const state = states[current];
@@ -1417,6 +1453,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <p class="prompt-text">${escapeHtml(q.prompt)}</p>
             ${renderSpeakerButtons(q, "right")}
           </div>
+          ${questionImageMarkup(q)}
           ${renderTarget(q)}
         </div>
         <div class="answer-grid">
@@ -2183,18 +2220,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadEditableGameContent();
   await loadPublishedTileMetadata();
   document.title = GAME_TITLE;
-  document.getElementById("unit-kicker").textContent = `CKLA UNIT ${UNIT_NUMBER}`;
+  document.getElementById("unit-kicker").textContent = `CKLA LISTENING & LEARNING · UNIT ${UNIT_NUMBER}`;
   document.getElementById("unit-heading").textContent = UNIT_CONFIG.heading;
   document.getElementById("unit-description").textContent = UNIT_CONFIG.description;
-  document.getElementById("unit-adventure-label").textContent = `UNIT ${UNIT_NUMBER} SKILLS ADVENTURE`;
-  document.getElementById("map-heading").textContent = `Climb through Unit ${UNIT_NUMBER}`;
+  document.getElementById("unit-adventure-label").textContent = `LISTENING & LEARNING · UNIT ${UNIT_NUMBER}`;
+  document.getElementById("map-heading").textContent = `Explore Unit ${UNIT_NUMBER}`;
   document.getElementById("unit-check-label").textContent = `Unit ${UNIT_NUMBER} check`;
-  document.getElementById("unit-footer-target").textContent = `Learning target: I can practice Unit ${UNIT_NUMBER} reading skills.`;
-  try {
-    validateSoundSafariQuestionBank();
-  } catch (error) {
-    console.error("Sound Safari validation failed without blocking play.", error);
-  }
+  document.getElementById("unit-footer-target").textContent = `Learning target: I can show what I learned in Unit ${UNIT_NUMBER}.`;
 
   setupStaticUI();
   prefillScholarName();

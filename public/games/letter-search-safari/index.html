@@ -1,0 +1,2401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Letter Search Safari</title>
+  <style>
+    :root {
+      --ink: #243044;
+      --muted: #667085;
+      --line: #d9e2ef;
+      --paper: #fffdf7;
+      --panel: #ffffff;
+      --sky: #dff5ff;
+      --leaf: #2f8f6b;
+      --blue: #3071d9;
+      --gold: #f2be48;
+      --coral: #f47f7a;
+      --shadow: 0 20px 60px rgba(35, 48, 68, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+      letter-spacing: 0;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    body {
+      background:
+        linear-gradient(180deg, rgba(223, 245, 255, 0.92), rgba(255, 253, 247, 0.95)),
+        #fffdf7;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      touch-action: manipulation;
+    }
+
+    .game-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      width: min(1100px, 100%);
+      margin: 0 auto 1rem;
+    }
+
+    .brand-lockup {
+      min-width: 0;
+    }
+
+    .brand-lockup p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .brand-lockup h1 {
+      margin: 0.1rem 0 0;
+      font-size: 1.65rem;
+      line-height: 1.05;
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.6rem;
+    }
+
+    .pill {
+      align-items: center;
+      border: 2px solid rgba(36, 48, 68, 0.12);
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: 0.78rem;
+      font-weight: 900;
+      gap: 0.4rem;
+      min-height: 2.4rem;
+      padding: 0.45rem 0.8rem;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .pill.class-mode {
+      background: #ffe9e7;
+      color: #9c302b;
+    }
+
+    .pill.scholar-mode {
+      background: #e7f8ef;
+      color: #176447;
+    }
+
+    .panel,
+    .play-panel,
+    .results-panel {
+      width: min(1040px, 100%);
+      margin: 0 auto;
+      border: 2px solid rgba(36, 48, 68, 0.1);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: var(--shadow);
+    }
+
+    .panel {
+      padding: clamp(1rem, 2vw, 1.4rem);
+    }
+
+    .panel h2,
+    .results-panel h2 {
+      margin: 0;
+      font-size: 1.65rem;
+      line-height: 1.1;
+    }
+
+    .panel p,
+    .results-panel p {
+      color: var(--muted);
+      font-weight: 750;
+      line-height: 1.45;
+    }
+
+    .level-grid {
+      display: grid;
+      gap: 0.9rem;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      margin-top: 1rem;
+    }
+
+    .level-button {
+      align-items: flex-start;
+      border: 3px solid transparent;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 12px 30px rgba(35, 48, 68, 0.12);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      min-height: 9rem;
+      padding: 1rem;
+      text-align: left;
+    }
+
+    .level-button:not(:disabled):hover,
+    .level-button:not(:disabled):focus-visible {
+      border-color: var(--blue);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .level-button:disabled {
+      background: #f2f4f7;
+      color: #98a2b3;
+      cursor: not-allowed;
+    }
+
+    .level-button strong {
+      font-size: 1.15rem;
+      line-height: 1.2;
+    }
+
+    .level-button span {
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 750;
+      line-height: 1.35;
+    }
+
+    .play-panel {
+      display: none;
+      overflow: hidden;
+    }
+
+    .play-panel.is-active,
+    .results-panel.is-active {
+      display: block;
+    }
+
+    .question-strip {
+      align-items: center;
+      background: #f8fbff;
+      border-bottom: 2px solid var(--line);
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: 0.85rem 1rem;
+    }
+
+    .question-strip strong {
+      display: block;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+    }
+
+    .question-strip span {
+      color: var(--muted);
+      display: block;
+      font-weight: 850;
+      margin-top: 0.12rem;
+    }
+
+    .question-jump-panel {
+      background: #f7fbff;
+      border: 2px solid #d9e8f6;
+      border-radius: 8px;
+      display: none;
+      margin: 0 0 0.85rem;
+      padding: 0.85rem;
+    }
+
+    .question-jump-panel.is-visible {
+      display: block;
+    }
+
+    .question-jump-panel strong {
+      color: #34536c;
+      display: block;
+      font-size: 0.82rem;
+      margin-bottom: 0.55rem;
+      text-transform: uppercase;
+    }
+
+    .question-jump-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .question-jump-button {
+      background: #ffffff;
+      border: 2px solid #c9d9e8;
+      border-radius: 8px;
+      color: var(--ink);
+      font-weight: 900;
+      min-height: 2.45rem;
+      min-width: 3.7rem;
+      padding: 0.35rem 0.55rem;
+    }
+
+    .question-jump-button.is-active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #ffffff;
+    }
+
+    .question-jump-button.is-complete {
+      border-color: #72c58e;
+      box-shadow: inset 0 -4px 0 rgba(114, 197, 142, 0.24);
+    }
+
+    .question-jump-button.is-started:not(.is-complete) {
+      border-color: #f2c766;
+      box-shadow: inset 0 -4px 0 rgba(242, 199, 102, 0.24);
+    }
+
+    .prompt-zone {
+      align-items: center;
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: minmax(0, 1fr);
+      padding: 1.1rem;
+    }
+
+    .prompt-zone.has-example {
+      grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr);
+    }
+
+    .example-visual {
+      align-items: center;
+      background: #fff6dc;
+      border: 2px solid #f6d57c;
+      border-radius: 8px;
+      display: none;
+      font-size: 2.2rem;
+      font-weight: 950;
+      height: clamp(5.5rem, 13vw, 7rem);
+      justify-content: center;
+      max-width: 7rem;
+      min-width: 0;
+      overflow: hidden;
+      padding: 0.45rem;
+      width: 100%;
+    }
+
+    .example-visual.is-visible {
+      display: flex;
+    }
+
+    .example-visual img {
+      border-radius: 6px;
+      display: block;
+      height: 100%;
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      width: 100%;
+    }
+
+    .prompt-zone > div:last-child {
+      min-width: 0;
+    }
+
+    .prompt-text {
+      margin: 0;
+      font-size: 1.8rem;
+      font-weight: 950;
+      line-height: 1.15;
+      white-space: pre-line;
+    }
+
+    .feedback {
+      min-height: 2rem;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 900;
+    }
+
+    .feedback.is-correct {
+      color: #19785a;
+    }
+
+    .feedback.is-try {
+      color: #9c302b;
+    }
+
+    .search-wrap {
+      padding: 0 1.1rem 1.1rem;
+    }
+
+    .search-field {
+      display: grid;
+      gap: 0.7rem;
+      grid-template-columns: repeat(var(--columns, 6), minmax(0, 1fr));
+      margin: 0 auto;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .search-cell {
+      align-items: center;
+      aspect-ratio: 1.45 / 1;
+      border: 3px solid #cdd7e6;
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      display: flex;
+      font-size: 2.35rem;
+      font-weight: 950;
+      justify-content: center;
+      line-height: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      padding: 0.35rem;
+      text-transform: none;
+    }
+
+    .search-field.is-wide-patterns .search-cell {
+      font-size: 2rem;
+    }
+
+    .search-cell:focus-visible,
+    .search-cell:hover {
+      border-color: var(--blue);
+      outline: none;
+    }
+
+    .search-cell.is-correct {
+      background: #dcf7e9;
+      border-color: var(--leaf);
+      color: #176447;
+    }
+
+    .primary-action,
+    .secondary-action,
+    .icon-action {
+      align-items: center;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      font-weight: 950;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    .primary-action {
+      background: var(--blue);
+      color: #fff;
+      min-height: 3rem;
+      padding: 0.7rem 1rem;
+    }
+
+    .secondary-action {
+      background: #edf2f7;
+      color: var(--ink);
+      min-height: 3rem;
+      padding: 0.7rem 1rem;
+    }
+
+    .icon-action {
+      align-items: center;
+      background: #ffffff;
+      border: 2px solid #cdd7e6;
+      color: var(--ink);
+      display: inline-flex;
+      gap: 0.45rem;
+      min-height: 3rem;
+      padding: 0.55rem 0.85rem;
+    }
+
+    .icon-action svg {
+      height: 1.2rem;
+      width: 1.2rem;
+    }
+
+    .results-panel {
+      display: none;
+      padding: 1.2rem;
+    }
+
+    .result-grid {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: 1rem 0;
+    }
+
+    .metric {
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      padding: 0.85rem;
+    }
+
+    .metric span {
+      color: var(--muted);
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.7rem;
+      margin-top: 0.15rem;
+    }
+
+    .attempt-summary {
+      border-top: 2px solid var(--line);
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+    }
+
+    .attempt-summary p {
+      margin: 0;
+    }
+
+    .start-error {
+      color: #a32b27;
+      font-weight: 900;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .assign-overlay {
+      align-items: center;
+      background: rgba(36, 48, 68, 0.64);
+      display: none;
+      inset: 0;
+      justify-content: center;
+      padding: 1rem;
+      position: fixed;
+      z-index: 50;
+    }
+
+    .assign-overlay.is-open {
+      display: flex;
+    }
+
+    .assign-panel {
+      background: #ffffff;
+      border: 3px solid #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      max-width: 520px;
+      padding: 1rem;
+      width: 100%;
+    }
+
+    .assign-panel h2 {
+      margin: 0;
+      font-size: 1.45rem;
+    }
+
+    .assign-panel label {
+      display: grid;
+      gap: 0.35rem;
+      font-weight: 900;
+      margin-top: 0.8rem;
+    }
+
+    .assign-panel input {
+      border: 2px solid #cdd7e6;
+      border-radius: 8px;
+      font-size: 1.25rem;
+      font-weight: 950;
+      padding: 0.6rem 0.7rem;
+      text-transform: uppercase;
+      width: 100%;
+    }
+
+    .assign-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 0.8rem;
+    }
+
+    .assign-status {
+      color: #a32b27;
+      font-weight: 900;
+      min-height: 1.4rem;
+    }
+
+    .assign-status.is-saved {
+      color: #19785a;
+    }
+
+    @media (max-width: 760px) {
+      .game-shell {
+        padding: 0.65rem;
+      }
+
+      .top-bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .brand-lockup h1 {
+        font-size: 1.35rem;
+      }
+
+      .question-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .prompt-zone {
+        grid-template-columns: 1fr;
+        padding: 0.9rem;
+      }
+
+      .example-visual {
+        justify-self: center;
+        width: min(7rem, 44vw);
+      }
+
+      .prompt-text {
+        font-size: 1.35rem;
+      }
+
+      .search-wrap {
+        padding: 0 0.8rem 0.8rem;
+      }
+
+      .search-field {
+        gap: 0.45rem;
+      }
+
+      .search-cell {
+        border-width: 2px;
+        font-size: 1.7rem;
+        min-height: 3.7rem;
+      }
+
+      .search-field.is-wide-patterns .search-cell {
+        font-size: 1.35rem;
+      }
+
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+    <header class="top-bar">
+      <div class="brand-lockup">
+        <p>CKLA Skills Assessment</p>
+        <h1>Letter Search Safari</h1>
+      </div>
+      <div class="top-actions">
+        <span id="mode-pill" class="pill scholar-mode">Scholar</span>
+        <button id="back-button" class="secondary-action" type="button">Back to Games</button>
+        <a class="secondary-action" href="https://first-grade-news-hub-mrdavis.web.app/">Class Hub</a>
+      </div>
+    </header>
+
+    <section id="start-panel" class="panel">
+      <h2>Choose a Level</h2>
+      <p id="start-message">Loading the letter search game...</p>
+      <p id="start-error" class="start-error" aria-live="polite"></p>
+      <div id="level-grid" class="level-grid"></div>
+    </section>
+
+    <section id="play-panel" class="play-panel" aria-live="polite">
+      <div class="question-strip">
+        <div>
+          <strong id="level-label">Level</strong>
+          <span id="progress-label">Question 1 of 1</span>
+        </div>
+        <button id="replay-button" class="icon-action" type="button" title="Replay prompt">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+            <path d="M18.5 5.5a9 9 0 0 1 0 13"></path>
+          </svg>
+          Replay
+        </button>
+      </div>
+
+      <div id="question-jump-panel" class="question-jump-panel">
+        <strong>Jump to question</strong>
+        <div id="question-jump-list" class="question-jump-list"></div>
+      </div>
+
+      <div class="prompt-zone">
+        <div id="example-visual" class="example-visual"></div>
+        <div>
+          <p id="prompt-text" class="prompt-text">Choose the letter.</p>
+          <p id="feedback" class="feedback"></p>
+        </div>
+      </div>
+
+      <div class="search-wrap">
+        <div id="search-field" class="search-field"></div>
+      </div>
+    </section>
+
+    <section id="results-panel" class="results-panel">
+      <h2 id="results-title">Level Complete</h2>
+      <p id="results-message">Your result is ready.</p>
+      <div class="result-grid">
+        <div class="metric">
+          <span>First Tap</span>
+          <strong id="first-tap-score">0/0</strong>
+        </div>
+        <div class="metric">
+          <span>Accuracy</span>
+          <strong id="accuracy-score">0%</strong>
+        </div>
+        <div class="metric">
+          <span>Total Taps</span>
+          <strong id="tap-count">0</strong>
+        </div>
+      </div>
+      <div id="attempt-summary" class="attempt-summary"></div>
+      <div class="assign-actions">
+        <button id="choose-level-button" class="secondary-action" type="button">Choose Another Level</button>
+        <button id="replay-level-button" class="primary-action" type="button">Play This Level Again</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="assign-overlay" class="assign-overlay" role="presentation">
+    <section class="assign-panel" role="dialog" aria-modal="true" aria-labelledby="assign-title">
+      <h2 id="assign-title">Track This Miss</h2>
+      <p id="assign-summary">Enter scholar initials for this missed target.</p>
+      <label>
+        Scholar initials
+        <input id="assign-initials" autocomplete="off" inputmode="text" maxlength="5" type="text">
+      </label>
+      <p id="assign-status" class="assign-status" aria-live="polite"></p>
+      <div class="assign-actions">
+        <button id="skip-assign-button" class="secondary-action" type="button">Skip</button>
+        <button id="save-assign-initials-button" class="primary-action" type="button">Save initials</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="/games/editable-game-content.js"></script>
+  <script>
+    const GAME_ID = "letter-search-safari";
+    const GAME_TITLE = "Letter Search Safari";
+    const GAME_COLLECTION = "gameHubGameDefinitions";
+    const RESULT_COLLECTION = "gameHubResultSubmissions";
+    const PROGRESS_COLLECTION = "gameHubProgressSubmissions";
+    const SCHOLAR_CONTROL_COLLECTION = "gameHubScholarControls";
+    const SCHOLAR_PROFILE_STORAGE_KEY = "first-grade-learning-games-scholar-profile";
+    const CKLA_ACCESS_STORAGE_KEY = "first-grade-learning-games-ckla-access";
+    const LEARNING_LOCATION_STORAGE_KEY = "first-grade-learning-games-learning-location";
+    const AUDIO_MANIFEST_URL = "/audio/manifest.json";
+    const SEED_CONTENT_URL = "/games/editable-content/letter-search-safari.json";
+    const MASTERY_PERCENT = 80;
+    const MASTERY_TARGET = 3;
+    const firebaseConfig = {
+      apiKey: "AIzaSyDKzxn9EHkjRTEAYNBuFtoIRH4ZB2r8vi8",
+      appId: "1:794898732231:web:07dace393137990eef5ae2",
+      authDomain: "stgradelearninggames.firebaseapp.com",
+      measurementId: "G-NBW471V655",
+      messagingSenderId: "794898732231",
+      projectId: "stgradelearninggames",
+      storageBucket: "stgradelearninggames.firebasestorage.app"
+    };
+    const AUTHORIZED_TEACHER_EMAILS = [
+      "davisg230@gmail.com",
+      "lvest1@crossroadsschoolskc.org",
+      "lvest1010@gmail.com",
+      "lvest@crossroadsschoolskc.org"
+    ];
+    const FALLBACK_CONTENT = {
+      levels: [
+        {
+          name: "Lowercase Letter Identification",
+          detail: "Scholars listen for a lowercase letter and tap it in a mixed field.",
+          learningTarget: "Identify lowercase letters.",
+          completionMessage: "Letter search complete."
+        }
+      ],
+      questions: [
+        {
+          id: "fallback-m",
+          zone: 0,
+          prompt: "Choose the letter {target}.",
+          promptTemplate: "Choose the letter {target}.",
+          type: "visual-search",
+          skill: "Lowercase letter identification",
+          category: "Letter Identification",
+          word: "m",
+          target: "m",
+          answer: "m",
+          correctAnswer: "m",
+          preferredDistractors: "n, w, h, r",
+          visualSearchFieldRows: 3,
+          visualSearchFieldColumns: 6,
+          choices: [["m", "m"], ["n", "n"], ["w", "w"], ["h", "h"]]
+        },
+        {
+          id: "fallback-b",
+          zone: 0,
+          prompt: "Choose the letter {target}.",
+          promptTemplate: "Choose the letter {target}.",
+          type: "visual-search",
+          skill: "Lowercase letter identification",
+          category: "Letter Identification",
+          word: "b",
+          target: "b",
+          answer: "b",
+          correctAnswer: "b",
+          preferredDistractors: "d, p, q, h",
+          visualSearchFieldRows: 3,
+          visualSearchFieldColumns: 6,
+          choices: [["b", "b"], ["d", "d"], ["p", "p"], ["q", "q"]]
+        }
+      ],
+      supplementalQuestions: [],
+      unitTitle: GAME_TITLE,
+      zoneEncouragements: []
+    };
+    const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
+    const LETTER_CONFUSIONS = {
+      a: ["o", "e", "d", "q", "c"],
+      b: ["d", "p", "q", "h"],
+      c: ["o", "e", "a", "s"],
+      d: ["b", "p", "q", "a"],
+      e: ["c", "o", "a", "s"],
+      f: ["t", "l", "i", "h"],
+      h: ["n", "m", "b", "k"],
+      i: ["l", "t", "j", "f"],
+      l: ["i", "t", "f", "h"],
+      m: ["n", "w", "u", "h"],
+      n: ["m", "h", "u", "r"],
+      o: ["a", "e", "c", "q"],
+      p: ["q", "b", "d", "g"],
+      q: ["p", "d", "b", "g"],
+      s: ["z", "c", "e", "a"],
+      t: ["f", "l", "i", "h"],
+      u: ["v", "n", "m", "w"],
+      v: ["u", "w", "y"],
+      w: ["m", "v", "u"],
+      z: ["s", "x"]
+    };
+    const LOWERCASE_LETTER_REPAIR_QUESTIONS = [
+      ["e", "Egg", "Choose the letter ____. ____ for __gg.", "Choose the letter E. E for Egg.", ["c", "o", "a", "s", "i"]],
+      ["g", "Goat", "Choose the letter ____. ____ for __oat.", "Choose the letter G. G for Goat.", ["q", "c", "o", "a", "d"]],
+      ["h", "Hat", "Choose the letter ____. ____ for __at.", "Choose the letter H. H for Hat.", ["n", "m", "b", "k", "r"]],
+      ["j", "Jam", "Choose the letter ____. ____ for __am.", "Choose the letter J. J for Jam.", ["i", "y", "g", "l", "t"]],
+      ["k", "Kite", "Choose the letter ____. ____ for __ite.", "Choose the letter K. K for Kite.", ["h", "l", "b", "x", "t"]],
+      ["l", "Lion", "Choose the letter ____. ____ for __ion.", "Choose the letter L. L for Lion.", ["i", "t", "f", "h", "b"]],
+      ["q", "Queen", "Choose the letter ____. ____ for __ueen.", "Choose the letter Q. Q for Queen.", ["d", "p", "b", "g", "o"]],
+      ["r", "Rabbit", "Choose the letter ____. ____ for __abbit.", "Choose the letter R. R for Rabbit.", ["n", "h", "u", "v", "m"]],
+      ["u", "Umbrella", "Choose the letter ____. ____ for __mbrella.", "Choose the letter U. U for Umbrella.", ["n", "m", "w", "v", "a"]],
+      ["v", "Van", "Choose the letter ____. ____ for __an.", "Choose the letter V. V for Van.", ["w", "y", "u", "n", "r"]],
+      ["w", "Wagon", "Choose the letter ____. ____ for __agon.", "Choose the letter W. W for Wagon.", ["m", "n", "u", "v", "y"]],
+      ["x", "X-ray", "Choose the letter ____. ____ for __-ray.", "Choose the letter X. X for X-ray.", ["k", "y", "z", "v", "w"]],
+      ["y", "Yarn", "Choose the letter ____. ____ for __arn.", "Choose the letter Y. Y for Yarn.", ["v", "w", "x", "j", "g"]],
+      ["z", "Zebra", "Choose the letter ____. ____ for __ebra.", "Choose the letter Z. Z for Zebra.", ["s", "r", "x", "y", "e"]]
+    ].map(([letter, exampleWord, prompt, speech, distractors]) => ({
+      answer: letter,
+      category: "Letter Identification",
+      choices: [letter, ...distractors].map((value) => [value, value]),
+      correctAnswer: letter,
+      display: letter,
+      exampleWord,
+      id: `letter-search-lowercase-${letter}`,
+      preferredDistractors: distractors.join(", "),
+      prompt,
+      promptTemplate: prompt,
+      skill: "Lowercase letter identification",
+      speakerButtons: [{
+        audioKind: "googleTts",
+        enabled: true,
+        id: "read-directions",
+        label: "Read directions",
+        position: "left",
+        text: speech
+      }],
+      standard: "RF.1.3a",
+      target: letter,
+      type: "visual-search",
+      visualSearchFieldColumns: 6,
+      visualSearchFieldRows: 3,
+      word: letter,
+      zone: 0
+    }));
+
+    const params = new URLSearchParams(window.location.search);
+    const wholeClassMode = params.get("wholeClass") === "1";
+    let content = FALLBACK_CONTENT;
+    let activeTeacherEmail = "unassigned";
+    let audioManifest = {};
+    let scholarControl = null;
+    let scholarFirstName = "";
+    let scholarFirstNameKey = "";
+    let learningLocation = "";
+    let activeLevelIndex = 0;
+    let activeLevel = null;
+    let activeQuestions = [];
+    let states = [];
+    let currentIndex = 0;
+    let sessionId = createSessionId();
+    let tapLocked = false;
+    let pendingClassMiss = null;
+    let lastTargetSlot = -1;
+    let autoStartedControl = false;
+
+    const startPanel = document.getElementById("start-panel");
+    const startMessage = document.getElementById("start-message");
+    const startError = document.getElementById("start-error");
+    const levelGrid = document.getElementById("level-grid");
+    const playPanel = document.getElementById("play-panel");
+    const resultsPanel = document.getElementById("results-panel");
+    const modePill = document.getElementById("mode-pill");
+    const levelLabel = document.getElementById("level-label");
+    const progressLabel = document.getElementById("progress-label");
+    const promptText = document.getElementById("prompt-text");
+    const feedback = document.getElementById("feedback");
+    const exampleVisual = document.getElementById("example-visual");
+    const searchField = document.getElementById("search-field");
+    const questionJumpPanel = document.getElementById("question-jump-panel");
+    const questionJumpList = document.getElementById("question-jump-list");
+    const assignOverlay = document.getElementById("assign-overlay");
+    const assignSummary = document.getElementById("assign-summary");
+    const assignInitialsInput = document.getElementById("assign-initials");
+    const assignStatus = document.getElementById("assign-status");
+
+    function text(value, fallback = "") {
+      return typeof value === "string" ? value : fallback;
+    }
+
+    function normalizeNameKey(value) {
+      return String(value || "")
+        .trim()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z]/g, "")
+        .slice(0, 30);
+    }
+
+    function parseStoredJson(key) {
+      try {
+        return JSON.parse(window.localStorage.getItem(key) || "null");
+      } catch {
+        return null;
+      }
+    }
+
+    function normalizeLearningLocation(value) {
+      const normalized = text(value).trim().toLowerCase();
+      return normalized === "home" || normalized === "school" ? normalized : "";
+    }
+
+    function readStoredLearningLocation() {
+      try {
+        return normalizeLearningLocation(window.localStorage.getItem(LEARNING_LOCATION_STORAGE_KEY));
+      } catch {
+        return "";
+      }
+    }
+
+    function writeStoredLearningLocation(value) {
+      const normalized = normalizeLearningLocation(value);
+      if (!normalized) {
+        return;
+      }
+      try {
+        window.localStorage.setItem(LEARNING_LOCATION_STORAGE_KEY, normalized);
+      } catch {}
+    }
+
+    function withLearningLocation(profile) {
+      const nextLocation =
+        normalizeLearningLocation(params.get("learningLocation") || params.get("location"))
+        || normalizeLearningLocation(profile?.learningLocation)
+        || readStoredLearningLocation();
+      if (!nextLocation) {
+        return profile;
+      }
+      writeStoredLearningLocation(nextLocation);
+      return { ...profile, learningLocation: nextLocation };
+    }
+
+    function learningLocationFields() {
+      return learningLocation && !wholeClassMode ? { learningLocation } : {};
+    }
+
+    function readLaunchProfile() {
+      if (wholeClassMode) {
+        return null;
+      }
+
+      const queryName = text(params.get("player")).trim();
+      const queryKey = text(params.get("key")).trim();
+      if (queryName && queryKey && normalizeNameKey(queryName) === queryKey) {
+        const profile = withLearningLocation({ firstName: queryName, firstNameKey: queryKey });
+        try {
+          window.localStorage.setItem(SCHOLAR_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+          window.localStorage.setItem(CKLA_ACCESS_STORAGE_KEY, JSON.stringify({ ...profile, mode: "scholar" }));
+        } catch {
+          return profile;
+        }
+        return profile;
+      }
+
+      const cklaAccess = parseStoredJson(CKLA_ACCESS_STORAGE_KEY);
+      if (
+        cklaAccess
+        && cklaAccess.mode === "scholar"
+        && cklaAccess.firstName
+        && cklaAccess.firstNameKey
+        && normalizeNameKey(cklaAccess.firstName) === cklaAccess.firstNameKey
+      ) {
+        return withLearningLocation({
+          firstName: cklaAccess.firstName,
+          firstNameKey: cklaAccess.firstNameKey,
+          learningLocation: cklaAccess.learningLocation
+        });
+      }
+
+      const profile = parseStoredJson(SCHOLAR_PROFILE_STORAGE_KEY);
+      if (
+        profile
+        && profile.firstName
+        && profile.firstNameKey
+        && normalizeNameKey(profile.firstName) === profile.firstNameKey
+      ) {
+        return withLearningLocation({
+          firstName: profile.firstName,
+          firstNameKey: profile.firstNameKey,
+          learningLocation: profile.learningLocation
+        });
+      }
+
+      return null;
+    }
+
+    function createSessionId() {
+      return `lettersearch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function getFirebaseServices() {
+      if (!window.firebase) {
+        return null;
+      }
+
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+
+      return {
+        auth: firebase.auth(),
+        db: firebase.firestore(),
+        firebase
+      };
+    }
+
+    function serverTimestamp() {
+      return firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    async function resolveTeacherEmail() {
+      const services = getFirebaseServices();
+      if (!services || !services.auth) {
+        return "unassigned";
+      }
+
+      const user = services.auth.currentUser || await new Promise((resolve) => {
+        const unsubscribe = services.auth.onAuthStateChanged((nextUser) => {
+          unsubscribe();
+          resolve(nextUser);
+        });
+        setTimeout(() => {
+          unsubscribe();
+          resolve(null);
+        }, 800);
+      });
+      const email = text(user && user.email).trim().toLowerCase();
+      return AUTHORIZED_TEACHER_EMAILS.includes(email) ? email : "unassigned";
+    }
+
+    async function loadAudioManifest() {
+      try {
+        const response = await fetch(AUDIO_MANIFEST_URL, { cache: "no-store" });
+        if (response.ok) {
+          const data = await response.json();
+          audioManifest = data && typeof data === "object"
+            ? (data.items && typeof data.items === "object" ? data.items : data)
+            : {};
+        }
+      } catch {
+        audioManifest = {};
+      }
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function normalizeChoice(choice) {
+      if (Array.isArray(choice)) {
+        const value = text(choice[0]).trim();
+        const label = text(choice[1] || choice[0]).trim();
+        return value ? [value, label || value] : null;
+      }
+
+      if (choice && typeof choice === "object") {
+        const value = text(choice.value || choice[0]).trim();
+        const label = text(choice.label || choice.value || choice[0]).trim();
+        return value ? [value, label || value] : null;
+      }
+
+      const value = text(choice).trim();
+      return value ? [value, value] : null;
+    }
+
+    function isBlankLetterSearchShell(question) {
+      const target = text(question.target || question.answer || question.correctAnswer || question.word || question.display).trim();
+      const prompt = text(question.promptTemplate || question.prompt).trim();
+      const skillFields = text(question.skill || question.category || question.type).trim();
+      const choices = Array.isArray(question.choices)
+        ? question.choices.map(normalizeChoice).filter(Boolean)
+        : [];
+      const hasPlaceholderChoice = choices.some((choice) => /^answer-\d+$/i.test(choice[0]) || !choice[1]);
+
+      return (
+        !target
+        || /^answer-\d+$/i.test(target)
+        || !prompt
+        || !skillFields
+        || hasPlaceholderChoice
+      );
+    }
+
+    function repairedLowercaseQuestion(rawQuestion, repairQuestion) {
+      const next = {
+        ...clone(rawQuestion),
+        ...clone(repairQuestion)
+      };
+      next.choices = clone(repairQuestion.choices);
+      next.speakerButtons = clone(repairQuestion.speakerButtons);
+      return next;
+    }
+
+    function isSingleLowercaseLetterQuestion(question) {
+      const target = text(question.target || question.answer || question.correctAnswer || question.word || question.display).trim();
+      return /^[a-z]$/.test(target);
+    }
+
+    function uppercaseChoice(choice) {
+      if (Array.isArray(choice)) {
+        const value = text(choice[0]).trim();
+        const label = text(choice[1] || choice[0]).trim();
+        const nextValue = /^[a-z]$/.test(value) ? value.toUpperCase() : value;
+        const nextLabel = /^[a-z]$/.test(label) ? label.toUpperCase() : label;
+        return choice.length > 2 ? [nextValue, nextLabel, choice[2]] : [nextValue, nextLabel];
+      }
+
+      if (choice && typeof choice === "object") {
+        const next = clone(choice);
+        if (/^[a-z]$/.test(text(next.value))) {
+          next.value = text(next.value).toUpperCase();
+        }
+        if (/^[a-z]$/.test(text(next.label))) {
+          next.label = text(next.label).toUpperCase();
+        }
+        return next;
+      }
+
+      const value = text(choice).trim();
+      return /^[a-z]$/.test(value) ? value.toUpperCase() : choice;
+    }
+
+    function capitalQuestionFromLowercase(question, zone) {
+      const target = text(question.target || question.answer || question.correctAnswer || question.word || question.display).trim().toLowerCase();
+      const upperTarget = target.toUpperCase();
+      const next = clone(question);
+      next.id = `letter-search-capital-${target}`;
+      next.zone = zone;
+      next.skill = "Capital letter identification";
+      next.category = "Capital Letter Identification";
+      next.word = upperTarget;
+      next.target = upperTarget;
+      next.display = upperTarget;
+      next.answer = upperTarget;
+      next.correctAnswer = upperTarget;
+      next.choices = Array.isArray(question.choices)
+        ? question.choices.map(uppercaseChoice)
+        : [[upperTarget, upperTarget]];
+      if (typeof question.preferredDistractors === "string") {
+        next.preferredDistractors = question.preferredDistractors
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .map((item) => /^[a-z]$/.test(item) ? item.toUpperCase() : item)
+          .join(", ");
+      }
+      return next;
+    }
+
+    function ensureCapitalLetterLevel(levels, questions) {
+      const lowercaseQuestions = questions
+        .filter((question) => Number(question.zone) === 0)
+        .filter(isSingleLowercaseLetterQuestion);
+
+      if (!lowercaseQuestions.length) {
+        return;
+      }
+
+      const capitalLevelIndex = levels.findIndex((level) =>
+        /capital|uppercase/i.test(`${text(level.name)} ${text(level.detail)} ${text(level.learningTarget)}`)
+      );
+      const copiedLowercaseIndex = levels.findIndex((level, index) => {
+        if (index === 0 || /digraph/i.test(`${text(level.name)} ${text(level.detail)}`)) {
+          return false;
+        }
+
+        const zoneQuestions = questions.filter((question) => Number(question.zone) === index);
+        return zoneQuestions.filter(isSingleLowercaseLetterQuestion).length >= 20;
+      });
+      let targetIndex = capitalLevelIndex >= 0 ? capitalLevelIndex : copiedLowercaseIndex;
+
+      if (targetIndex < 0) {
+        targetIndex = 1;
+        levels.splice(targetIndex, 0, {
+          completionMessage: "Capital letter search complete.",
+          detail: "Scholars listen for a capital letter, scan a mixed field, and tap the matching target.",
+          icon: "search",
+          learningTarget: "Identify capital letters in a mixed visual field.",
+          lessonRange: "Alphabet recognition",
+          name: "Capital Letter Identification",
+          practiceLabel: "Assessment"
+        });
+        questions.forEach((question) => {
+          if (Number(question.zone) >= targetIndex) {
+            question.zone = Number(question.zone) + 1;
+          }
+        });
+      } else {
+        levels[targetIndex] = {
+          ...levels[targetIndex],
+          completionMessage: text(levels[targetIndex].completionMessage) || "Capital letter search complete.",
+          detail: "Scholars listen for a capital letter, scan a mixed field, and tap the matching target.",
+          icon: text(levels[targetIndex].icon, "search"),
+          learningTarget: "Identify capital letters in a mixed visual field.",
+          lessonRange: text(levels[targetIndex].lessonRange, "Alphabet recognition"),
+          name: "Capital Letter Identification",
+          practiceLabel: text(levels[targetIndex].practiceLabel, "Assessment")
+        };
+        for (let index = questions.length - 1; index >= 0; index -= 1) {
+          if (Number(questions[index].zone) === targetIndex) {
+            questions.splice(index, 1);
+          }
+        }
+      }
+
+      lowercaseQuestions.forEach((question) => {
+        questions.push(capitalQuestionFromLowercase(question, targetIndex));
+      });
+    }
+
+    function normalizeLetterSearchContent(rawContent) {
+      const raw = rawContent && typeof rawContent === "object" && rawContent.content
+        ? rawContent.content
+        : rawContent;
+
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        return null;
+      }
+
+      const rawLevels = Array.isArray(raw.levels) ? raw.levels : [];
+      const levels = rawLevels
+        .map((level, index) => {
+          if (!level || typeof level !== "object" || Array.isArray(level)) {
+            return null;
+          }
+
+          const next = clone(level);
+          next.name = text(next.name, `Level ${index + 1}`).trim();
+          next.detail = text(next.detail, "Search the field and tap the target.").trim();
+          next.practiceLabel = text(next.practiceLabel).trim();
+          next.completionMessage = text(next.completionMessage).trim();
+          return next.name ? next : null;
+        })
+        .filter(Boolean);
+
+      if (!levels.length) {
+        return null;
+      }
+
+      let repairQuestionIndex = 0;
+      const questions = Array.isArray(raw.questions)
+        ? raw.questions
+            .map((question, index) => {
+              if (!question || typeof question !== "object" || Array.isArray(question)) {
+                return null;
+              }
+
+              let next = clone(question);
+              const isLowercaseZone = Number(next.zone) === 0;
+              if (
+                isLowercaseZone
+                && repairQuestionIndex < LOWERCASE_LETTER_REPAIR_QUESTIONS.length
+                && isBlankLetterSearchShell(next)
+              ) {
+                next = repairedLowercaseQuestion(
+                  next,
+                  LOWERCASE_LETTER_REPAIR_QUESTIONS[repairQuestionIndex]
+                );
+                repairQuestionIndex += 1;
+              }
+
+              const zone = Number(next.zone);
+              const target = text(next.target || next.answer || next.correctAnswer || next.word || next.display).trim();
+              const promptTemplate = text(
+                next.promptTemplate || next.prompt || next.promptSpeak || next.spokenDirections,
+                target ? "Find {target}." : ""
+              ).trim();
+
+              if (!Number.isInteger(zone) || zone < 0 || zone >= levels.length || !target || !promptTemplate) {
+                return null;
+              }
+
+              let choices = Array.isArray(next.choices)
+                ? next.choices.map(normalizeChoice).filter(Boolean)
+                : [];
+              if (!choices.some((choice) => choice[0] === target)) {
+                choices.unshift([target, target]);
+              }
+              if (choices.length < 2) {
+                const distractors = splitList(next.preferredDistractors)
+                  .filter((value) => value !== target)
+                  .slice(0, 6);
+                choices = [[target, target], ...distractors.map((value) => [value, value])];
+              }
+
+              next.id = text(next.id, `letter-search-question-${index + 1}`).trim();
+              next.zone = zone;
+              next.target = target;
+              next.answer = target;
+              next.correctAnswer = target;
+              next.prompt = text(next.prompt || promptTemplate, promptTemplate).trim();
+              next.promptTemplate = promptTemplate;
+              next.choices = choices;
+              next.questionImageAlt = text(next.questionImageAlt).trim();
+              next.questionImageUrl = text(next.questionImageUrl).trim();
+              next.exampleVisual = text(next.exampleVisual).trim();
+              next.exampleWord = text(next.exampleWord).trim();
+              return next.id ? next : null;
+            })
+            .filter(Boolean)
+        : [];
+
+      if (repairQuestionIndex > 0) {
+        const existingTargets = new Set(questions.map((question) => targetFor(question).toLowerCase()));
+        LOWERCASE_LETTER_REPAIR_QUESTIONS.slice(repairQuestionIndex).forEach((repairQuestion) => {
+          if (!existingTargets.has(text(repairQuestion.target).toLowerCase())) {
+            questions.push(clone(repairQuestion));
+          }
+        });
+      }
+
+      ensureCapitalLetterLevel(levels, questions);
+
+      if (!questions.length) {
+        return null;
+      }
+
+      return {
+        levels,
+        questions,
+        schemaVersion: 1,
+        supplementalQuestions: [],
+        unitTitle: text(raw.unitTitle, GAME_TITLE).trim(),
+        zoneEncouragements: []
+      };
+    }
+
+    async function loadPublishedLetterSearchContent() {
+      const services = getFirebaseServices();
+      if (!services) {
+        return null;
+      }
+
+      try {
+        const gameDoc = await services.db
+          .collection(GAME_COLLECTION)
+          .doc(GAME_ID)
+          .get();
+        const gameData = gameDoc.exists ? gameDoc.data() || {} : {};
+        const versionId = text(gameData.publishedVersion).trim();
+        if (!versionId) {
+          return null;
+        }
+
+        const versionDoc = await services.db
+          .collection(GAME_COLLECTION)
+          .doc(GAME_ID)
+          .collection("versions")
+          .doc(versionId)
+          .get();
+        const versionData = versionDoc.exists ? versionDoc.data() || {} : {};
+        if (versionData.status !== "published") {
+          return null;
+        }
+
+        return normalizeLetterSearchContent(versionData.content || versionData);
+      } catch (error) {
+        console.warn("Published Letter Search content could not load.", error);
+        return null;
+      }
+    }
+
+    async function loadSeedContent() {
+      try {
+        const response = await fetch(SEED_CONTENT_URL, { cache: "no-store" });
+        if (!response.ok) {
+          return FALLBACK_CONTENT;
+        }
+        const data = await response.json();
+        const normalized = normalizeLetterSearchContent(data);
+        if (normalized) {
+          return normalized;
+        }
+        if (window.EditableGameContent && typeof window.EditableGameContent.normalizeGameContent === "function") {
+          return window.EditableGameContent.normalizeGameContent(data) || FALLBACK_CONTENT;
+        }
+        return data.content || data || FALLBACK_CONTENT;
+      } catch {
+        return FALLBACK_CONTENT;
+      }
+    }
+
+    async function loadContent() {
+      const seedContent = await loadSeedContent();
+      const directPublished = await loadPublishedLetterSearchContent();
+      if (directPublished) {
+        return directPublished;
+      }
+
+      const loader = window.EditableGameContent;
+      if (!loader || typeof loader.loadPublishedGameContent !== "function") {
+        return seedContent;
+      }
+
+      const published = await loader.loadPublishedGameContent({
+        firebaseConfig,
+        gameId: GAME_ID
+      });
+      return normalizeLetterSearchContent(published) || published || seedContent;
+    }
+
+    async function loadScholarControl() {
+      if (wholeClassMode || !scholarFirstNameKey) {
+        return;
+      }
+
+      const services = getFirebaseServices();
+      if (!services) {
+        return;
+      }
+
+      try {
+        const doc = await services.db
+          .collection(SCHOLAR_CONTROL_COLLECTION)
+          .doc(scholarFirstNameKey)
+          .get();
+        const data = doc.exists ? doc.data() || {} : {};
+        const gameControls = data.gameControls && typeof data.gameControls === "object"
+          ? data.gameControls
+          : {};
+        scholarControl = gameControls[GAME_ID] || null;
+      } catch {
+        scholarControl = null;
+      }
+    }
+
+    function levelId(level, index) {
+      const raw = text(level.id) || text(level.name) || `level-${index + 1}`;
+      return raw
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || `level-${index + 1}`;
+    }
+
+    function questionsForLevel(index) {
+      return content.questions.filter((question) => Number(question.zone) === index);
+    }
+
+    function targetFor(question) {
+      return text(question.target)
+        || text(question.answer)
+        || text(question.correctAnswer)
+        || text(question.word)
+        || text(question.display);
+    }
+
+    function choicesFor(question) {
+      return Array.isArray(question.choices)
+        ? question.choices
+            .map((choice) => Array.isArray(choice) ? text(choice[0]) : text(choice.value))
+            .filter(Boolean)
+        : [];
+    }
+
+    function splitList(value) {
+      return text(value)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function uniqueValues(values) {
+      const seen = new Set();
+      return values.filter((value) => {
+        const key = value.toLowerCase();
+        if (!value || seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function shuffle(values) {
+      const next = values.slice();
+      for (let index = next.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      }
+      return next;
+    }
+
+    function pick(values) {
+      return values[Math.floor(Math.random() * values.length)];
+    }
+
+    function isCapitalLetterTarget(value) {
+      return /^[A-Z]$/.test(text(value).trim());
+    }
+
+    function fieldValueForQuestion(question, value) {
+      const nextValue = text(value).trim();
+      if (isCapitalLetterTarget(targetFor(question)) && /^[a-z]$/.test(nextValue)) {
+        return nextValue.toUpperCase();
+      }
+      return nextValue;
+    }
+
+    function fieldValuesForQuestion(question, values) {
+      return values
+        .map((value) => fieldValueForQuestion(question, value))
+        .filter(Boolean);
+    }
+
+    function generatedField(question) {
+      const target = targetFor(question);
+      const rows = Math.max(2, Math.min(5, Number(question.visualSearchFieldRows) || 3));
+      const columns = Math.max(3, Math.min(8, Number(question.visualSearchFieldColumns) || (target.length > 1 ? 5 : 6)));
+      const count = rows * columns;
+      const levelTargets = fieldValuesForQuestion(question, activeQuestions.map(targetFor)).filter((value) => value !== target);
+      const preferred = fieldValuesForQuestion(question, splitList(question.preferredDistractors));
+      const choiceDistractors = fieldValuesForQuestion(question, choicesFor(question)).filter((value) => value !== target);
+      const similar = fieldValuesForQuestion(question, target.length === 1 ? (LETTER_CONFUSIONS[target.toLowerCase()] || []) : []);
+      const basePool = target.length === 1 ? fieldValuesForQuestion(question, LETTERS) : levelTargets;
+      const pool = uniqueValues([
+        ...preferred,
+        ...similar,
+        ...choiceDistractors,
+        ...basePool
+      ]).filter((value) => value !== target);
+      const safePool = pool.length ? pool : (target.length === 1 ? fieldValuesForQuestion(question, LETTERS).filter((letter) => letter !== target) : ["sh", "ch", "th", "wh", "ph"].filter((item) => item !== target));
+      const slots = shuffle(Array.from({ length: count }, (_, index) => index).filter((slot) => slot !== lastTargetSlot));
+      const targetSlot = slots[0] ?? Math.floor(Math.random() * count);
+      const items = Array.from({ length: count }, (_, index) => index === targetSlot ? target : pick(safePool));
+      lastTargetSlot = targetSlot;
+      return { columns, items, targetSlot };
+    }
+
+    function applyTemplate(template, question, level) {
+      const target = targetFor(question);
+      const exampleWord = text(question.exampleWord).trim();
+      return text(template, "Find {target}.")
+        .replaceAll("{target}", target)
+        .replaceAll("{exampleWord}", exampleWord)
+        .replaceAll("{levelName}", text(level.name));
+    }
+
+    function normalizeSpeechKey(value) {
+      return text(value)
+        .replace(/[’]/g, "'")
+        .replace(/[“”]/g, '"')
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function speakerButtonsFor(question) {
+      return Array.isArray(question.speakerButtons)
+        ? question.speakerButtons.filter((button) => button && typeof button === "object")
+        : [];
+    }
+
+    function directionsSpeakerButton(question) {
+      const buttons = speakerButtonsFor(question);
+      return buttons.find((button) =>
+        button.enabled !== false
+        && (
+          text(button.id).toLowerCase() === "read-directions"
+          || text(button.label).toLowerCase().includes("direction")
+          || text(button.label).toLowerCase().includes("prompt")
+          || text(button.position).toLowerCase() === "left"
+          || text(button.position).toLowerCase() === "above"
+        )
+      ) || null;
+    }
+
+    function directionsSpeakerText(question) {
+      const button = directionsSpeakerButton(question);
+      return text(button?.audioSourceText || button?.audioText || button?.text).trim();
+    }
+
+    function promptFor(question) {
+      return applyTemplate(
+        text(question.promptTemplate)
+          || text(question.prompt)
+          || text(question.spokenDirections)
+          || text(question.promptSpeak)
+          || directionsSpeakerText(question),
+        question,
+        activeLevel
+      ).trim();
+    }
+
+    function speechPromptFor(question) {
+      return (
+        directionsSpeakerText(question)
+        ? applyTemplate(directionsSpeakerText(question), question, activeLevel)
+        : promptFor(question)
+      ).replace(/\s+/g, " ").trim();
+    }
+
+    function promptAudioUrlFor(question, speechText) {
+      const button = directionsSpeakerButton(question);
+      const audioUrl = text(button?.audioUrl).trim();
+      const rawButtonText = text(button?.audioSourceText || button?.audioText || button?.text).trim();
+      const renderedButtonText = rawButtonText
+        ? applyTemplate(rawButtonText, question, activeLevel).replace(/\s+/g, " ").trim()
+        : "";
+
+      if (
+        audioUrl
+        && renderedButtonText
+        && normalizeSpeechKey(renderedButtonText) === normalizeSpeechKey(speechText)
+      ) {
+        return audioUrl;
+      }
+
+      return "";
+    }
+
+    function looksLikeImageSource(value) {
+      const source = text(value).trim();
+      return /^(https?:|data:image\/|\/)/i.test(source)
+        || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(source);
+    }
+
+    function normalizeImageSource(value) {
+      const source = text(value).trim();
+      if (!looksLikeImageSource(source)) {
+        return "";
+      }
+
+      const driveFileMatch = source.match(/drive\.google\.com\/file\/d\/([^/?#]+)/i);
+      const driveIdMatch = source.match(/[?&]id=([^&#]+)/i);
+      const driveId = driveFileMatch?.[1] || driveIdMatch?.[1] || "";
+      if (driveId) {
+        return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(decodeURIComponent(driveId))}`;
+      }
+
+      return source;
+    }
+
+    function setExampleVisualVisible(isVisible) {
+      exampleVisual.classList.toggle("is-visible", isVisible);
+      exampleVisual.closest(".prompt-zone")?.classList.toggle("has-example", isVisible);
+    }
+
+    function renderExampleVisual(question) {
+      const uploadedImageUrl = normalizeImageSource(question.questionImageUrl);
+      const typedVisual = text(question.exampleVisual).trim();
+      const imageUrl = uploadedImageUrl || normalizeImageSource(typedVisual);
+
+      exampleVisual.textContent = "";
+      exampleVisual.innerHTML = "";
+
+      if (imageUrl) {
+        const image = document.createElement("img");
+        image.alt = text(question.questionImageAlt)
+          || text(question.exampleWord)
+          || `Example for ${targetFor(question)}`;
+        image.decoding = "async";
+        image.loading = "lazy";
+        image.style.visibility = "hidden";
+        image.addEventListener("load", () => {
+          image.style.visibility = "visible";
+        });
+        image.addEventListener("error", () => {
+          exampleVisual.innerHTML = "";
+          if (typedVisual && typedVisual !== imageUrl && !looksLikeImageSource(typedVisual)) {
+            exampleVisual.textContent = typedVisual;
+            setExampleVisualVisible(true);
+            return;
+          }
+          if (text(question.exampleWord).trim()) {
+            exampleVisual.textContent = text(question.exampleWord).trim();
+            setExampleVisualVisible(true);
+            return;
+          }
+          setExampleVisualVisible(false);
+        });
+        image.src = imageUrl;
+        exampleVisual.append(image);
+        setExampleVisualVisible(true);
+        return;
+      }
+
+      if (typedVisual) {
+        exampleVisual.textContent = typedVisual;
+        setExampleVisualVisible(true);
+        return;
+      }
+
+      setExampleVisualVisible(false);
+    }
+
+    function speak(value, preferredAudioUrl = "") {
+      const speechText = text(value).trim();
+      if (!speechText) {
+        return;
+      }
+
+      if (preferredAudioUrl) {
+        try {
+          window.speechSynthesis && window.speechSynthesis.cancel();
+          const audio = new Audio(preferredAudioUrl);
+          audio.play().catch(() => speakWithBrowser(speechText));
+          return;
+        } catch {
+          speakWithBrowser(speechText);
+          return;
+        }
+      }
+
+      const manifestUrl = audioManifest[speechText] || audioManifest[normalizeSpeechKey(speechText)];
+      if (manifestUrl) {
+        try {
+          window.speechSynthesis && window.speechSynthesis.cancel();
+          const audio = new Audio(manifestUrl);
+          audio.play().catch(() => speakWithBrowser(speechText));
+          return;
+        } catch {
+          speakWithBrowser(speechText);
+          return;
+        }
+      }
+
+      speakWithBrowser(speechText);
+    }
+
+    function speakQuestion(question) {
+      const speechText = speechPromptFor(question);
+      speak(speechText, promptAudioUrlFor(question, speechText));
+    }
+
+    function speakWithBrowser(value) {
+      if (!("speechSynthesis" in window)) {
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(value);
+      utterance.lang = "en-US";
+      utterance.rate = 0.86;
+      utterance.pitch = 1.05;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function renderLevels() {
+      startPanel.classList.remove("hidden");
+      playPanel.classList.remove("is-active");
+      resultsPanel.classList.remove("is-active");
+      questionJumpPanel.classList.remove("is-visible");
+      levelGrid.innerHTML = "";
+      startError.textContent = "";
+
+      const profileName = wholeClassMode ? "Whole Class Mode" : scholarFirstName;
+      startMessage.textContent = profileName
+        ? `Pick a level for ${profileName}.`
+        : "Open this game from the game card so your work saves for your teacher.";
+
+      content.levels.forEach((level, index) => {
+        const questions = questionsForLevel(index);
+        const locked =
+          !wholeClassMode
+          && scholarControl
+          && Array.isArray(scholarControl.lockedLevelIndexes)
+          && scholarControl.lockedLevelIndexes.includes(index)
+          && !(
+            Array.isArray(scholarControl.unlockedLevelIndexes)
+            && scholarControl.unlockedLevelIndexes.includes(index)
+          );
+        const button = document.createElement("button");
+        button.className = "level-button";
+        button.type = "button";
+        button.disabled = !questions.length || locked || (!wholeClassMode && !scholarFirstNameKey);
+        button.innerHTML = `
+          <strong></strong>
+          <span></span>
+          <span></span>
+        `;
+        button.querySelector("strong").textContent = text(level.name, `Level ${index + 1}`);
+        button.querySelectorAll("span")[0].textContent = locked
+          ? "Locked by teacher"
+          : text(level.detail, "Search the field and tap the target.");
+        button.querySelectorAll("span")[1].textContent = `${questions.length} target${questions.length === 1 ? "" : "s"}`;
+        button.addEventListener("click", () => beginLevel(index));
+        levelGrid.append(button);
+      });
+    }
+
+    function beginLevel(index) {
+      activeLevelIndex = index;
+      activeLevel = content.levels[index];
+      activeQuestions = questionsForLevel(index);
+
+      if (!activeLevel || !activeQuestions.length) {
+        startError.textContent = "This level does not have targets yet.";
+        return;
+      }
+
+      sessionId = createSessionId();
+      currentIndex = 0;
+      lastTargetSlot = -1;
+      states = activeQuestions.map(() => ({
+        attempts: [],
+        complete: false,
+        field: null,
+        startedAt: 0,
+        targetSlot: -1
+      }));
+      startPanel.classList.add("hidden");
+      resultsPanel.classList.remove("is-active");
+      playPanel.classList.add("is-active");
+      renderQuestionJumpList();
+      saveProgress("started");
+      showQuestion(0);
+    }
+
+    function renderQuestionJumpList() {
+      questionJumpList.innerHTML = "";
+      questionJumpPanel.classList.toggle("is-visible", wholeClassMode);
+      if (!wholeClassMode) {
+        return;
+      }
+
+      activeQuestions.forEach((question, index) => {
+        const state = states[index];
+        const button = document.createElement("button");
+        button.className = "question-jump-button";
+        button.type = "button";
+        button.textContent = String(index + 1);
+        button.setAttribute("aria-label", `Go to question ${index + 1}`);
+        button.addEventListener("click", () => goToQuestion(index));
+        if (state && state.complete) {
+          button.classList.add("is-complete");
+        } else if (state && state.attempts.length) {
+          button.classList.add("is-started");
+        }
+        if (index === currentIndex) {
+          button.classList.add("is-active");
+        }
+        questionJumpList.append(button);
+      });
+    }
+
+    function goToQuestion(index) {
+      if (!wholeClassMode || index < 0 || index >= activeQuestions.length) {
+        return;
+      }
+
+      showQuestion(index);
+    }
+
+    function nextWholeClassQuestionIndex(startIndex) {
+      for (let offset = 1; offset <= activeQuestions.length; offset += 1) {
+        const index = (startIndex + offset) % activeQuestions.length;
+        if (!states[index]?.complete) {
+          return index;
+        }
+      }
+
+      return -1;
+    }
+
+    function showQuestion(index) {
+      currentIndex = index;
+      tapLocked = false;
+      const question = activeQuestions[currentIndex];
+      const state = states[currentIndex];
+      if (!question || !state) {
+        showResults();
+        return;
+      }
+
+      if (!state.field) {
+        state.field = generatedField(question);
+        state.targetSlot = state.field.targetSlot;
+        state.startedAt = Date.now();
+      }
+
+      levelLabel.textContent = text(activeLevel.name, `Level ${activeLevelIndex + 1}`);
+      progressLabel.textContent = `Question ${currentIndex + 1} of ${activeQuestions.length}`;
+      promptText.textContent = promptFor(question);
+      feedback.textContent = state.complete
+        ? "Already found. Pick another question or replay this level."
+        : "";
+      feedback.className = state.complete ? "feedback is-correct" : "feedback";
+
+      renderQuestionJumpList();
+      renderExampleVisual(question);
+
+      renderSearchField(question, state);
+      window.setTimeout(() => speakQuestion(question), 220);
+    }
+
+    function renderSearchField(question, state) {
+      const field = state.field;
+      const target = targetFor(question);
+      searchField.innerHTML = "";
+      searchField.style.setProperty("--columns", String(field.columns));
+      searchField.classList.toggle("is-wide-patterns", target.length > 1);
+
+      field.items.forEach((item, slotIndex) => {
+        const button = document.createElement("button");
+        button.className = "search-cell";
+        button.type = "button";
+        button.textContent = item;
+        button.setAttribute("aria-label", item);
+        button.addEventListener("click", () => handleSelection(item, slotIndex, button));
+        searchField.append(button);
+      });
+    }
+
+    function handleSelection(selected, slotIndex, button) {
+      if (tapLocked) {
+        return;
+      }
+
+      const question = activeQuestions[currentIndex];
+      const state = states[currentIndex];
+      if (!question || !state || state.complete) {
+        return;
+      }
+
+      tapLocked = true;
+      const target = targetFor(question);
+      const correct = selected === target;
+      const now = Date.now();
+      const attempt = {
+        attemptNumber: state.attempts.length + 1,
+        correct,
+        responseMs: now - state.startedAt,
+        selected,
+        slotIndex,
+        target,
+        targetSlot: state.targetSlot,
+        timestamp: new Date(now).toISOString()
+      };
+      state.attempts.push(attempt);
+
+      if (correct) {
+        state.complete = true;
+        state.completedAt = now;
+        button.classList.add("is-correct");
+        feedback.textContent = "Found it.";
+        feedback.className = "feedback is-correct";
+        renderQuestionJumpList();
+        saveProgress(currentIndex + 1 >= activeQuestions.length ? "completed" : "in-progress");
+        window.setTimeout(() => {
+          if (wholeClassMode) {
+            const nextIndex = nextWholeClassQuestionIndex(currentIndex);
+            if (nextIndex < 0) {
+              showResults();
+            } else {
+              showQuestion(nextIndex);
+            }
+          } else if (currentIndex + 1 >= activeQuestions.length) {
+            showResults();
+          } else {
+            showQuestion(currentIndex + 1);
+          }
+        }, 680);
+        return;
+      }
+
+      feedback.textContent = "Keep searching.";
+      feedback.className = "feedback is-try";
+      if (wholeClassMode) {
+        openAssignMiss({
+          category: text(question.category, text(activeLevel.name)),
+          correctAnswer: target,
+          incorrectSelection: selected,
+          levelId: levelId(activeLevel, activeLevelIndex),
+          levelName: text(activeLevel.name, `Level ${activeLevelIndex + 1}`),
+          levelQuestionIndex: currentIndex + 1,
+          questionIndex: currentIndex + 1,
+          word: target
+        });
+      }
+      saveProgress("in-progress");
+      window.setTimeout(() => {
+        tapLocked = false;
+      }, 260);
+    }
+
+    function responseRows(includeIncomplete = true) {
+      return activeQuestions
+        .map((question, index) => {
+          const state = states[index];
+          if (!state || (!includeIncomplete && !state.complete) || (!state.complete && !state.attempts.length)) {
+            return null;
+          }
+
+          const attempts = state.attempts.map((attempt) => ({
+            attemptNumber: attempt.attemptNumber,
+            correct: attempt.correct,
+            responseMs: attempt.responseMs,
+            selected: attempt.selected,
+            slotIndex: attempt.slotIndex,
+            targetSlot: attempt.targetSlot,
+            timestamp: attempt.timestamp
+          }));
+          const firstAttempt = attempts[0];
+          const wrongAttempts = attempts.filter((attempt) => !attempt.correct);
+          const target = targetFor(question);
+
+          return {
+            category: text(question.category),
+            choicesDisplayed: state.field ? state.field.items : [],
+            eventualSuccess: attempts.some((attempt) => attempt.correct),
+            eventuallyCorrect: attempts.some((attempt) => attempt.correct),
+            exampleVisual: text(question.exampleVisual),
+            exampleWord: text(question.exampleWord),
+            firstAttemptCorrect: Boolean(firstAttempt && firstAttempt.correct),
+            incorrectSelections: wrongAttempts.map((attempt) => attempt.selected),
+            levelId: levelId(activeLevel, activeLevelIndex),
+            levelIndex: activeLevelIndex,
+            levelName: text(activeLevel.name, `Level ${activeLevelIndex + 1}`),
+            questionId: text(question.id, `question-${index + 1}`),
+            questionImageAlt: text(question.questionImageAlt),
+            questionImageUrl: text(question.questionImageUrl),
+            questionIndex: index + 1,
+            responseTimeMs: firstAttempt ? firstAttempt.responseMs : 0,
+            sessionId,
+            skill: text(question.skill),
+            target,
+            targetSlot: state.targetSlot,
+            attempts
+          };
+        })
+        .filter(Boolean);
+    }
+
+    function completedStates() {
+      return states.filter((state) => state.complete);
+    }
+
+    function firstAttemptScore() {
+      return states.filter((state) => state.complete && state.attempts[0] && state.attempts[0].correct).length;
+    }
+
+    function totalAttemptCount() {
+      return states.reduce((total, state) => total + state.attempts.length, 0);
+    }
+
+    function incorrectSelectionDetails() {
+      return responseRows(true).flatMap((row) =>
+        row.incorrectSelections.map((incorrectSelection) => ({
+          category: row.category,
+          correctAnswer: row.target,
+          gameId: GAME_ID,
+          gameTitle: GAME_TITLE,
+          incorrectSelection,
+          levelId: row.levelId,
+          levelName: row.levelName,
+          levelQuestionIndex: row.questionIndex,
+          questionIndex: row.questionIndex,
+          sessionId,
+          word: row.target
+        }))
+      ).slice(0, 100);
+    }
+
+    function missedQuestionDetails() {
+      return responseRows(true)
+        .filter((row) => row.incorrectSelections.length)
+        .map((row) => ({
+          category: row.category,
+          correctAnswer: row.target,
+          gameId: GAME_ID,
+          gameTitle: GAME_TITLE,
+          incorrectSelections: row.incorrectSelections,
+          levelId: row.levelId,
+          levelName: row.levelName,
+          levelQuestionIndex: row.questionIndex,
+          questionIndex: row.questionIndex,
+          word: row.target
+        }));
+    }
+
+    function categoryScores(includeAllTargets) {
+      const scores = {};
+      activeQuestions.forEach((question, index) => {
+        const state = states[index];
+        if (!includeAllTargets && (!state || (!state.complete && !state.attempts.length))) {
+          return;
+        }
+        const category = text(question.category, text(activeLevel.name, "Letter Search"));
+        const score = scores[category] || { correct: 0, missed: 0, skipped: 0, total: 0 };
+        score.total += 1;
+        if (state && state.complete && state.attempts[0] && state.attempts[0].correct) {
+          score.correct += 1;
+        } else if (state && state.attempts.length) {
+          score.missed += 1;
+        } else {
+          score.skipped += 1;
+        }
+        scores[category] = score;
+      });
+      return scores;
+    }
+
+    async function saveProgress(status) {
+      if (wholeClassMode || !scholarFirstNameKey) {
+        return;
+      }
+
+      const services = getFirebaseServices();
+      if (!services) {
+        return;
+      }
+
+      const currentQuestion = activeQuestions[currentIndex] || activeQuestions[activeQuestions.length - 1] || {};
+      const completedCount = completedStates().length;
+      const percentComplete = activeQuestions.length
+        ? Math.round(completedCount / activeQuestions.length * 100)
+        : 0;
+
+      try {
+        await services.db.collection(PROGRESS_COLLECTION).doc(sessionId).set({
+          assessmentId: sessionId,
+          assessmentVersion: "letter-search-safari-v1",
+          categoryScores: categoryScores(false),
+          completedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          currentQuestionIndex: Math.min(currentIndex + 1, activeQuestions.length || 1),
+          currentQuestionLabel: promptFor(currentQuestion),
+          currentWord: targetFor(currentQuestion),
+          gameId: GAME_ID,
+          gameTitle: GAME_TITLE,
+          incorrectSelections: incorrectSelectionDetails(),
+          levelId: levelId(activeLevel, activeLevelIndex),
+          levelIndex: activeLevelIndex,
+          levelName: text(activeLevel.name, `Level ${activeLevelIndex + 1}`),
+          missedCount: missedQuestionDetails().length,
+          missedQuestions: missedQuestionDetails(),
+          mode: "session-progress",
+          percentComplete,
+          questionResponses: responseRows(true),
+          questionsCompleted: completedCount,
+          responseTimesMs: responseRows(true).map((row) => row.responseTimeMs).filter(Boolean),
+          schemaVersion: 1,
+          ...learningLocationFields(),
+          scholarFirstName,
+          scholarFirstNameKey,
+          scholarId: null,
+          score: firstAttemptScore(),
+          sessionId,
+          status,
+          teacherEmail: "unassigned",
+          totalQuestions: activeQuestions.length,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (error) {
+        console.warn("Letter Search progress could not save.", error);
+      }
+    }
+
+    async function submitResult(percent) {
+      if (wholeClassMode || !scholarFirstNameKey) {
+        return;
+      }
+
+      const services = getFirebaseServices();
+      if (!services) {
+        return;
+      }
+
+      const mastered = percent >= MASTERY_PERCENT;
+
+      try {
+        await services.db.collection(RESULT_COLLECTION).add({
+          assessmentId: sessionId,
+          assessmentVersion: "letter-search-safari-v1",
+          attempts: Math.min(totalAttemptCount(), 100),
+          categoryScores: categoryScores(true),
+          completedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          gameId: GAME_ID,
+          gameTitle: GAME_TITLE,
+          incorrectSelections: incorrectSelectionDetails(),
+          levelId: levelId(activeLevel, activeLevelIndex),
+          levelIndex: activeLevelIndex,
+          levelName: text(activeLevel.name, `Level ${activeLevelIndex + 1}`),
+          masteredLevel: mastered,
+          masteryCount: mastered ? 1 : 0,
+          masteryEarned: mastered,
+          masteryTarget: MASTERY_TARGET,
+          missedCount: missedQuestionDetails().length,
+          missedQuestions: missedQuestionDetails(),
+          mode: "individual-complete",
+          percent,
+          questionResponses: responseRows(false),
+          responseTimesMs: responseRows(false).map((row) => row.responseTimeMs).filter(Boolean),
+          schemaVersion: 1,
+          ...learningLocationFields(),
+          scholarFirstName,
+          scholarFirstNameKey,
+          scholarId: null,
+          score: firstAttemptScore(),
+          soundSafariComplete: false,
+          teacherEmail: "unassigned",
+          totalQuestions: activeQuestions.length
+        });
+      } catch (error) {
+        console.warn("Letter Search result could not save.", error);
+      }
+    }
+
+    function showResults() {
+      playPanel.classList.remove("is-active");
+      resultsPanel.classList.add("is-active");
+      const score = firstAttemptScore();
+      const total = activeQuestions.length;
+      const percent = total ? Math.round(score / total * 100) : 0;
+      const taps = totalAttemptCount();
+      const missed = missedQuestionDetails();
+      const completionMessage = text(activeLevel.completionMessage, "Letter search complete.");
+
+      document.getElementById("results-title").textContent = wholeClassMode ? "Class Round Complete" : "Level Complete";
+      document.getElementById("results-message").textContent = wholeClassMode
+        ? completionMessage
+        : `${completionMessage} Your teacher can see the first-tap score and every tap.`;
+      document.getElementById("first-tap-score").textContent = `${score}/${total}`;
+      document.getElementById("accuracy-score").textContent = `${percent}%`;
+      document.getElementById("tap-count").textContent = String(taps);
+      renderAttemptSummary();
+      submitResult(percent);
+    }
+
+    function renderAttemptSummary() {
+      const summary = document.getElementById("attempt-summary");
+      summary.innerHTML = "";
+      responseRows(false).forEach((row) => {
+        const line = document.createElement("p");
+        const attemptText = row.attempts.map((attempt) => `${attempt.selected}${attempt.correct ? " correct" : " miss"}`).join(" -> ");
+        line.textContent = `${row.target}: ${attemptText || "No taps recorded"}`;
+        summary.append(line);
+      });
+    }
+
+    function openAssignMiss(miss) {
+      pendingClassMiss = miss;
+      assignStatus.textContent = "";
+      assignStatus.classList.remove("is-saved");
+      assignSummary.textContent = `Question ${miss.questionIndex}: chose ${miss.incorrectSelection}; correct answer ${miss.correctAnswer}.`;
+      assignInitialsInput.value = "";
+      assignOverlay.classList.add("is-open");
+      assignInitialsInput.focus();
+    }
+
+    function closeAssignMiss() {
+      assignOverlay.classList.remove("is-open");
+      pendingClassMiss = null;
+    }
+
+    async function saveWholeClassMiss() {
+      if (!pendingClassMiss) {
+        return;
+      }
+
+      const services = getFirebaseServices();
+      const initials = assignInitialsInput.value.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+      if (!initials) {
+        assignStatus.textContent = "Type the scholar's initials first.";
+        assignInitialsInput.focus();
+        return;
+      }
+
+      if (!services) {
+        assignStatus.textContent = "This miss could not save yet.";
+        return;
+      }
+
+      try {
+        await services.db.collection(RESULT_COLLECTION).add({
+          attempts: 1,
+          completedAt: serverTimestamp(),
+          correctAnswer: pendingClassMiss.correctAnswer,
+          createdAt: serverTimestamp(),
+          gameId: GAME_ID,
+          gameTitle: GAME_TITLE,
+          incorrectSelection: pendingClassMiss.incorrectSelection,
+          incorrectSelections: [{
+            category: pendingClassMiss.category,
+            correctAnswer: pendingClassMiss.correctAnswer,
+            gameId: GAME_ID,
+            gameTitle: GAME_TITLE,
+            incorrectSelection: pendingClassMiss.incorrectSelection,
+            levelId: pendingClassMiss.levelId,
+            levelName: pendingClassMiss.levelName,
+            levelQuestionIndex: pendingClassMiss.levelQuestionIndex,
+            questionIndex: pendingClassMiss.questionIndex,
+            word: pendingClassMiss.word
+          }],
+          missedCount: 1,
+          missedQuestions: [{
+            category: pendingClassMiss.category,
+            correctAnswer: pendingClassMiss.correctAnswer,
+            gameId: GAME_ID,
+            gameTitle: GAME_TITLE,
+            incorrectSelections: [pendingClassMiss.incorrectSelection],
+            levelId: pendingClassMiss.levelId,
+            levelName: pendingClassMiss.levelName,
+            levelQuestionIndex: pendingClassMiss.levelQuestionIndex,
+            questionIndex: pendingClassMiss.questionIndex,
+            word: pendingClassMiss.word
+          }],
+          mode: "whole-class-miss",
+          questionIndex: pendingClassMiss.questionIndex,
+          schemaVersion: 1,
+          scholarDisplayName: initials,
+          scholarFirstName: "Class Miss",
+          scholarFirstNameKey: "classmiss",
+          scholarId: null,
+          score: 0,
+          teacherEmail: activeTeacherEmail,
+          totalQuestions: 1,
+          word: pendingClassMiss.word
+        });
+        assignStatus.textContent = "Saved.";
+        assignStatus.classList.add("is-saved");
+        window.setTimeout(closeAssignMiss, 350);
+      } catch (error) {
+        console.warn("Whole class miss could not save.", error);
+        assignStatus.textContent = "This miss could not save yet.";
+      }
+    }
+
+    function wireEvents() {
+      document.getElementById("back-button").addEventListener("click", () => {
+        window.location.href = "/skills";
+      });
+      document.getElementById("replay-button").addEventListener("click", () => {
+        const question = activeQuestions[currentIndex];
+        if (question) {
+          speakQuestion(question);
+        }
+      });
+      document.getElementById("choose-level-button").addEventListener("click", renderLevels);
+      document.getElementById("replay-level-button").addEventListener("click", () => beginLevel(activeLevelIndex));
+      document.getElementById("skip-assign-button").addEventListener("click", closeAssignMiss);
+      document.getElementById("save-assign-initials-button").addEventListener("click", saveWholeClassMiss);
+      assignInitialsInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          saveWholeClassMiss();
+        }
+      });
+    }
+
+    async function init() {
+      wireEvents();
+      modePill.textContent = wholeClassMode ? "Whole Class" : "Scholar";
+      modePill.className = wholeClassMode ? "pill class-mode" : "pill scholar-mode";
+      const profile = readLaunchProfile();
+      if (profile) {
+        scholarFirstName = profile.firstName;
+        scholarFirstNameKey = profile.firstNameKey;
+        learningLocation = normalizeLearningLocation(profile.learningLocation) || readStoredLearningLocation();
+      }
+
+      await Promise.all([
+        loadAudioManifest(),
+        loadContent().then((loadedContent) => {
+          content = loadedContent;
+        }),
+        wholeClassMode ? resolveTeacherEmail().then((email) => {
+          activeTeacherEmail = email;
+        }) : Promise.resolve()
+      ]);
+      await loadScholarControl();
+      renderLevels();
+
+      const restartIndex = scholarControl && Number.isInteger(scholarControl.restartLevelIndex)
+        ? scholarControl.restartLevelIndex
+        : -1;
+      if (!wholeClassMode && !autoStartedControl && restartIndex >= 0 && questionsForLevel(restartIndex).length) {
+        autoStartedControl = true;
+        beginLevel(restartIndex);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

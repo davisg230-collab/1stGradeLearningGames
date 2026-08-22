@@ -109,6 +109,7 @@
     <header class="w-full px-4 pt-5 sm:px-8 sm:pt-7">
       <div class="mx-auto flex w-full max-w-[1450px] flex-wrap items-center justify-between gap-4">
         <a class="game-home-link" href="/skills">Back to Skills</a>
+        <a class="game-home-link" href="https://first-grade-news-hub-mrdavis.web.app/">Class Hub</a>
         <div class="max-w-2xl">
           <p class="mb-1" style="color:var(--coral);font-weight:900;letter-spacing:.12rem">CKLA UNIT 2</p>
           <h1 class="leading-tight" style="font-size:clamp(2rem,4vw,2.55rem);font-weight:900">Long Vowel Quest</h1>
@@ -321,9 +322,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const CLASS_MODE_CODE = "2213";
   const RESULT_COLLECTION = "gameHubResultSubmissions";
   const PROGRESS_COLLECTION = "gameHubProgressSubmissions";
+  const SCHOLAR_CONTROL_COLLECTION = "gameHubScholarControls";
   const AUTHORIZED_TEACHERS = [
     { email: "davisg230@gmail.com", label: "Mr. Davis" },
-    { email: "lvest1@crossroadsschoolskc.org", label: "Ms. Vest" }
+    { email: "lvest1@crossroadsschoolskc.org", label: "Ms. Vest", aliases: ["lvest1010@gmail.com", "lvest@crossroadsschoolskc.org"] }
   ];
   const firebaseConfig = {
     apiKey: "AIzaSyDKzxn9EHkjRTEAYNBuFtoIRH4ZB2r8vi8",
@@ -377,6 +379,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let current = 0;
   let unlockedZone = 0;
+  let teacherUnlockedZones = new Set();
+  let teacherLockedZones = new Set();
+  let teacherMasteryCounts = [];
+  let teacherMasteryOverrideZones = new Set();
+  let teacherRestartZone = -1;
   let score = 0;
   let muted = false;
   let audioContext = null;
@@ -412,6 +419,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[char]));
   }
+  function cleanFeedbackText(value) {
+    if (typeof value !== "string") return "";
+    const text = value.trim();
+    return text && text.toLowerCase() !== "undefined" ? text : "";
+  }
+  function questionFeedbackText(question) {
+    const answer = choiceReportLabel(question, question.answer);
+    return cleanFeedbackText(question.hint)
+      || cleanFeedbackText(question.visibleExplanation)
+      || cleanFeedbackText(question.spokenExplanation)
+      || (answer ? `The correct answer is ${answer}.` : "Try again. Look closely and choose the best answer.");
+  }
+  function retryFeedbackText() {
+    return "Try again. Look closely and choose the best answer.";
+  }
 
   function normalizeNameKey(value) {
     return value.trim().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 30);
@@ -421,6 +443,50 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!window.firebase) return null;
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     return { auth: firebase.auth(), db: firebase.firestore(), firebase };
+  }
+
+  async function loadScholarGameControl() {
+    const services = getFirebaseServices();
+    if (!services || !scholarFirstNameKey || wholeClassMode) return;
+
+    try {
+      const snapshot = await services.db
+        .collection(SCHOLAR_CONTROL_COLLECTION)
+        .doc(scholarFirstNameKey)
+        .get();
+
+      if (!snapshot.exists) return;
+
+      const controlDocument = snapshot.data() || {};
+      const control = controlDocument.gameControls?.[GAME_ID];
+      if (!control?.commandId) return;
+
+      teacherUnlockedZones = new Set(
+        Array.isArray(control.unlockedLevelIndexes)
+          ? control.unlockedLevelIndexes.map(Number).filter(index => Number.isInteger(index) && index >= 0 && index < ZONES.length)
+          : [],
+      );
+      teacherLockedZones = new Set(
+        Array.isArray(control.lockedLevelIndexes)
+          ? control.lockedLevelIndexes.map(Number).filter(index => Number.isInteger(index) && index >= 0 && index < ZONES.length)
+          : [],
+      );
+      teacherMasteryCounts = Array.isArray(control.masteryCounts)
+        ? control.masteryCounts.slice(0, ZONES.length).map(Number)
+        : [];
+      teacherMasteryOverrideZones = new Set(
+        Array.isArray(control.masteryOverrideLevelIndexes)
+          ? control.masteryOverrideLevelIndexes.map(Number).filter(index => Number.isInteger(index) && index >= 0 && index < ZONES.length)
+          : [],
+      );
+      teacherRestartZone = Number.isInteger(Number(control.restartLevelIndex))
+        ? Number(control.restartLevelIndex)
+        : -1;
+
+      if (teacherUnlockedZones.size) {
+        unlockedZone = Math.max(unlockedZone, ...teacherUnlockedZones);
+      }
+    } catch {}
   }
 
   function serverTimestamp() {
@@ -433,13 +499,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     return (services?.auth.currentUser?.email || "").trim().toLowerCase();
   }
 
+  function findAuthorizedTeacher(email) {
+    const normalized = (email || "").trim().toLowerCase();
+    return AUTHORIZED_TEACHERS.find(teacher => teacher.email === normalized || (teacher.aliases || []).includes(normalized));
+  }
+
   function teacherForClassCode() {
     const signedInEmail = currentTeacherEmail();
-    return AUTHORIZED_TEACHERS.find(option => option.email === signedInEmail) || { email: "unassigned", label: "Whole Class" };
+    return findAuthorizedTeacher(signedInEmail) || { email: "unassigned", label: "Whole Class" };
   }
 
   function validClassMissTeacherEmail(email) {
-    return email === "unassigned" || AUTHORIZED_TEACHERS.some(teacher => teacher.email === email);
+    return email === "unassigned" || Boolean(findAuthorizedTeacher(email));
   }
 
   function speechText(text) {
@@ -819,7 +890,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("zone-name").textContent = ZONES[zone].detail;
     document.getElementById("game-progress-fill").style.width = `${(states.filter(state => state.complete).length / QUESTIONS.length) * 100}%`;
     document.querySelectorAll(".zone-tab").forEach((tab, index) => {
-      tab.disabled = !wholeClassMode && index > unlockedZone;
+      tab.disabled = !wholeClassMode && (teacherLockedZones.has(index) || (index > unlockedZone && !teacherUnlockedZones.has(index)));
       tab.classList.toggle("is-active", index === zone);
     });
     document.querySelectorAll("[data-progress-zone]").forEach((zoneEl, index) => {
@@ -856,8 +927,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function showFeedback(text, good) {
+    const visibleText = cleanFeedbackText(text) || "Try again. Look closely and choose the best answer.";
     feedback.className = `feedback is-visible ${good ? "is-good" : ""}`;
-    feedback.innerHTML = `<span>${escapeHtml(text)}</span><button class="speak-button" type="button" data-speak="${escapeHtml(text)}">Read</button>`;
+    feedback.innerHTML = `<span>${escapeHtml(visibleText)}</span><button class="speak-button" type="button" data-speak="${escapeHtml(visibleText)}">Read</button>`;
   }
 
   function checkAnswer() {
@@ -877,12 +949,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       tone("correct");
     } else {
       state.incorrectSelections.push(state.selected);
-      showFeedback(q.hint, false);
+      showFeedback(state.attempts >= 2 ? questionFeedbackText(q) : retryFeedbackText(), false);
       tone("wrong");
       if (wholeClassMode) {
         openAssignMiss({
-          correctAnswer: q.answer,
-          incorrectSelection: state.selected,
+          correctAnswer: choiceReportLabel(q, q.answer),
+          incorrectSelection: choiceReportLabel(q, state.selected),
           questionIndex: current + 1,
           word: q.word
         });
@@ -916,13 +988,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     advance();
   }
 
+  function choiceReportLabel(q, value) {
+    const choice = Array.isArray(q?.choices)
+      ? q.choices.find(item => item[0] === value)
+      : null;
+    const visibleLabel = String(
+      choice?.[1] ?? value ?? "",
+    ).trim();
+    const genericLabel =
+      /^(?:choice\s*)?[A-Z](?:[.)])?$/i.test(visibleLabel);
+    const explicitReportText =
+      q?.answerStyle === "listening-letters"
+        ? String(
+            q?.answerReportLabels?.[value]
+              || q?.answerAudio?.[value]?.audioSourceText
+              || q?.answerAudio?.[value]?.audioText
+              || "",
+          ).trim()
+        : "";
+
+    if (genericLabel && explicitReportText) {
+      return `${explicitReportText} (${visibleLabel})`;
+    }
+
+    const answerAudio = q?.answerAudio?.[value] || {};
+    const thirdChoiceValue = String(choice?.[2] || "").trim();
+    const usableThirdChoiceValue =
+      /^(?:https?:|data:|\/)/i.test(thirdChoiceValue)
+        ? ""
+        : thirdChoiceValue;
+    const spokenText = String(
+      answerAudio.audioSourceText
+        || answerAudio.audioText
+        || usableThirdChoiceValue
+        || "",
+    ).trim();
+
+    if (
+      genericLabel
+      && spokenText
+      && spokenText.toLowerCase() !== visibleLabel.toLowerCase()
+    ) {
+      return `${spokenText} (${visibleLabel})`;
+    }
+
+    return visibleLabel || spokenText || String(value ?? "");
+  }
   function missedQuestionDetails() {
     return QUESTIONS.flatMap((q, index) => {
       const state = states[index];
       if (state.scored) return [];
       return [{
-        correctAnswer: q.answer,
-        incorrectSelections: state.incorrectSelections,
+        correctAnswer: choiceReportLabel(q, q.answer),
+        incorrectSelections: state.incorrectSelections.map(choice => choiceReportLabel(q, choice)),
         questionIndex: index + 1,
         word: q.word
       }];
@@ -931,8 +1049,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function incorrectSelectionDetails() {
     return states.flatMap((state, index) => state.incorrectSelections.map(choice => ({
-      correctAnswer: QUESTIONS[index].answer,
-      incorrectSelection: choice,
+      correctAnswer: choiceReportLabel(QUESTIONS[index], QUESTIONS[index].answer),
+      incorrectSelection: choiceReportLabel(QUESTIONS[index], choice),
       questionIndex: index + 1,
       word: QUESTIONS[index].word
     })));
@@ -1101,6 +1219,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function applyTeacherLevelControls() {
+    teacherMasteryOverrideZones.forEach(zoneIndex => {
+      zoneViews[zoneIndex]?.forEach(item => {
+        Object.assign(states[item.index], {
+          selected: null,
+          firstChecked: teacherMasteryCounts[zoneIndex] >= 3,
+          scored: teacherMasteryCounts[zoneIndex] >= 3,
+          complete: teacherMasteryCounts[zoneIndex] >= 3,
+          skipped: false,
+          attempts: 0,
+          incorrectSelections: [],
+        });
+      });
+    });
+
+    if (teacherRestartZone >= 0 && teacherRestartZone < ZONES.length) {
+      zoneViews[teacherRestartZone]?.forEach(item => {
+        Object.assign(states[item.index], {
+          selected: null,
+          firstChecked: false,
+          scored: false,
+          complete: false,
+          skipped: false,
+          attempts: 0,
+          incorrectSelections: [],
+        });
+      });
+    }
+
+    score = states.filter(state => state.scored).length;
+  }
+
   function beginGame(mode) {
     wholeClassMode = mode === "class";
     startError.textContent = "";
@@ -1111,12 +1261,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     sessionCompleted = false;
     progressStarted = false;
     sessionId = createSessionId();
+    if (!wholeClassMode) applyTeacherLevelControls();
     speak(wholeClassMode ? "Whole Class Mode is on. Pick any zone or question together." : "Great job. Let's play.");
-    showQuestion(0);
+    const firstAvailableZone = wholeClassMode
+      ? 0
+      : ZONES.findIndex((_, index) => !teacherLockedZones.has(index) && (index <= unlockedZone || teacherUnlockedZones.has(index)));
+    const firstQuestion = zoneViews[Math.max(0, firstAvailableZone)]?.[0];
+    showQuestion(firstQuestion?.index ?? 0);
   }
 
-  function startGame() {
+  async function validateRosterName(firstName) {
+    const response = await fetch(
+      "https://us-central1-stgradelearninggames.cloudfunctions.net/validateScholarName",
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({data: {firstName}}),
+      },
+    );
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error?.message || "The roster could not be checked.",
+      );
+    }
+
+    return payload.result || {};
+  }
+
+  async function startGame() {
     const cleanName = firstNameInput.value.trim().replace(/\s+/g, " ");
+
     if (cleanName.replace(/\D/g, "") === CLASS_MODE_CODE) {
       const teacher = teacherForClassCode();
       activeTeacherEmail = teacher.email;
@@ -1125,15 +1301,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       beginGame("class");
       return;
     }
+
     const nameKey = normalizeNameKey(cleanName);
+
     if (!nameKey) {
-      startError.textContent = "Type your first name first.";
+      startError.textContent = "Type your full first name first.";
       firstNameInput.focus();
       return;
     }
-    scholarFirstName = cleanName;
-    scholarFirstNameKey = nameKey;
-    beginGame("individual");
+
+    startError.textContent = "Checking the class roster...";
+
+    try {
+      const validation = await validateRosterName(cleanName);
+
+      if (!validation.allowed) {
+        startError.textContent =
+          "Please enter your full first name. You must be a scholar in Mr. Davis's or Ms. Vest's roster.";
+        firstNameInput.focus();
+        return;
+      }
+
+      scholarFirstName = validation.firstName || cleanName;
+      scholarFirstNameKey = validation.firstNameKey || nameKey;
+      firstNameInput.value = scholarFirstName;
+      startError.textContent = "";
+      await loadScholarGameControl();
+      beginGame("individual");
+    } catch {
+      startError.textContent =
+        "The class roster could not be checked. Please try again.";
+    }
   }
 
   function watchTeacherSignIn() {
@@ -1171,7 +1369,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tab = event.target.closest("[data-zone]");
     if (!tab) return;
     const zone = Number(tab.dataset.zone);
-    if (wholeClassMode || zone <= unlockedZone) {
+    if (wholeClassMode || (!teacherLockedZones.has(zone) && (zone <= unlockedZone || teacherUnlockedZones.has(zone)))) {
       const nextIncomplete = zoneViews[zone].find(item => !states[item.index].complete) || zoneViews[zone][0];
       showQuestion(nextIncomplete.index);
     }
