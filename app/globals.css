@@ -810,6 +810,22 @@ button.area-card {
   font-weight: 900;
 }
 
+.qps-live-controls {
+  display: grid;
+  gap: 8px;
+  border: 2px solid #d9e9f7;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f4f9ff;
+}
+
+.qps-live-controls p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
 .qps-section-jump,
 .qps-item-list {
   display: grid;
@@ -943,6 +959,91 @@ button.area-card {
 .qps-item-chip strong {
   font-size: 1.05rem;
   font-weight: 950;
+}
+
+.qps-scholar-page {
+  min-height: calc(100vh - 116px);
+  padding: clamp(18px, 4vw, 40px);
+  background:
+    radial-gradient(circle at top left, rgb(255 207 82 / 0.25), transparent 34%),
+    #fff8ec;
+}
+
+.qps-scholar-shell {
+  display: grid;
+  gap: clamp(14px, 3vw, 22px);
+  width: min(100%, 1060px);
+  margin: 0 auto;
+}
+
+.qps-scholar-status,
+.qps-waiting-card,
+.qps-scholar-card {
+  border: 1px solid rgb(124 111 91 / 0.14);
+  border-radius: 18px;
+  background: #fffdf8;
+  box-shadow: 0 14px 30px rgb(47 64 84 / 0.08);
+}
+
+.qps-scholar-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  color: #223044;
+  font-weight: 950;
+}
+
+.qps-scholar-status span {
+  color: #1f6f45;
+}
+
+.qps-waiting-card {
+  display: grid;
+  place-items: center;
+  min-height: 420px;
+  padding: clamp(24px, 7vw, 70px);
+  text-align: center;
+}
+
+.qps-waiting-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 950;
+}
+
+.qps-waiting-card p {
+  max-width: 640px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  font-weight: 850;
+}
+
+.qps-scholar-card {
+  display: grid;
+  place-items: center;
+  min-height: min(66vh, 620px);
+  padding: clamp(24px, 8vw, 86px);
+  color: #223044;
+  text-align: center;
+}
+
+.qps-scholar-card p,
+.qps-scholar-card span {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 2vw, 1.2rem);
+  font-weight: 900;
+}
+
+.qps-scholar-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .pin-error {
@@ -1733,7 +1834,7 @@ button.area-card {
 
 .roster-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 10px;
   max-height: 430px;
   overflow: auto;
@@ -1743,8 +1844,8 @@ button.area-card {
 
 .roster-card {
   display: grid;
-  grid-template-columns: 1fr repeat(3, auto);
-  align-items: center;
+  grid-template-columns: 1fr;
+  align-items: stretch;
   gap: 8px;
   border: 1px solid rgb(124 111 91 / 0.12);
   border-radius: 12px;
@@ -1813,34 +1914,48 @@ button.area-card {
   font-weight: 900;
 }
 
-.roster-initials-edit {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+.roster-initials-badge-edit {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  align-items: end;
+  border-top: 1px solid rgb(124 111 91 / 0.1);
+  padding-top: 8px;
 }
 
-.roster-initials-edit label {
-  display: grid;
-  gap: 4px;
+.roster-initials-badge-edit span {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.roster-initials-edit input {
-  width: 100%;
-  border: 2px solid rgb(124 111 91 / 0.16);
-  border-radius: 10px;
-  background: #fffdfa;
-  color: var(--ink);
+.roster-initials-badge-edit input {
+  display: grid;
+  width: 42px;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
+  background: var(--blue);
   font: inherit;
-  font-size: 0.95rem;
   font-weight: 900;
   letter-spacing: 0;
-  padding: 7px 9px;
+  text-align: center;
   text-transform: uppercase;
+}
+
+.roster-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid rgb(124 111 91 / 0.1);
+  padding-top: 8px;
+}
+
+.roster-card-actions .teacher-text-button {
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .students-page-head {

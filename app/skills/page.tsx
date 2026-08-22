@@ -10,8 +10,8 @@ export default function SkillsPage() {
       <section className="page-heading">
         <div>
           <p className="section-kicker">CKLA Skills Games</p>
-          <h1>Choose a unit</h1>
-          <p>Pick the unit your class is ready to practice.</p>
+          <h1>Choose Reading Practice</h1>
+          <p>Pick what your class is ready to practice.</p>
         </div>
         <Link className="home-link" href="/">
           {"\u{1F3E0}"} Home

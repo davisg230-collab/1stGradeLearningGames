@@ -16,7 +16,9 @@ import { ScholarResultsPanel } from "./ScholarResultsPanel";
 export type CardEdit = {
   description?: string;
   icon?: string;
+  sortOrder?: number;
   title?: string;
+  underConstruction?: boolean;
 };
 
 type TeacherEditContextValue = {
@@ -24,9 +26,11 @@ type TeacherEditContextValue = {
   errorMessage: string;
   isEditing: boolean;
   isSaving: boolean;
+  openGameEditor: (gameId?: string) => void;
   resetCard: (cardKey: string) => void;
   statusMessage: string;
   updateCard: (cardKey: string, update: CardEdit) => void;
+  updateCardOrder: (updates: Record<string, CardEdit>) => void;
 };
 
 type FirebaseUser = {
@@ -91,7 +95,8 @@ type TeacherLogAction =
   | "enter-edit-mode"
   | "exit-edit-mode"
   | "reset-card"
-  | "update-card";
+  | "update-card"
+  | "update-card-order";
 
 declare global {
   interface Window {
@@ -102,6 +107,56 @@ declare global {
 const EDIT_STORAGE_KEY = "first-grade-game-hub-card-edits";
 const EDIT_LOG_STORAGE_KEY = "first-grade-game-hub-edit-log";
 const CARD_COLLECTION = "gameHubCards";
+const GAME_DEFINITION_COLLECTION = "gameHubGameDefinitions";
+
+function gameIdForCardKey(cardKey: string) {
+  if (cardKey === "CKLA Skills:starting-point") {
+    return "skills-starting-point";
+  }
+
+  if (cardKey === "CKLA Skills:letter-search-safari") {
+    return "letter-search-safari";
+  }
+
+  if (cardKey === "Math:starting-point") {
+    return "math-starting-point-quest";
+  }
+
+  if (cardKey === "Math:number-search-safari") {
+    return "number-search-safari";
+  }
+
+  const mathMatch = /^Eureka Math:module-(\d+)$/.exec(cardKey);
+
+  if (mathMatch) {
+    return `eureka-math-module-${Number(mathMatch[1])}`;
+  }
+
+  const listeningMatch =
+    /^CKLA Listening & Learning:unit-(\d+)$/.exec(cardKey);
+
+  if (listeningMatch) {
+    return `ckla-listening-learning-unit-${Number(listeningMatch[1])}`;
+  }
+
+  const skillsMatch = /^CKLA Skills:unit-(\d+)$/.exec(cardKey);
+
+  if (!skillsMatch) {
+    return "";
+  }
+
+  const unitNumber = Number(skillsMatch[1]);
+
+  if (unitNumber === 1) {
+    return "unit1-zone1-sound-safari";
+  }
+
+  if (unitNumber === 2) {
+    return "ckla-unit-2-long-vowel-quest";
+  }
+
+  return `ckla-unit-${unitNumber}-skills-quest`;
+}
 const LOG_COLLECTION = "gameHubTeacherLogs";
 const FIREBASE_SCRIPTS = [
   "https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js",
@@ -181,11 +236,37 @@ function normalizeCardEdit(value: unknown): CardEdit | null {
     edit.icon = rawEdit.icon;
   }
 
+  if (typeof rawEdit.sortOrder === "number" && Number.isFinite(rawEdit.sortOrder)) {
+    edit.sortOrder = rawEdit.sortOrder;
+  }
+
   if (typeof rawEdit.title === "string") {
     edit.title = rawEdit.title;
   }
 
+  if (typeof rawEdit.underConstruction === "boolean") {
+    edit.underConstruction = rawEdit.underConstruction;
+  }
+
   return Object.keys(edit).length > 0 ? edit : null;
+}
+
+function cardPayloadForSave(
+  edit: CardEdit,
+  serverTime: unknown,
+  updatedBy: string,
+) {
+  return {
+    description: edit.description ?? "",
+    icon: edit.icon ?? "",
+    ...(typeof edit.sortOrder === "number" ? { sortOrder: edit.sortOrder } : {}),
+    title: edit.title ?? "",
+    ...(typeof edit.underConstruction === "boolean"
+      ? { underConstruction: edit.underConstruction }
+      : {}),
+    updatedAt: serverTime,
+    updatedBy,
+  };
 }
 
 function normalizeCardEdits(value: unknown): Record<string, CardEdit> {
@@ -493,15 +574,123 @@ export function TeacherEditProvider({ children }: { children: ReactNode }) {
     };
 
     saveNextEdits(next, "update-card", cardKey, async (services) => {
+      const serverTime =
+        services.firebase.firestore.FieldValue.serverTimestamp();
+      const savedCard = next[cardKey];
+
       await services.db.collection(CARD_COLLECTION).doc(cardKey).set(
+        cardPayloadForSave(savedCard, serverTime, teacherEmailRef.current),
+        { merge: true },
+      );
+
+      const title = savedCard.title?.trim();
+      const gameId = gameIdForCardKey(cardKey);
+
+      if (!title || !gameId) {
+        return;
+      }
+
+      const gameRef = services.db
+          .collection(GAME_DEFINITION_COLLECTION)
+          .doc(gameId);
+      const gameSnapshot = await gameRef.get();
+
+      if (!gameSnapshot.exists) {
+        return;
+      }
+
+      const gameData = gameSnapshot.data() ?? {};
+      const versionIds = [
+        gameData.draftVersion,
+        gameData.publishedVersion,
+      ].filter(
+        (value): value is string =>
+          typeof value === "string" && Boolean(value.trim()),
+      );
+
+      await gameRef.set(
         {
-          ...update,
-          updatedAt: services.firebase.firestore.FieldValue.serverTimestamp(),
+          title,
+          updatedAt: serverTime,
           updatedBy: teacherEmailRef.current,
         },
         { merge: true },
       );
+
+      for (const versionId of new Set(versionIds)) {
+        const versionRef = gameRef
+            .collection("versions")
+            .doc(versionId);
+        const versionSnapshot = await versionRef.get();
+
+        if (!versionSnapshot.exists) {
+          continue;
+        }
+
+        const versionData = versionSnapshot.data() ?? {};
+        const content =
+          versionData.content
+          && typeof versionData.content === "object"
+          && !Array.isArray(versionData.content)
+            ? versionData.content as Record<string, unknown>
+            : {};
+
+        await versionRef.set({
+          ...versionData,
+          content: {
+            ...content,
+            unitTitle: title,
+          },
+          updatedAt: serverTime,
+          updatedBy: teacherEmailRef.current,
+        });
+      }
     });
+  }
+
+  function updateCardOrder(updates: Record<string, CardEdit>) {
+    const next = {
+      ...editedCardsRef.current,
+    };
+
+    Object.entries(updates).forEach(([cardKey, update]) => {
+      next[cardKey] = {
+        ...next[cardKey],
+        ...update,
+      };
+    });
+
+    editedCardsRef.current = next;
+    setEditedCards(next);
+    writeStoredEdits(next);
+    setIsSaving(true);
+    setErrorMessage("");
+
+    void loadFirebase()
+      .then(async (services) => {
+        if (!isAuthorizedTeacher(services.auth.currentUser?.email)) {
+          throw new Error("Please sign in with an authorized teacher account before saving.");
+        }
+
+        const serverTime =
+          services.firebase.firestore.FieldValue.serverTimestamp();
+
+        await Promise.all(
+          Object.entries(updates).map(([cardKey]) =>
+            services.db.collection(CARD_COLLECTION).doc(cardKey).set(
+              cardPayloadForSave(next[cardKey], serverTime, teacherEmailRef.current),
+              { merge: true },
+            ),
+          ),
+        );
+        await recordTeacherLog("update-card-order");
+        setStatusMessage("Card order saved.");
+      })
+      .catch((error) => {
+        setErrorMessage(firebaseErrorMessage(error, "That card order did not save to Firebase."));
+        setStatusMessage("The order changed on this screen, but Firebase did not save it yet.");
+      })
+      .finally(() => setIsSaving(false));
   }
 
   function resetCard(cardKey: string) {
@@ -524,15 +713,25 @@ export function TeacherEditProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }
 
+  function openGameEditor(gameId?: string) {
+    if (gameId) {
+      window.sessionStorage.setItem("first-grade-learning-games-editor-game-id", gameId);
+    }
+    setIsGameEditorOpen(true);
+    setIsScholarResultsOpen(false);
+  }
+
   const value = useMemo<TeacherEditContextValue>(
     () => ({
       editedCards,
       errorMessage,
       isEditing,
       isSaving,
+      openGameEditor,
       resetCard,
       statusMessage,
       updateCard,
+      updateCardOrder,
     }),
     [editedCards, errorMessage, isEditing, isSaving, statusMessage],
   );
@@ -544,16 +743,7 @@ export function TeacherEditProvider({ children }: { children: ReactNode }) {
         {isEditing ? (
           <>
             <span>{isSaving ? "Saving..." : "Teacher edit mode"}</span>
-            <button
-              disabled={isSaving}
-              type="button"
-              onClick={() => {
-                setIsGameEditorOpen(true);
-                setIsScholarResultsOpen(false);
-              }}
-            >
-              Game Editor
-            </button>
+
             <button
               disabled={isSaving}
               type="button"
@@ -562,7 +752,7 @@ export function TeacherEditProvider({ children }: { children: ReactNode }) {
                 setIsGameEditorOpen(false);
               }}
             >
-              Rosters & Results
+              Data and Reports
             </button>
             <button disabled={isSaving} type="button" onClick={exitEditMode}>
               Done
@@ -585,7 +775,11 @@ export function TeacherEditProvider({ children }: { children: ReactNode }) {
         <ScholarResultsPanel onClose={() => setIsScholarResultsOpen(false)} />
       ) : null}
       {isEditing && isGameEditorOpen ? (
-        <GameEditorPanel onClose={() => setIsGameEditorOpen(false)} />
+        <GameEditorPanel
+          cardEdits={editedCards}
+          onClose={() => setIsGameEditorOpen(false)}
+          updateCard={updateCard}
+        />
       ) : null}
     </TeacherEditContext.Provider>
   );

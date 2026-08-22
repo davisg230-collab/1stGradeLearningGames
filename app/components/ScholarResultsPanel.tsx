@@ -2466,6 +2466,11 @@ function recommendationMatchesNeedCandidate(
   recommendation: CurriculumRecommendation,
   candidate: CurriculumNeedCandidate,
 ) {
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  if (letterNeed) {
+    return recommendationExplicitlyTeachesLetter(recommendation, letterNeed);
+  }
+
   const terms = curriculumCandidateMatchTerms(candidate);
   const matchedNeeds = recommendation.matchedNeeds
     .map(normalizeCurriculumNeedKey)
@@ -2474,6 +2479,34 @@ function recommendationMatchesNeedCandidate(
   return matchedNeeds.some((matchedNeed) =>
     terms.some((term) => curriculumNeedTermMatches(matchedNeed, term)),
   );
+}
+
+function recommendationExplicitlyTeachesLetter(
+  recommendation: CurriculumRecommendation,
+  letter: string,
+) {
+  const cleanLetter = letter.toLowerCase();
+  const metadataText = [
+    recommendation.lessonTitle,
+    recommendation.iCanStatement,
+    recommendation.objective,
+    recommendation.parentSummary,
+    recommendation.priorityStandard,
+  ]
+    .map((value) => String(value ?? ""))
+    .join(" ")
+    .toLowerCase();
+
+  const explicitPatterns = [
+    new RegExp(`\\blowercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\buppercase\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\bletter\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\bname\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`\\bsound\\s+${escapeRegExp(cleanLetter)}\\b`, "i"),
+    new RegExp(`/${escapeRegExp(cleanLetter)}/`, "i"),
+  ];
+
+  return explicitPatterns.some((pattern) => pattern.test(metadataText));
 }
 
 function curriculumNeedScholarCount(candidate: CurriculumNeedCandidate) {
@@ -2572,11 +2605,27 @@ function curriculumGroupUploadUrl(
   return `${HUB_CLASS_URL}?${params.toString()}`;
 }
 
+function curriculumRecommendationSearchTerms(candidate: CurriculumNeedCandidate) {
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+
+  if (letterNeed) {
+    return [
+      `letter ${letterNeed}`,
+      `lowercase ${letterNeed}`,
+      `${letterNeed} sound`,
+      candidate.need,
+    ];
+  }
+
+  return [candidate.need, ...candidate.searchTerms];
+}
+
 function curriculumFamilyPracticeTips(
   candidate: CurriculumNeedCandidate,
   subject: "skills" | "listening" | "math",
 ) {
   const need = candidate.need.toLowerCase();
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
 
   if (subject === "math") {
     return {
@@ -2626,6 +2675,18 @@ function curriculumFamilyPracticeTips(
     };
   }
 
+  if (letterNeed) {
+    return {
+      lookFor: `Your child can find ${letterNeed}, name it or say its sound, and write it without guessing.`,
+      steps: [
+        `Write ${letterNeed} on a card or paper. Say: "This is ${letterNeed}."`,
+        `Mix ${letterNeed} with 3 or 4 other letters. Ask your child to point to ${letterNeed}.`,
+        `Have your child write ${letterNeed} three times and read it back.`,
+      ],
+      prompt: `Point to ${letterNeed}, say it, write it, then find it in a book or around the house.`,
+    };
+  }
+
   if (need.includes("vowel") || need.includes("letter") || need.length <= 3) {
     return {
       lookFor: "Your child can connect the letter or spelling to the sound and use it in a word.",
@@ -2649,11 +2710,33 @@ function curriculumFamilyPracticeTips(
   };
 }
 
+function smallGroupSingleLetterNeed(candidate: CurriculumNeedCandidate) {
+  const need = normalizeCurriculumNeedText(candidate.need).toLowerCase();
+  const terms = [
+    need,
+    ...candidate.searchTerms.map((term) => normalizeCurriculumNeedText(term).toLowerCase()),
+  ];
+
+  for (const term of terms) {
+    const match =
+      term.match(/(?:lowercase|uppercase|letter)\s+([a-z])\b/)
+      || term.match(/\b([a-z])\s+(?:identification|name|sound)\b/)
+      || term.match(/^([a-z])$/);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
 function smallGroupTeachingTarget(
   candidate: CurriculumNeedCandidate,
   subject: "skills" | "listening" | "math",
 ) {
   const need = normalizeCurriculumNeedText(candidate.need);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
 
   if (subject === "math") {
     return need ? `Practice ${need} with objects, drawings, numbers, and words.` : "Practice the target math skill.";
@@ -2661,6 +2744,10 @@ function smallGroupTeachingTarget(
 
   if (subject === "listening") {
     return need ? `Use details from a story or topic to practice ${need}.` : "Practice the target Listening & Learning skill.";
+  }
+
+  if (letterNeed) {
+    return `Identify, say, read, and write the letter ${letterNeed}.`;
   }
 
   if (/^[a-z]$/i.test(need)) {
@@ -2733,11 +2820,40 @@ function isReadableLessonSourceText(text: string, minWords = 12, minLength = 80)
 
 function isReadableLessonSourceSentence(text: string) {
   const stats = sourceTextReadability(text);
+  const tokens = text.match(/[A-Za-z]+/g) ?? [];
+  const singleLetterTokens = tokens.filter((token) => token.length === 1).length;
+  const singleLetterRatio = singleLetterTokens / Math.max(1, tokens.length);
 
   return (
     stats.wordCount >= 3
     && stats.letterRatio >= 0.45
     && stats.weirdRatio <= 0.02
+    && singleLetterRatio <= 0.28
+    && !/(?:\b[a-z]\s+){4,}\b[a-z]\b/i.test(text)
+    && !/additional\s+standards\s+addressed\s+in\s+all\s+lessons/i.test(text)
+  );
+}
+
+function smallGroupSourceSentenceSupportsLesson(
+  sentence: string,
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+) {
+  const lowerSentence = sentence.toLowerCase();
+  const target = smallGroupSingleLetterNeed(candidate);
+
+  if (/copyright|all rights reserved|additional standards addressed/i.test(sentence)) {
+    return false;
+  }
+
+  if (target) {
+    const targetPattern = new RegExp(`(^|[^a-z])${target}([^a-z]|$)`, "i");
+    const hasUsefulLessonAction = /read|write|spell|sound|letter|word|card|blend|segment|circle|point|tap|say|name/i.test(sentence);
+    return targetPattern.test(sentence) && hasUsefulLessonAction;
+  }
+
+  return Boolean(recommendation) || curriculumCandidateMatchTerms(candidate).some((term) =>
+    curriculumNeedTermMatches(lowerSentence, term),
   );
 }
 
@@ -2777,6 +2893,7 @@ function relevantSmallGroupSourceNotes(
 
   const best = scored
     .filter((item) => item.score > 0)
+    .filter((item) => smallGroupSourceSentenceSupportsLesson(item.sentence, candidate, recommendation))
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, 5)
     .sort((a, b) => a.index - b.index)
@@ -2784,7 +2901,7 @@ function relevantSmallGroupSourceNotes(
 
   if (best.length) return best;
 
-  return sentences.slice(0, 4);
+  return [];
 }
 
 function smallGroupMaterials(
@@ -2823,6 +2940,7 @@ function smallGroupDataCheckItems(
   subject: "skills" | "listening" | "math",
 ) {
   const need = normalizeCurriculumNeedText(candidate.need);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
 
   if (subject === "math") {
     return [
@@ -2840,7 +2958,15 @@ function smallGroupDataCheckItems(
     ];
   }
 
-  if (/^[a-z]$/i.test(need)) {
+  if (subject === "skills" && letterNeed) {
+    return [
+      `Point to or circle ${letterNeed} from a small set of letters.`,
+      `Say the name or sound for ${letterNeed}.`,
+      `Write ${letterNeed} and read it back.`,
+    ];
+  }
+
+  if (subject === "skills" && /^[a-z]$/i.test(need)) {
     return [
       `Point to or circle ${need} from a small set of letters.`,
       `Say the name/sound for ${need}.`,
@@ -2848,7 +2974,7 @@ function smallGroupDataCheckItems(
     ];
   }
 
-  if (/^[a-z]{2,4}$/i.test(need)) {
+  if (subject === "skills" && /^[a-z]{2,4}$/i.test(need)) {
     return [
       `Read one word with ${need}.`,
       `Build or write one word with ${need}.`,
@@ -2874,7 +3000,7 @@ function smallGroupTeacherPlanRows(
   const lessonTitle = recommendation?.lessonTitle || "the connected lesson";
   const sourcePractice = sourceNotes[0]
     ? `Use this lesson source moment: ${sourceNotes[0]}`
-    : `Use ${lessonTitle} as the connected classroom lesson while keeping the practice focused on ${candidate.need}.`;
+    : smallGroupGuidedPracticeStep(candidate, recommendation, subject);
 
   if (subject === "math") {
     return [
@@ -2905,6 +3031,29 @@ function smallGroupTeacherPlanRows(
   ];
 }
 
+function smallGroupGuidedPracticeStep(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+) {
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const lessonTitle = recommendation?.lessonTitle || "the connected classroom lesson";
+
+  if (subject === "skills" && letterNeed) {
+    return `Mix ${letterNeed} with 3-5 known letters. Scholars point to ${letterNeed}, say its name or sound, trace it, write it, and read it in one short lesson word if available.`;
+  }
+
+  if (subject === "skills") {
+    return `Use ${lessonTitle} as the connected classroom lesson. Model the target, practice two guided examples, then have scholars read or write one example independently.`;
+  }
+
+  if (subject === "math") {
+    return `Use ${lessonTitle} as the connected classroom lesson. Model one problem with objects or drawings, solve one together, then have scholars try one and explain their thinking.`;
+  }
+
+  return `Use ${lessonTitle} as the connected classroom lesson. Revisit a short text/detail, model one response, then have scholars answer with a complete sentence.`;
+}
+
 function smallGroupFamilyPractice(
   candidate: CurriculumNeedCandidate,
   recommendation: CurriculumRecommendation | undefined,
@@ -2913,17 +3062,19 @@ function smallGroupFamilyPractice(
   const tips = curriculumFamilyPracticeTips(candidate, subject);
   const target = smallGroupTeachingTarget(candidate, subject);
   const need = normalizeCurriculumNeedText(candidate.need);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
 
-  if (subject === "skills" && /^[a-z]$/i.test(need)) {
+  if (subject === "skills" && (letterNeed || /^[a-z]$/i.test(need))) {
+    const letter = letterNeed || need;
     return {
       focus: target,
-      lookFor: `Your child can find ${need}, name or say it, and write it without guessing.`,
+      lookFor: `Your child can find ${letter}, name or say it, and write it without guessing.`,
       steps: [
-        `Write ${need} on a card or paper. Say: "This is ${need}."`,
-        `Mix ${need} with 3 or 4 other letters. Ask your child to point to ${need}.`,
-        `Have your child write ${need} three times and read it back.`,
+        `Write ${letter} on a card or paper. Say: "This is ${letter}."`,
+        `Mix ${letter} with 3 or 4 other letters. Ask your child to point to ${letter}.`,
+        `Have your child write ${letter} three times and read it back.`,
       ],
-      prompt: `Point to ${need}, say it, write it, then find it in a book or around the house.`,
+      prompt: `Point to ${letter}, say it, write it, then find it in a book or around the house.`,
     };
   }
 
@@ -4223,7 +4374,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const searchCandidates = focusCandidate ? [focusCandidate] : curriculumNeedCandidates;
     const needs = Array.from(new Set(
       searchCandidates
-        .flatMap((candidate) => [candidate.need, ...candidate.searchTerms])
+        .flatMap(curriculumRecommendationSearchTerms)
         .map(normalizeCurriculumNeedText)
         .filter(Boolean),
     )).slice(0, focusCandidate ? 12 : 24);
@@ -6526,7 +6677,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 return (
                   <article className="roster-card" key={scholar.id}>
                     <button onClick={() => setSelectedScholarId(scholar.id)} type="button">
-                      <span className="roster-initials">{initialsForScholar(scholar)}</span>
+                      <span className="roster-initials" aria-hidden="true">{initialsForScholar(scholar)}</span>
                       <span>
                         <strong>{scholar.firstName} {scholar.lastName}</strong>
                         <small>{teacherLabelForEmail(scholar.teacherEmail)} - {scholarResults.length} result{scholarResults.length === 1 ? "" : "s"}</small>
@@ -6535,46 +6686,47 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         ) : null}
                       </span>
                     </button>
-                    <div className="roster-initials-edit">
-                      <label>
-                        Tracking initials
-                        <input
-                          aria-label={`Whole-group tracking initials for ${scholar.firstName} ${scholar.lastName}`}
-                          maxLength={3}
-                          onChange={(event) => {
-                            const nextInitials = cleanTrackingInitials(event.target.value);
-                            setTrackingInitialDrafts((drafts) => ({
-                              ...drafts,
-                              [scholar.id]: nextInitials,
-                            }));
-                          }}
-                          value={trackingInitialDraft}
-                        />
-                      </label>
-                      <button
-                        className="teacher-text-button"
-                        disabled={!trackingInitialDraft || trackingInitialDraft === initialsForScholar(scholar)}
-                        onClick={() => void saveScholarTrackingInitials(scholar, trackingInitialDraft)}
-                        type="button"
-                      >
-                        Save Initials
+                    <label className="roster-initials-badge-edit">
+                      <span>Tracking initials</span>
+                      <input
+                        aria-label={`Whole-group tracking initials for ${scholar.firstName} ${scholar.lastName}`}
+                        maxLength={3}
+                        onChange={(event) => {
+                          const nextInitials = cleanTrackingInitials(event.target.value);
+                          setTrackingInitialDrafts((drafts) => ({
+                            ...drafts,
+                            [scholar.id]: nextInitials,
+                          }));
+                        }}
+                        value={trackingInitialDraft}
+                      />
+                    </label>
+                    <div className="roster-card-actions">
+                      {trackingInitialDraft && trackingInitialDraft !== initialsForScholar(scholar) ? (
+                        <button
+                          className="teacher-text-button"
+                          onClick={() => void saveScholarTrackingInitials(scholar, trackingInitialDraft)}
+                          type="button"
+                        >
+                          Save Initials
+                        </button>
+                      ) : null}
+                      {isTestScholar(scholar) ? (
+                        <button
+                          className="teacher-text-button"
+                          onClick={() => void toggleTestScholarReportVisibility(scholar)}
+                          type="button"
+                        >
+                          {scholar.includeInReports ? "Hide Data" : "Show Data"}
+                        </button>
+                      ) : null}
+                      <button className="teacher-text-button" onClick={() => printStudentOverviewReport(scholar)} type="button">
+                        Print
+                      </button>
+                      <button className="teacher-text-button danger" onClick={() => void deleteScholar(scholar)} type="button">
+                        Delete
                       </button>
                     </div>
-                    {isTestScholar(scholar) ? (
-                      <button
-                        className="teacher-text-button"
-                        onClick={() => void toggleTestScholarReportVisibility(scholar)}
-                        type="button"
-                      >
-                        {scholar.includeInReports ? "Hide Data" : "Show Data"}
-                      </button>
-                    ) : null}
-                    <button className="teacher-text-button" onClick={() => printStudentOverviewReport(scholar)} type="button">
-                      Print
-                    </button>
-                    <button className="teacher-text-button danger" onClick={() => void deleteScholar(scholar)} type="button">
-                      Delete
-                    </button>
                   </article>
                 );
               })}

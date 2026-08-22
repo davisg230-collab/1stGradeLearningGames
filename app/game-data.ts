@@ -30,7 +30,7 @@ export const skillsGames: GameCard[] = [
   { adventure: "ckla-unit", unitNumber: 5, description: "Build and practice Unit 5 skills and levels.", group: "CKLA Skills", icon: "\u{1F9E0}", slug: "unit-5", theme: "green", title: "Unit 5" },
   { adventure: "ckla-unit", unitNumber: 6, description: "Build and practice Unit 6 skills and levels.", group: "CKLA Skills", icon: "\u{270D}\u{FE0F}", slug: "unit-6", theme: "purple", title: "Unit 6" },
   { adventure: "ckla-unit", unitNumber: 7, description: "Build and practice Unit 7 skills and levels.", group: "CKLA Skills", icon: "\u{1F3A7}", slug: "unit-7", theme: "coral", title: "Unit 7" },
-  { adventure: "qps-screener", description: "Teacher-only Quick Phonics Screener for live scoring, printing, and Skills report evidence.", group: "CKLA Skills", icon: "QPS", slug: "qps-screener", teacherOnly: true, theme: "green", title: "QPS Screener" },
+  { adventure: "qps-screener", description: "Teacher-led QPS slides. Start live with your teacher, then type your name to connect.", group: "CKLA Skills", icon: "QPS", slug: "qps-screener", theme: "green", title: "QPS" },
 ];
 
 export const listeningLearningGames: GameCard[] = [

@@ -20,6 +20,7 @@ type FirebaseAuth = {
 
 type FirestoreDocSnapshot = {
   data: () => unknown;
+  exists?: boolean;
   id: string;
 };
 
@@ -27,8 +28,16 @@ type FirestoreQuerySnapshot = {
   docs: FirestoreDocSnapshot[];
 };
 
+type FirestoreDocRef = {
+  collection: (name: string) => FirestoreCollectionRef;
+  get: () => Promise<FirestoreDocSnapshot>;
+  onSnapshot: (callback: (snapshot: FirestoreDocSnapshot) => void) => () => void;
+  set: (data: unknown, options?: { merge: boolean }) => Promise<void>;
+};
+
 type FirestoreCollectionRef = {
   add: (data: unknown) => Promise<unknown>;
+  doc: (id: string) => FirestoreDocRef;
   get: () => Promise<FirestoreQuerySnapshot>;
 };
 
@@ -91,6 +100,22 @@ type QpsItemScore = {
   status: "unscored" | "correct" | "missed";
 };
 
+type QpsLiveSession = {
+  active: boolean;
+  currentIndex: number;
+  formId: QpsFormId;
+  lastChangedBy: "scholar" | "teacher";
+  scholarFirstName: string;
+  scholarFirstNameKey: string;
+  scholarId: string;
+  teacherEmail: string;
+};
+
+type QpsScholarSlideProfile = {
+  firstName: string;
+  firstNameKey: string;
+};
+
 declare global {
   interface Window {
     firebase?: FirebaseNamespace;
@@ -104,6 +129,8 @@ const FIREBASE_SCRIPTS = [
 ];
 const SCHOLAR_COLLECTION = "gameHubScholars";
 const RESULT_COLLECTION = "gameHubResultSubmissions";
+const GAME_DEFINITION_COLLECTION = "gameHubGameDefinitions";
+const QPS_LIVE_SESSION_COLLECTION = "gameHubQpsLiveSessions";
 const QPS_GAME_ID = "qps-screener";
 const QPS_GAME_TITLE = "QPS Screener";
 const QPS_DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ck", "ng", "qu"];
@@ -160,7 +187,7 @@ const QPS_FORM_RAW = {
     ],
   },
 } as const;
-const QPS_FORMS: Record<QpsFormId, QpsForm> = {
+export const QPS_FORMS: Record<QpsFormId, QpsForm> = {
   A: buildQpsForm("A"),
   B: buildQpsForm("B"),
   C: buildQpsForm("C"),
@@ -307,8 +334,20 @@ function asText(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function asNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function normalizeNameKey(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z]/g, "").slice(0, 30);
+}
+
+function qpsFormIdFor(value: unknown): QpsFormId {
+  return value === "B" || value === "C" ? value : "A";
+}
+
+function boundedQpsIndex(value: unknown, itemCount: number) {
+  return Math.max(0, Math.min(Math.max(0, itemCount - 1), Math.trunc(asNumber(value))));
 }
 
 function qpsItemScoreDefaults(items: QpsItem[]): Record<string, QpsItemScore> {
@@ -327,7 +366,7 @@ function qpsItemScoreDefaults(items: QpsItem[]): Record<string, QpsItemScore> {
 function mapScholar(doc: FirestoreDocSnapshot): QpsScholar | null {
   const data = asRecord(doc.data());
 
-  if (!data || data.active === false) {
+  if (!data || data.active === false || data.includeInReports === false) {
     return null;
   }
 
@@ -345,6 +384,38 @@ function mapScholar(doc: FirestoreDocSnapshot): QpsScholar | null {
     firstNameKey,
     id: doc.id,
     lastName,
+    teacherEmail,
+  };
+}
+
+function mapQpsLiveSession(doc: FirestoreDocSnapshot): QpsLiveSession | null {
+  if (doc.exists === false) {
+    return null;
+  }
+
+  const data = asRecord(doc.data());
+  if (!data) {
+    return null;
+  }
+
+  const formId = qpsFormIdFor(data.formId);
+  const scholarFirstName = asText(data.scholarFirstName).trim();
+  const scholarFirstNameKey = asText(data.scholarFirstNameKey).trim();
+  const scholarId = asText(data.scholarId).trim();
+  const teacherEmail = rosterTeacherEmailForEmail(asText(data.teacherEmail)) || asText(data.teacherEmail);
+
+  if (!scholarFirstName || !scholarFirstNameKey || !teacherEmail) {
+    return null;
+  }
+
+  return {
+    active: data.active === true,
+    currentIndex: boundedQpsIndex(data.currentIndex, QPS_FORMS[formId].items.length),
+    formId,
+    lastChangedBy: data.lastChangedBy === "scholar" ? "scholar" : "teacher",
+    scholarFirstName,
+    scholarFirstNameKey,
+    scholarId,
     teacherEmail,
   };
 }
@@ -372,19 +443,235 @@ function statusLabel(status: QpsItemScore["status"]) {
   return "Not scored";
 }
 
+function qpsItemTypeFor(value: unknown, display: string, section: string): QpsItem["type"] {
+  if (value === "letter" || value === "sound" || value === "word" || value === "sentence") {
+    return value;
+  }
+
+  if (section.includes("Letter Names")) return "letter";
+  if (section.includes("Letter Sounds")) return "sound";
+  if (/\s/.test(display.trim())) return "sentence";
+  return display.trim().length <= 2 ? "letter" : "word";
+}
+
+function editableQpsFormsFromContent(content: Record<string, unknown>, versionId: string) {
+  const levels = Array.isArray(content.levels) ? content.levels : [];
+  const questions = Array.isArray(content.questions) ? content.questions : [];
+  const nextForms: Record<QpsFormId, QpsForm> = {
+    A: { ...QPS_FORMS.A, items: [] },
+    B: { ...QPS_FORMS.B, items: [] },
+    C: { ...QPS_FORMS.C, items: [] },
+  };
+
+  questions.forEach((question, index) => {
+    const raw = asRecord(question);
+    if (!raw) return;
+
+    const zone = Math.max(0, Math.trunc(asNumber(raw.zone)));
+    const level = asRecord(levels[zone]);
+    const levelName = asText(level?.name).trim();
+    const formId = qpsFormIdFor(raw.formId || levelName.match(/Form\s+([ABC])/i)?.[1]);
+    const display = asText(raw.display || raw.word || raw.correctAnswer || raw.answer).trim();
+    const section = asText(raw.section).trim() || levelName.replace(/^Form\s+[ABC]\s*[-:]\s*/i, "").trim() || "QPS";
+    const prompt = asText(raw.prompt).trim();
+
+    if (!display || !prompt) {
+      return;
+    }
+
+    nextForms[formId].items.push({
+      display,
+      formId,
+      id: asText(raw.id).trim() || `${formId}-${slug(section)}-${index + 1}-${slug(display).slice(0, 36)}`,
+      prompt,
+      section,
+      skill: asText(raw.skill || raw.category).trim() || section.replace(/^Set \d+ - /, ""),
+      target: asText(raw.target).trim() || qpsTargetFor(display, section),
+      type: qpsItemTypeFor(raw.itemType || raw.type, display, section),
+    });
+  });
+
+  if (!nextForms.A.items.length && !nextForms.B.items.length && !nextForms.C.items.length) {
+    return null;
+  }
+
+  return {
+    A: nextForms.A.items.length ? { ...nextForms.A, version: versionId } : QPS_FORMS.A,
+    B: nextForms.B.items.length ? { ...nextForms.B, version: versionId } : QPS_FORMS.B,
+    C: nextForms.C.items.length ? { ...nextForms.C, version: versionId } : QPS_FORMS.C,
+  };
+}
+
+async function loadEditableQpsForms(db: FirestoreDb) {
+  try {
+    const parentDoc = await db.collection(GAME_DEFINITION_COLLECTION).doc(QPS_GAME_ID).get();
+    const parent = asRecord(parentDoc.data());
+    const versionId = asText(parent?.publishedVersion || parent?.draftVersion).trim();
+
+    if (!versionId) {
+      return QPS_FORMS;
+    }
+
+    const versionDoc = await db
+      .collection(GAME_DEFINITION_COLLECTION)
+      .doc(QPS_GAME_ID)
+      .collection("versions")
+      .doc(versionId)
+      .get();
+    const versionData = asRecord(versionDoc.data());
+    const content = asRecord(versionData?.content);
+
+    return content ? editableQpsFormsFromContent(content, versionId) ?? QPS_FORMS : QPS_FORMS;
+  } catch {
+    return QPS_FORMS;
+  }
+}
+
+function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) {
+  const [error, setError] = useState("");
+  const [forms, setForms] = useState<Record<QpsFormId, QpsForm>>(QPS_FORMS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [liveSession, setLiveSession] = useState<QpsLiveSession | null>(null);
+  const [isMoving, setIsMoving] = useState(false);
+
+  const selectedForm = forms[liveSession?.formId ?? "A"];
+  const qpsItems = selectedForm.items;
+  const currentIndex = boundedQpsIndex(liveSession?.currentIndex ?? 0, qpsItems.length);
+  const currentItem = qpsItems[currentIndex] ?? qpsItems[0];
+  const isConnected = liveSession?.active === true && liveSession.scholarFirstNameKey === profile.firstNameKey;
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    setError("");
+    setIsLoading(true);
+
+    loadFirebase()
+      .then(async ({ db }) => {
+        setForms(await loadEditableQpsForms(db));
+        unsubscribe = db
+          .collection(QPS_LIVE_SESSION_COLLECTION)
+          .doc(profile.firstNameKey)
+          .onSnapshot((snapshot) => {
+            setLiveSession(mapQpsLiveSession(snapshot));
+            setIsLoading(false);
+          });
+      })
+      .catch((nextError) => {
+        setError(nextError instanceof Error ? nextError.message : "QPS could not connect.");
+        setIsLoading(false);
+      });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [profile.firstNameKey]);
+
+  const moveToIndex = async (nextIndex: number) => {
+    if (!isConnected) {
+      return;
+    }
+
+    setIsMoving(true);
+    setError("");
+
+    try {
+      const { db, firebase } = await loadFirebase();
+      await db
+        .collection(QPS_LIVE_SESSION_COLLECTION)
+        .doc(profile.firstNameKey)
+        .set({
+          currentIndex: boundedQpsIndex(nextIndex, qpsItems.length),
+          lastChangedBy: "scholar",
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "QPS could not move.");
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
+  return (
+    <section className="qps-scholar-page">
+      <div className="qps-scholar-shell">
+        <a className="home-link" href="/skills">
+          Back to Skills
+        </a>
+
+        {isLoading ? (
+          <div className="qps-waiting-card">
+            <p className="section-kicker">QPS</p>
+            <h2>Connecting to your teacher...</h2>
+          </div>
+        ) : null}
+
+        {!isLoading && !isConnected ? (
+          <div className="qps-waiting-card">
+            <p className="section-kicker">QPS</p>
+            <h2>Waiting for your teacher</h2>
+            <p>{profile.firstName}, keep this screen open. When your teacher starts your QPS, the slide will appear here.</p>
+          </div>
+        ) : null}
+
+        {isConnected ? (
+          <>
+            <div className="qps-scholar-status">
+              <span>Connected with your teacher</span>
+              <strong>{selectedForm.label} - Item {currentIndex + 1} of {qpsItems.length}</strong>
+            </div>
+            <div className="qps-scholar-card">
+              <p>{currentItem.section}</p>
+              <strong className={`qps-reader-display is-${currentItem.type}`}>
+                {currentItem.display}
+              </strong>
+              <span>Read or say this for your teacher.</span>
+            </div>
+            <div className="qps-scholar-nav">
+              <button
+                className="teacher-control-button secondary"
+                disabled={isMoving || currentIndex === 0}
+                onClick={() => void moveToIndex(currentIndex - 1)}
+                type="button"
+              >
+                Previous
+              </button>
+              <button
+                className="teacher-control-button"
+                disabled={isMoving || currentIndex >= qpsItems.length - 1}
+                onClick={() => void moveToIndex(currentIndex + 1)}
+                type="button"
+              >
+                Next
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {error ? <p className="pin-error">{error}</p> : null}
+      </div>
+    </section>
+  );
+}
+
 export function QpsScreenerGame() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState("");
   const [formId, setFormId] = useState<QpsFormId>("A");
+  const [hasCheckedScholarMode, setHasCheckedScholarMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLiveSessionSaving, setIsLiveSessionSaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [liveSessionActive, setLiveSessionActive] = useState(false);
+  const [liveSessionStatus, setLiveSessionStatus] = useState("");
+  const [forms, setForms] = useState<Record<QpsFormId, QpsForm>>(QPS_FORMS);
   const [scores, setScores] = useState<Record<string, QpsItemScore>>(() => qpsItemScoreDefaults(QPS_FORMS.A.items));
   const [scholars, setScholars] = useState<QpsScholar[]>([]);
+  const [scholarSlideProfile, setScholarSlideProfile] = useState<QpsScholarSlideProfile | null>(null);
   const [selectedScholarId, setSelectedScholarId] = useState("");
   const [status, setStatus] = useState("");
   const [teacherEmail, setTeacherEmail] = useState("");
 
-  const selectedForm = QPS_FORMS[formId];
+  const selectedForm = forms[formId] ?? QPS_FORMS[formId];
   const qpsItems = selectedForm.items;
   const currentItem = qpsItems[currentIndex] ?? qpsItems[0];
   const currentScore = scores[currentItem.id] ?? { note: "", said: "", status: "unscored" as const };
@@ -396,6 +683,18 @@ export function QpsScreenerGame() {
   const correctCount = scoredItems.filter((item) => scores[item.id]?.status === "correct").length;
   const missedCount = scoredItems.filter((item) => scores[item.id]?.status === "missed").length;
   const percent = scoredItems.length ? Math.round((correctCount / scoredItems.length) * 100) : 0;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const firstName = asText(params.get("player")).trim();
+    const firstNameKey = asText(params.get("key")).trim() || normalizeNameKey(firstName);
+
+    if (params.get("live") === "1" && firstName && firstNameKey && normalizeNameKey(firstName) === firstNameKey) {
+      setScholarSlideProfile({ firstName, firstNameKey });
+    }
+
+    setHasCheckedScholarMode(true);
+  }, []);
 
   const loadTeacherData = async () => {
     setError("");
@@ -413,6 +712,7 @@ export function QpsScreenerGame() {
         return;
       }
 
+      setForms(await loadEditableQpsForms(db));
       const snapshot = await db.collection(SCHOLAR_COLLECTION).get();
       setScholars(
         snapshot.docs
@@ -434,6 +734,12 @@ export function QpsScreenerGame() {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
+    if (!hasCheckedScholarMode || scholarSlideProfile) {
+      return () => {
+        unsubscribe?.();
+      };
+    }
+
     loadFirebase()
       .then(({ auth }) => {
         unsubscribe = auth.onAuthStateChanged(() => {
@@ -448,13 +754,57 @@ export function QpsScreenerGame() {
     return () => {
       unsubscribe?.();
     };
-  }, []);
+  }, [hasCheckedScholarMode, scholarSlideProfile]);
 
   useEffect(() => {
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
     setStatus("");
   }, [qpsItems]);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
+    if (!selectedScholar || !isAuthorizedTeacherEmail(teacherEmail)) {
+      setLiveSessionActive(false);
+      setLiveSessionStatus("");
+      return () => {
+        unsubscribe?.();
+      };
+    }
+
+    loadFirebase()
+      .then(({ db }) => {
+        unsubscribe = db
+          .collection(QPS_LIVE_SESSION_COLLECTION)
+          .doc(selectedScholar.firstNameKey)
+          .onSnapshot((snapshot) => {
+            const session = mapQpsLiveSession(snapshot);
+
+            if (!session?.active || session.scholarFirstNameKey !== selectedScholar.firstNameKey) {
+              setLiveSessionActive(false);
+              setLiveSessionStatus("Live slides are off for this scholar.");
+              return;
+            }
+
+            setLiveSessionActive(true);
+            setLiveSessionStatus(`Live slides are on for ${session.scholarFirstName}.`);
+            if (session.formId !== formId) {
+              setFormId(session.formId);
+              return;
+            }
+
+            setCurrentIndex((index) => index === session.currentIndex ? index : session.currentIndex);
+          });
+      })
+      .catch((nextError) => {
+        setLiveSessionStatus(nextError instanceof Error ? nextError.message : "Live QPS could not connect.");
+      });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [selectedScholar, selectedScholarId, teacherEmail, formId]);
 
   const signIn = async () => {
     setError("");
@@ -467,6 +817,68 @@ export function QpsScreenerGame() {
       setError(nextError instanceof Error ? nextError.message : "Teacher sign-in did not finish.");
     }
   };
+
+  const writeLiveSession = async (active: boolean, silent = false) => {
+    if (!selectedScholar) {
+      setLiveSessionStatus("Choose a scholar before starting live QPS.");
+      return;
+    }
+
+    if (!silent) {
+      setIsLiveSessionSaving(true);
+    }
+    setError("");
+
+    try {
+      const { auth, db, firebase } = await loadFirebase();
+      const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
+
+      if (!isAuthorizedTeacherEmail(signedInEmail)) {
+        throw new Error("Sign in with an authorized teacher account before starting live QPS.");
+      }
+
+      const serverTime = firebase.firestore.FieldValue.serverTimestamp();
+      await db
+        .collection(QPS_LIVE_SESSION_COLLECTION)
+        .doc(selectedScholar.firstNameKey)
+        .set({
+          active,
+          createdAt: serverTime,
+          currentIndex: boundedQpsIndex(currentIndex, qpsItems.length),
+          formId,
+          lastChangedBy: "teacher",
+          schemaVersion: 1,
+          scholarFirstName: selectedScholar.firstName,
+          scholarFirstNameKey: selectedScholar.firstNameKey,
+          scholarId: selectedScholar.id,
+          teacherEmail: selectedScholar.teacherEmail,
+          updatedAt: serverTime,
+        }, { merge: true });
+
+      setLiveSessionActive(active);
+      setLiveSessionStatus(active ? `Live slides are on for ${selectedScholar.firstName}.` : `Live slides ended for ${selectedScholar.firstName}.`);
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : "Live QPS could not update.";
+      setError(message);
+      setLiveSessionStatus(message);
+    } finally {
+      if (!silent) {
+        setIsLiveSessionSaving(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!liveSessionActive || !selectedScholar || scholarSlideProfile) {
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      void writeLiveSession(true, true);
+    }, 175);
+
+    return () => window.clearTimeout(handle);
+  }, [currentIndex, formId, liveSessionActive, selectedScholar, scholarSlideProfile]);
 
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     setScores((currentScores) => ({
@@ -708,6 +1120,18 @@ export function QpsScreenerGame() {
     }
   };
 
+  if (!hasCheckedScholarMode) {
+    return (
+      <section className="qps-screener-page">
+        <p className="empty-results-message">Preparing QPS...</p>
+      </section>
+    );
+  }
+
+  if (scholarSlideProfile) {
+    return <QpsScholarLiveSlides profile={scholarSlideProfile} />;
+  }
+
   const signedInButUnauthorized = teacherEmail && !isAuthorizedTeacherEmail(teacherEmail);
 
   return (
@@ -768,6 +1192,25 @@ export function QpsScreenerGame() {
                 ))}
               </select>
             </label>
+            <div className="qps-live-controls">
+              <button
+                className="teacher-control-button"
+                disabled={!selectedScholar || isLiveSessionSaving}
+                onClick={() => void writeLiveSession(true)}
+                type="button"
+              >
+                {liveSessionActive ? "Update Live Slides" : "Start Live Slides"}
+              </button>
+              <button
+                className="teacher-control-button secondary"
+                disabled={!selectedScholar || !liveSessionActive || isLiveSessionSaving}
+                onClick={() => void writeLiveSession(false)}
+                type="button"
+              >
+                End Live
+              </button>
+              <p>{liveSessionStatus || "Start live slides when the scholar is ready on their iPad."}</p>
+            </div>
             <div className="qps-score-summary">
               <strong>{correctCount}/{scoredItems.length || 0}</strong>
               <span>correct</span>

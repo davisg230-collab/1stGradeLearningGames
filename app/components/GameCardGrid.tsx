@@ -143,7 +143,7 @@ function isManagedGame(game: GameCard) {
 }
 
 function isTeacherOnlyGame(game: GameCard) {
-  return game.teacherOnly === true || game.adventure === "qps-screener";
+  return game.teacherOnly === true && game.adventure !== "qps-screener";
 }
 
 function isPreassessmentGame(game: GameCard | null) {
@@ -184,6 +184,10 @@ type ScholarLaunchProfile = {
 };
 
 function wholeClassGameUrl(game: GameCard | null) {
+  if (game?.adventure === "qps-screener") {
+    return QPS_SCREENER_URL;
+  }
+
   if (isPreassessmentGame(game)) {
     const params = new URLSearchParams({
       next: defaultPostAssessmentUrl(game, true),
@@ -207,6 +211,13 @@ function scholarGameUrl(game: GameCard, profile: ScholarLaunchProfile) {
   }
 
   const directUrl = `${playerUrl(game)}?${params.toString()}`;
+
+  if (game.adventure === "qps-screener") {
+    params.delete("unit");
+    params.set("live", "1");
+    params.set("learningLocation", "school");
+    return `${QPS_SCREENER_URL}?${params.toString()}`;
+  }
 
   if (isPreassessmentGame(game)) {
     const startingPointParams = new URLSearchParams({
@@ -466,6 +477,11 @@ export function GameCardGrid({ games }: GameCardGridProps) {
         return;
       }
 
+      if (namePromptGame?.adventure === "qps-screener") {
+        window.location.href = scholarGameUrl(namePromptGame, profile);
+        return;
+      }
+
       setNameDraft(profile.firstName);
       setPendingScholarProfile(profile);
       setNameError("");
@@ -505,6 +521,8 @@ export function GameCardGrid({ games }: GameCardGridProps) {
                     ? `EUREKA MATH · MODULE ${game.unitNumber}`
                     : game.adventure === "ckla-listening-learning-unit"
                       ? `CKLA LISTENING & LEARNING · UNIT ${game.unitNumber}`
+                    : game.adventure === "qps-screener"
+                      ? "TEACHER-LED CHECK-IN"
                       : isTeacherOnlyGame(game)
                         ? "TEACHER ONLY · CKLA SKILLS"
                       : game.adventure === "ckla-unit"
@@ -639,8 +657,8 @@ export function GameCardGrid({ games }: GameCardGridProps) {
               </>
             ) : (
               <>
-                <h2 id="unit1-name-title">Who is playing {namePromptGame.title}?</h2>
-                <p>Scholars type a first name. Teachers type the class code.</p>
+                <h2 id="unit1-name-title">Who is {namePromptGame.adventure === "qps-screener" ? "doing" : "playing"} {namePromptGame.title}?</h2>
+                <p>{namePromptGame.adventure === "qps-screener" ? "Scholars type a first name. If your teacher has started live QPS, your screen will connect." : "Scholars type a first name. Teachers type the class code."}</p>
                 <label>
                   First name or teacher code
                   <input

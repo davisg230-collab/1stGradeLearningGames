@@ -198,9 +198,15 @@ function extractConstants(script) {
 }
 
 function extractQuestionBlock(script) {
-  const marker = "const QUESTIONS = [";
-  const start = script.indexOf(marker);
-  if (start < 0) return "";
+  const markers = [
+    "const QUESTIONS = [",
+    "const DEFAULT_QUESTIONS = [",
+  ];
+  const start = markers
+    .map((marker) => script.indexOf(marker))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0];
+  if (start === undefined) return "";
   const openIndex = script.indexOf("[", start);
   const closeIndex = findMatchingBracket(script, openIndex);
   return closeIndex > openIndex ? script.slice(openIndex, closeIndex + 1) : "";
@@ -259,14 +265,17 @@ function collectScriptSpeech(script, filePath, texts) {
   const sourceName = path.relative(root, filePath).replace(/\\/g, "/");
   const constants = extractConstants(script);
   const questionBlock = extractQuestionBlock(script);
-  for (const match of questionBlock.matchAll(/\b(?:prompt|visiblePrompt|spokenDirections|spokenTarget|soundsSpeech|promptSpeak|speak|hint|visibleExplanation|spokenExplanation|word|passage)\s*:\s*(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/g)) {
+  for (const match of questionBlock.matchAll(/["'`]?(?:audioSourceText|audioText|prompt|visiblePrompt|spokenDirections|spokenTarget|soundsSpeech|promptSpeak|speak|hint|visibleExplanation|spokenExplanation|word|passage)["'`]?\s*:\s*(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/g)) {
     try {
       addText(texts, decodeJsString(match[1], match[2]), `${sourceName}:question-field`);
     } catch {
       // Ignore malformed question strings.
     }
   }
-  for (const block of extractArrayBlocks(questionBlock, "choices:")) {
+  for (const block of [
+    ...extractArrayBlocks(questionBlock, "choices:"),
+    ...extractArrayBlocks(questionBlock, '"choices":'),
+  ]) {
     collectChoiceSpeech(block, texts, sourceName);
   }
   for (const block of extractArrayBlocks(script, "PRELOAD_SPEECH_TEXTS")) {
@@ -274,7 +283,7 @@ function collectScriptSpeech(script, filePath, texts) {
       addText(texts, text, `${sourceName}:preload`);
     }
   }
-  for (const match of questionBlock.matchAll(/\b(?:speak|passage|prompt|visiblePrompt|spokenDirections|spokenTarget|soundsSpeech|promptSpeak|hint|visibleExplanation|spokenExplanation|word)\s*:\s*([A-Z][A-Z0-9_]*)/g)) {
+  for (const match of questionBlock.matchAll(/["'`]?(?:audioSourceText|audioText|speak|passage|prompt|visiblePrompt|spokenDirections|spokenTarget|soundsSpeech|promptSpeak|hint|visibleExplanation|spokenExplanation|word)["'`]?\s*:\s*([A-Z][A-Z0-9_]*)/g)) {
     const value = constants.get(match[1]);
     if (value) addText(texts, value, `${sourceName}:question-constant`);
   }

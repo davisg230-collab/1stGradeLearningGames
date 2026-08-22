@@ -1,12 +1,16 @@
+export type LearningLocation = "home" | "school";
+
 export type ScholarProfile = {
   firstName: string;
   firstNameKey: string;
+  learningLocation?: LearningLocation;
 };
 
 export type CklaAccess =
   | {
       firstName: string;
       firstNameKey: string;
+      learningLocation?: LearningLocation;
       mode: "scholar";
     }
   | {
@@ -16,6 +20,8 @@ export type CklaAccess =
 export const SCHOLAR_PROFILE_STORAGE_KEY =
   "first-grade-learning-games-scholar-profile";
 export const CKLA_ACCESS_STORAGE_KEY = "first-grade-learning-games-ckla-access";
+export const LEARNING_LOCATION_STORAGE_KEY =
+  "first-grade-learning-games-learning-location";
 export const CKLA_ACCESS_CHANGED_EVENT = "ckla-access-changed";
 export const TEACHER_CLASS_CODE = "2213";
 
@@ -27,6 +33,11 @@ export function normalizeScholarNameKey(value: string) {
     .toLowerCase()
     .replace(/[^a-z]/g, "")
     .slice(0, 30);
+}
+
+export function normalizeLearningLocation(value: unknown): LearningLocation | "" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "home" || normalized === "school" ? normalized : "";
 }
 
 export function readScholarProfile(): ScholarProfile | null {
@@ -47,6 +58,9 @@ export function readScholarProfile(): ScholarProfile | null {
       return {
         firstName: stored.firstName,
         firstNameKey: stored.firstNameKey,
+        ...(normalizeLearningLocation(stored.learningLocation)
+          ? { learningLocation: normalizeLearningLocation(stored.learningLocation) }
+          : {}),
       };
     }
   } catch {
@@ -56,7 +70,10 @@ export function readScholarProfile(): ScholarProfile | null {
   return null;
 }
 
-export function writeScholarProfile(firstName: string) {
+export function writeScholarProfile(
+  firstName: string,
+  learningLocation?: LearningLocation,
+) {
   const cleanName = firstName.trim().replace(/\s+/g, " ");
   const firstNameKey = normalizeScholarNameKey(cleanName);
 
@@ -64,7 +81,13 @@ export function writeScholarProfile(firstName: string) {
     return null;
   }
 
-  const profile = { firstName: cleanName, firstNameKey };
+  const profile: ScholarProfile = {
+    firstName: cleanName,
+    firstNameKey,
+    ...(normalizeLearningLocation(learningLocation)
+      ? { learningLocation: normalizeLearningLocation(learningLocation) }
+      : {}),
+  };
 
   if (typeof window !== "undefined") {
     try {
@@ -72,6 +95,12 @@ export function writeScholarProfile(firstName: string) {
         SCHOLAR_PROFILE_STORAGE_KEY,
         JSON.stringify(profile),
       );
+      if (profile.learningLocation) {
+        window.localStorage.setItem(
+          LEARNING_LOCATION_STORAGE_KEY,
+          profile.learningLocation,
+        );
+      }
     } catch {
       // The Unit 1 launch URL still carries the name if storage is blocked.
     }
@@ -109,6 +138,9 @@ export function readCklaAccess(): CklaAccess | null {
       return {
         firstName: stored.firstName,
         firstNameKey: stored.firstNameKey,
+        ...(normalizeLearningLocation(stored.learningLocation)
+          ? { learningLocation: normalizeLearningLocation(stored.learningLocation) }
+          : {}),
         mode: "scholar",
       };
     }
@@ -119,8 +151,11 @@ export function readCklaAccess(): CklaAccess | null {
   return null;
 }
 
-export function writeCklaScholarAccess(firstName: string) {
-  const profile = writeScholarProfile(firstName);
+export function writeCklaScholarAccess(
+  firstName: string,
+  learningLocation?: LearningLocation,
+) {
+  const profile = writeScholarProfile(firstName, learningLocation);
 
   if (!profile || typeof window === "undefined") {
     return profile;

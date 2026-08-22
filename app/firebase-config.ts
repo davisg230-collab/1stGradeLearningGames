@@ -10,16 +10,24 @@ export const firebaseConfig = {
 
 export const authorizedTeachers = [
   {
+    aliases: [],
     email: "davisg230@gmail.com",
     label: "Mr. Davis",
   },
   {
+    aliases: [
+      "lvest1010@gmail.com",
+      "lvest@crossroadsschoolskc.org",
+    ],
     email: "lvest1@crossroadsschoolskc.org",
     label: "Ms. Vest",
   },
 ] as const;
 
-export const authorizedTeacherEmails = authorizedTeachers.map((teacher) => teacher.email);
+export const authorizedTeacherEmails = authorizedTeachers.flatMap((teacher) => [
+  teacher.email,
+  ...teacher.aliases,
+]);
 export const teacherEmail = authorizedTeachers[0].email;
 
 export function isAuthorizedTeacherEmail(email: string | null | undefined) {
@@ -27,7 +35,16 @@ export function isAuthorizedTeacherEmail(email: string | null | undefined) {
   return authorizedTeacherEmails.includes(normalized as (typeof authorizedTeacherEmails)[number]);
 }
 
+export function rosterTeacherEmailForEmail(email: string | null | undefined) {
+  const normalized = email?.trim().toLowerCase() ?? "";
+  return authorizedTeachers.find((teacher) =>
+    teacher.email === normalized || (teacher.aliases as readonly string[]).includes(normalized),
+  )?.email ?? "";
+}
+
 export function teacherLabelForEmail(email: string | null | undefined) {
   const normalized = email?.trim().toLowerCase() ?? "";
-  return authorizedTeachers.find((teacher) => teacher.email === normalized)?.label ?? "Teacher";
+  return authorizedTeachers.find((teacher) =>
+    teacher.email === normalized || (teacher.aliases as readonly string[]).includes(normalized),
+  )?.label ?? "Teacher";
 }

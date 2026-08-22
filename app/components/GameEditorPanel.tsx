@@ -7,6 +7,7 @@ import {
   teacherLabelForEmail,
 } from "../firebase-config";
 import { listeningLearningGames, mathGames, skillsGames } from "../game-data";
+import { QPS_FORMS } from "./QpsScreenerGame";
 import type { CardEdit } from "./TeacherEditProvider";
 
 type FirebaseUser = {
@@ -262,6 +263,7 @@ type RecordingDraft = {
 const GAME_COLLECTION = "gameHubGameDefinitions";
 const LETTER_SEARCH_SAFARI_GAME_ID = "letter-search-safari";
 const NUMBER_SEARCH_SAFARI_GAME_ID = "number-search-safari";
+const QPS_SCREENER_GAME_ID = "qps-screener";
 const RAPID_GUESSING_SPEAKER_ID = "rapid-guessing-voice";
 const DEFAULT_RAPID_GUESSING_MESSAGE = "Please don't rush. Take your time. You are rocking it.";
 
@@ -321,6 +323,10 @@ function preassessmentLabelForGameId(gameId: string) {
 }
 
 function cardKeyForGameId(gameId: string) {
+  if (gameId === QPS_SCREENER_GAME_ID) {
+    return "CKLA Skills:qps-screener";
+  }
+
   if (gameId === "skills-starting-point") {
     return "CKLA Skills:starting-point";
   }
@@ -353,6 +359,10 @@ function cardKeyForGameId(gameId: string) {
 }
 
 function baseCardForGameId(gameId: string) {
+  if (gameId === QPS_SCREENER_GAME_ID) {
+    return skillsGames.find((game) => game.slug === "qps-screener");
+  }
+
   if (gameId === "skills-starting-point") {
     return skillsGames.find((game) => game.slug === "starting-point");
   }
@@ -1267,6 +1277,73 @@ function blankGame(): EditableGame {
     tileIcon: "🎮",
     title: "New CKLA Unit",
     unitSlug: id,
+  };
+}
+
+function qpsEditableGame(): EditableGame {
+  const levels: EditableLevel[] = [];
+  const levelIndexes = new Map<string, number>();
+  const questions: EditableQuestion[] = [];
+
+  (["A", "B", "C"] as const).forEach((formId) => {
+    QPS_FORMS[formId].items.forEach((item) => {
+      const levelKey = `${formId}:${item.section}`;
+      let levelIndex = levelIndexes.get(levelKey);
+
+      if (levelIndex === undefined) {
+        levelIndex = levels.length;
+        levelIndexes.set(levelKey, levelIndex);
+        levels.push({
+          detail: `Form ${formId} ${item.section}`,
+          icon: "QPS",
+          learningTarget: item.section,
+          lessonRange: `Form ${formId}`,
+          name: `Form ${formId} - ${item.section}`,
+          practiceLabel: "QPS",
+        });
+      }
+
+      questions.push({
+        answer: item.display,
+        category: item.section,
+        choices: [
+          [item.display, item.display],
+          ["needs-review", "Needs Review"],
+        ],
+        correctAnswer: item.display,
+        display: item.display,
+        formId,
+        id: item.id,
+        itemType: item.type,
+        prompt: item.prompt,
+        section: item.section,
+        skill: item.skill,
+        target: item.target || item.display,
+        type: item.type,
+        word: item.display,
+        zone: levelIndex,
+      });
+    });
+  });
+
+  return {
+    content: {
+      levels,
+      questions,
+      rapidGuessingVoice: defaultRapidGuessingVoice(),
+      schemaVersion: 1,
+      supplementalQuestions: [],
+      unitTitle: "QPS Screener",
+      zoneEncouragements: [],
+    },
+    gameId: QPS_SCREENER_GAME_ID,
+    publishedVersion: "",
+    schemaVersion: 1,
+    subject: "ckla",
+    tileDescription: "Teacher-led QPS slides for live screening.",
+    tileIcon: "QPS",
+    title: "QPS",
+    unitSlug: QPS_SCREENER_GAME_ID,
   };
 }
 
@@ -3289,14 +3366,17 @@ export function GameEditorPanel({
       setIsLoading(true);
 
       try {
-        const seedGames = (
+        const seedGames = [
+          ...(
           await Promise.all(
             SEED_GAME_FILES.map(async (seed) => {
               const response = await fetch(seed.path, { cache: "no-store" });
               return normalizeGame(await response.json());
             }),
           )
-        ).filter((game): game is EditableGame => Boolean(game));
+        ).filter((game): game is EditableGame => Boolean(game)),
+          qpsEditableGame(),
+        ];
         const byId = new Map(seedGames.map((game) => [game.gameId, game]));
         const services = await loadFirebase();
         const email = await signedInTeacher(services);
@@ -3343,7 +3423,10 @@ export function GameEditorPanel({
         }
 
         const gameOrder = new Map(
-          SEED_GAME_FILES.map((seed, index) => [seed.gameId, index]),
+          [
+            ...SEED_GAME_FILES.map((seed, index) => [seed.gameId, index] as const),
+            [QPS_SCREENER_GAME_ID, SEED_GAME_FILES.length] as const,
+          ],
         );
 
         const nextGames = Array.from(byId.values())

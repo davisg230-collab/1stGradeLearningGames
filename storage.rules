@@ -5,7 +5,9 @@ service firebase.storage {
       return request.auth != null
         && request.auth.token.email in [
           'davisg230@gmail.com',
-          'lvest1@crossroadsschoolskc.org'
+          'lvest1@crossroadsschoolskc.org',
+          'lvest1010@gmail.com',
+          'lvest@crossroadsschoolskc.org'
         ];
     }
 
@@ -19,6 +21,16 @@ service firebase.storage {
         && isValidEditableGameId(gameId)
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('audio/.*');
+      allow delete: if isTeacherEditor()
+        && isValidEditableGameId(gameId);
+    }
+
+    match /gameImages/{gameId}/{imageFile} {
+      allow read: if isValidEditableGameId(gameId);
+      allow create, update: if isTeacherEditor()
+        && isValidEditableGameId(gameId)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
       allow delete: if isTeacherEditor()
         && isValidEditableGameId(gameId);
     }

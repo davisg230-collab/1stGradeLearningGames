@@ -176,12 +176,12 @@ service cloud.firestore {
         && request.resource.data.content.levels.size() > 0
         && request.resource.data.content.levels.size() <= 40
         && request.resource.data.content.questions is list
-        && request.resource.data.content.questions.size() <= 300
+        && request.resource.data.content.questions.size() <= 700
         && (
           !request.resource.data.content.keys().hasAny(['supplementalQuestions'])
           || (
             request.resource.data.content.supplementalQuestions is list
-            && request.resource.data.content.supplementalQuestions.size() <= 300
+            && request.resource.data.content.supplementalQuestions.size() <= 700
           )
         )
         && (
@@ -1316,6 +1316,70 @@ service cloud.firestore {
       return isTeacherEditor();
     }
 
+    function isValidQpsLiveSession(sessionId) {
+      return sessionId.matches('^[a-z]{1,30}$')
+        && request.resource.data.keys().hasOnly([
+          'active',
+          'createdAt',
+          'currentIndex',
+          'formId',
+          'lastChangedBy',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'teacherEmail',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'active',
+          'currentIndex',
+          'formId',
+          'lastChangedBy',
+          'schemaVersion',
+          'scholarFirstName',
+          'scholarFirstNameKey',
+          'scholarId',
+          'teacherEmail',
+          'updatedAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.active is bool
+        && request.resource.data.currentIndex is int
+        && request.resource.data.currentIndex >= 0
+        && request.resource.data.currentIndex <= 220
+        && request.resource.data.formId in ['A', 'B', 'C']
+        && request.resource.data.lastChangedBy in ['teacher', 'scholar']
+        && isValidName(request.resource.data.scholarFirstName)
+        && request.resource.data.scholarFirstNameKey == sessionId
+        && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && request.resource.data.scholarId is string
+        && request.resource.data.scholarId.size() > 0
+        && request.resource.data.scholarId.size() <= 150
+        && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
+        && request.resource.data.updatedAt is timestamp
+        && (
+          !request.resource.data.keys().hasAny(['createdAt'])
+          || request.resource.data.createdAt is timestamp
+        );
+    }
+
+    function isValidScholarQpsLiveMove(sessionId) {
+      return sessionId.matches('^[a-z]{1,30}$')
+        && resource.data.active == true
+        && resource.data.scholarFirstNameKey == sessionId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'currentIndex',
+          'lastChangedBy',
+          'updatedAt'
+        ])
+        && request.resource.data.currentIndex is int
+        && request.resource.data.currentIndex >= 0
+        && request.resource.data.currentIndex <= 220
+        && request.resource.data.lastChangedBy == 'scholar'
+        && request.resource.data.updatedAt is timestamp;
+    }
+
     match /gameHubCards/{cardId} {
       allow read: if true;
       allow create, update: if isTeacherEditor()
@@ -1397,6 +1461,18 @@ service cloud.firestore {
         || controlId.matches('^skills-starting-point-[a-z]{1,30}$');
       allow list: if isTeacherEditor();
       allow create, update: if isValidPreassessmentControl(controlId);
+      allow delete: if isTeacherEditor();
+    }
+
+    match /gameHubQpsLiveSessions/{sessionId} {
+      allow get: if sessionId.matches('^[a-z]{1,30}$');
+      allow list: if isTeacherEditor();
+      allow create: if isTeacherEditor()
+        && isValidQpsLiveSession(sessionId);
+      allow update: if (
+          isTeacherEditor()
+          && isValidQpsLiveSession(sessionId)
+        ) || isValidScholarQpsLiveMove(sessionId);
       allow delete: if isTeacherEditor();
     }
 
