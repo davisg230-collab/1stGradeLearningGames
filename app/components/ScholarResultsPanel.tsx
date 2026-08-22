@@ -397,6 +397,10 @@ const QPS_SCREENER_GAME_ID = "qps-screener";
 const HUB_CLASS_URL = "https://first-grade-news-hub-mrdavis.web.app/";
 const DISMISSED_SMALL_GROUP_NEEDS_STORAGE_KEY =
   "learningGames.dismissedSmallGroupNeeds.v1";
+const PERMANENTLY_DELETED_SMALL_GROUP_NEEDS_STORAGE_KEY =
+  "learningGames.permanentlyDeletedSmallGroupNeeds.v1";
+const UFLI_RECOMMENDATIONS_BY_NEED_STORAGE_KEY =
+  "learningGames.ufliRecommendationsByNeed.v1";
 
 const HUB_TEACHER_WORKSPACE_SAVE_URL =
   "https://us-central1-first-grade-news-hub.cloudfunctions.net/saveTeacherWorkspaceResource";
@@ -5541,6 +5545,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const [lessonLookupNumber, setLessonLookupNumber] = useState("");
   const [managedGames, setManagedGames] =
     useState<ManagedGame[]>(MANAGED_GAMES);
+  const [permanentlyDeletedSmallGroupNeedKeys, setPermanentlyDeletedSmallGroupNeedKeys] =
+    useState<string[]>([]);
   const [progressRecords, setProgressRecords] =
     useState<ProgressSubmission[]>([]);
   const [preassessmentControls, setPreassessmentControls] =
@@ -5610,6 +5616,60 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     try {
+      const savedKeys = window.localStorage.getItem(PERMANENTLY_DELETED_SMALL_GROUP_NEEDS_STORAGE_KEY);
+      const parsedKeys = savedKeys ? JSON.parse(savedKeys) : [];
+
+      if (Array.isArray(parsedKeys)) {
+        setPermanentlyDeletedSmallGroupNeedKeys(
+          parsedKeys
+            .map((key) => String(key ?? ""))
+            .filter(Boolean),
+        );
+      }
+    } catch {
+      setPermanentlyDeletedSmallGroupNeedKeys([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const savedRecommendations = window.localStorage.getItem(UFLI_RECOMMENDATIONS_BY_NEED_STORAGE_KEY);
+      const parsedRecommendations = savedRecommendations ? JSON.parse(savedRecommendations) : {};
+
+      if (parsedRecommendations && typeof parsedRecommendations === "object" && !Array.isArray(parsedRecommendations)) {
+        const nextRecommendations: Record<string, CurriculumRecommendation[]> = {};
+        const nextStatuses: Record<string, CurriculumRecommendationStatus> = {};
+
+        Object.entries(parsedRecommendations).forEach(([needKey, recommendations]) => {
+          if (!Array.isArray(recommendations)) {
+            return;
+          }
+
+          const cleanRecommendations = recommendations
+            .map((recommendation) => recommendation && typeof recommendation === "object"
+              ? recommendation as CurriculumRecommendation
+              : null)
+            .filter((recommendation): recommendation is CurriculumRecommendation => Boolean(recommendation?.id));
+
+          if (needKey && cleanRecommendations.length) {
+            nextRecommendations[needKey] = cleanRecommendations.slice(0, 4);
+            nextStatuses[needKey] = "success";
+          }
+        });
+
+        setCurriculumRecommendationsByNeedKey(nextRecommendations);
+        setCurriculumRecommendationStatusesByNeedKey((current) => ({
+          ...nextStatuses,
+          ...current,
+        }));
+      }
+    } catch {
+      setCurriculumRecommendationsByNeedKey({});
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
       window.localStorage.setItem(
         DISMISSED_SMALL_GROUP_NEEDS_STORAGE_KEY,
         JSON.stringify(dismissedSmallGroupNeedKeys),
@@ -5618,6 +5678,33 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       // Local storage is only a convenience for keeping the planning list tidy.
     }
   }, [dismissedSmallGroupNeedKeys]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        PERMANENTLY_DELETED_SMALL_GROUP_NEEDS_STORAGE_KEY,
+        JSON.stringify(permanentlyDeletedSmallGroupNeedKeys),
+      );
+    } catch {
+      // Local storage is only a convenience for keeping the planning list tidy.
+    }
+  }, [permanentlyDeletedSmallGroupNeedKeys]);
+
+  useEffect(() => {
+    try {
+      const compactRecommendations = Object.fromEntries(
+        Object.entries(curriculumRecommendationsByNeedKey)
+          .filter(([, recommendations]) => recommendations.length)
+          .map(([needKey, recommendations]) => [needKey, recommendations.slice(0, 4)]),
+      );
+      window.localStorage.setItem(
+        UFLI_RECOMMENDATIONS_BY_NEED_STORAGE_KEY,
+        JSON.stringify(compactRecommendations),
+      );
+    } catch {
+      // UFLI recommendations can be rebuilt from the built-in bank if storage fails.
+    }
+  }, [curriculumRecommendationsByNeedKey]);
 
   const loadDashboardData = async () => {
     setError("");
@@ -6551,8 +6638,43 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   ]);
   const visibleCurriculumNeedCandidates = useMemo(() => {
     const dismissedKeys = new Set(dismissedSmallGroupNeedKeys);
-    return curriculumNeedCandidates.filter((candidate) => !dismissedKeys.has(candidate.key));
-  }, [curriculumNeedCandidates, dismissedSmallGroupNeedKeys]);
+    const permanentlyDeletedKeys = new Set(permanentlyDeletedSmallGroupNeedKeys);
+    return curriculumNeedCandidates.filter((candidate) =>
+      !dismissedKeys.has(candidate.key) && !permanentlyDeletedKeys.has(candidate.key),
+    );
+  }, [curriculumNeedCandidates, dismissedSmallGroupNeedKeys, permanentlyDeletedSmallGroupNeedKeys]);
+  const challengeReadyRows = useMemo(() => {
+    if (!skillsSmallGroupActive || !selectedSkillsDataReport.targets.length) {
+      return [];
+    }
+
+    const challengeThreshold = Math.max(3, Math.ceil(selectedSkillsDataReport.targets.length * 0.75));
+
+    return skillsDataRows
+      .filter((row) =>
+        row.evidenceCount > 0
+        && row.needsReviewCount === 0
+        && row.masteredCount >= challengeThreshold,
+      )
+      .sort((a, b) =>
+        b.masteredCount - a.masteredCount
+        || b.evidenceCount - a.evidenceCount
+        || a.scholar.firstName.localeCompare(b.scholar.firstName),
+      )
+      .slice(0, 10);
+  }, [selectedSkillsDataReport.targets.length, skillsDataRows, skillsSmallGroupActive]);
+  const challengeReadyTargetPreview = useMemo(() => {
+    const targets = new Set<string>();
+
+    challengeReadyRows.forEach((row) => {
+      row.cells
+        .filter((cell) => cell.status === "mastered")
+        .slice(0, 6)
+        .forEach((cell) => targets.add(cell.target));
+    });
+
+    return Array.from(targets).slice(0, 10);
+  }, [challengeReadyRows]);
   const smallGroupNeedStacks = useMemo(() =>
     skillsSmallGroupActive
       ? buildSmallGroupNeedStacks(visibleCurriculumNeedCandidates)
@@ -6614,6 +6736,39 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       setSelectedSmallGroupNeedKey("");
     }
     setStatus(`Removed "${candidate.need}" from the small-group planning list. Student data was not deleted.`);
+  };
+
+  const forgetSmallGroupNeed = (candidate: CurriculumNeedCandidate) => {
+    setPermanentlyDeletedSmallGroupNeedKeys((currentKeys) =>
+      currentKeys.includes(candidate.key) ? currentKeys : [...currentKeys, candidate.key],
+    );
+    setDismissedSmallGroupNeedKeys((currentKeys) => currentKeys.filter((key) => key !== candidate.key));
+    setCurriculumRecommendationsByNeedKey((current) => {
+      const { [candidate.key]: _removed, ...rest } = current;
+      return rest;
+    });
+    setCurriculumRecommendationStatusesByNeedKey((current) => {
+      const { [candidate.key]: _removed, ...rest } = current;
+      return rest;
+    });
+    setCurriculumRecommendationErrorsByNeedKey((current) => {
+      const { [candidate.key]: _removed, ...rest } = current;
+      return rest;
+    });
+
+    if (selectedSmallGroupNeedKey === candidate.key) {
+      setSelectedSmallGroupNeedKey("");
+    }
+
+    setStatus(`Fully deleted "${candidate.need}" from the small-group planning list. Student data stayed in reports.`);
+  };
+
+  const forgetDismissedSmallGroups = () => {
+    setPermanentlyDeletedSmallGroupNeedKeys((currentKeys) =>
+      Array.from(new Set([...currentKeys, ...dismissedSmallGroupNeedKeys])),
+    );
+    setDismissedSmallGroupNeedKeys([]);
+    setStatus("Fully deleted the hidden small groups from the planning list. Student data stayed in reports.");
   };
 
   const restoreDismissedSmallGroups = () => {
@@ -8747,6 +8902,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       >
                         Restore deleted
                       </button>
+                      <button
+                        className="teacher-text-button"
+                        onClick={forgetDismissedSmallGroups}
+                        type="button"
+                      >
+                        Delete forever
+                      </button>
                     </div>
                   ) : null}
                   {smallGroupNeedStacks.length ? (
@@ -8798,6 +8960,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                   >
                                     Delete
                                   </button>
+                                  <button
+                                    aria-label={`Fully delete ${candidate.need} small group`}
+                                    className="small-group-delete-button"
+                                    onClick={() => forgetSmallGroupNeed(candidate)}
+                                    type="button"
+                                  >
+                                    Delete forever
+                                  </button>
                                 </div>
                               );
                             })}
@@ -8810,6 +8980,45 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       {curriculumNeedCandidates.length
                         ? "All small groups are hidden. Restore deleted groups if you want them back."
                         : "No chart or game needs were recorded for this view."}
+                    </p>
+                  )}
+                </details>
+
+                <details className="dashboard-collapsible-section challenge-board">
+                  <summary>
+                    <span>
+                      <strong>Ready for Challenge</strong>
+                      <em>Scholars with strong current chart evidence and no active needs on this report.</em>
+                    </span>
+                    <span>{challengeReadyRows.length} scholar{challengeReadyRows.length === 1 ? "" : "s"}</span>
+                  </summary>
+                  {challengeReadyRows.length ? (
+                    <div className="small-group-need-grid">
+                      <article className="small-group-need-stack">
+                        <div className="small-group-stack-head">
+                          <strong>{challengeReadyRows.length}</strong>
+                          <span>scholar{challengeReadyRows.length === 1 ? "" : "s"}</span>
+                          <em>{selectedSkillsDataReport.label} extension group</em>
+                          <small>
+                            Use when these scholars are ready to go deeper while reteach groups get teacher support.
+                          </small>
+                        </div>
+                        <div className="small-group-student-list">
+                          {challengeReadyRows.map((row) => (
+                            <span key={row.scholar.id}>
+                              {row.scholar.firstName} {row.scholar.lastName} ({row.masteredCount}/{selectedSkillsDataReport.targets.length})
+                            </span>
+                          ))}
+                        </div>
+                        <p className="pin-helper">
+                          Challenge idea: mixed practice, faster automaticity, explain-how-you-know work, and one connected reading/writing task using mastered targets.
+                          {challengeReadyTargetPreview.length ? ` Strong targets include ${challengeReadyTargetPreview.join(", ")}.` : ""}
+                        </p>
+                      </article>
+                    </div>
+                  ) : (
+                    <p className="empty-results-message">
+                      No challenge group found on this chart yet. Try another Skills report or add more evidence first.
                     </p>
                   )}
                 </details>
@@ -8848,6 +9057,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                           type="button"
                         >
                           Delete Small Group
+                        </button>
+                        <button
+                          className="teacher-control-button secondary"
+                          onClick={() => forgetSmallGroupNeed(selectedSmallGroupNeed)}
+                          type="button"
+                        >
+                          Delete Forever
                         </button>
                       </div>
                       {selectedSmallGroupRecommendationStatus === "loading" ? (

@@ -1766,13 +1766,20 @@ button.area-card {
 
 .small-group-stack-item {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 6px;
   align-items: center;
   border: 1px solid #eadcc8;
   border-radius: 10px;
   padding: 7px;
   background: #fffdf8;
+}
+
+@media (max-width: 720px) {
+  .small-group-stack-item {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
 }
 
 .small-group-stack-open {
