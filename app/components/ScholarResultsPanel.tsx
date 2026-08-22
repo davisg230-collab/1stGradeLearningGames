@@ -338,6 +338,15 @@ type CurriculumNeedCandidate = {
   searchTerms: string[];
   source: string;
 };
+type SmallGroupNeedStack = {
+  candidates: CurriculumNeedCandidate[];
+  count: number;
+  key: string;
+  label: string;
+  scholarCount: number;
+  scholars: string[];
+  source: string;
+};
 type CurriculumRecommendationResponse = {
   count?: number;
   needs?: string[];
@@ -385,6 +394,8 @@ const LETTER_SEARCH_SAFARI_GAME_ID = "letter-search-safari";
 const NUMBER_SEARCH_SAFARI_GAME_ID = "number-search-safari";
 const QPS_SCREENER_GAME_ID = "qps-screener";
 const HUB_CLASS_URL = "https://first-grade-news-hub-mrdavis.web.app/";
+const DISMISSED_SMALL_GROUP_NEEDS_STORAGE_KEY =
+  "learningGames.dismissedSmallGroupNeeds.v1";
 
 const HUB_TEACHER_WORKSPACE_SAVE_URL =
   "https://us-central1-first-grade-news-hub.cloudfunctions.net/saveTeacherWorkspaceResource";
@@ -3294,6 +3305,169 @@ function addCurriculumNeedCandidate(
   });
 }
 
+function smallGroupNeedFamily(candidate: CurriculumNeedCandidate) {
+  const need = normalizeCurriculumNeedKey(candidate.need);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const chunkNeed = smallGroupNeedChunk(candidate);
+  const ufliPatterns = ufliPatternTermsForCandidate(candidate);
+
+  if (letterNeed) {
+    if (/uppercase/.test(need)) {
+      return {
+        key: "uppercase-letter-identification",
+        label: "Uppercase letter needs",
+      };
+    }
+
+    return {
+      key: "letter-identification",
+      label: /lowercase/.test(need) ? "Lowercase letter needs" : "Letter needs",
+    };
+  }
+
+  if (chunkNeed) {
+    return {
+      key: "digraph-and-patterns",
+      label: "Digraph and spelling-pattern needs",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /short [aeiou]|short vowels|nasalized a/.test(pattern))) {
+    return {
+      key: "short-vowel-needs",
+      label: "Short-vowel needs",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /vce|a_e|i_e|o_e|u_e|e_e|silent e/.test(pattern))) {
+    return {
+      key: "silent-e-needs",
+      label: "Silent-e needs",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /vowel teams|ai|ee|oa|ie|oo|ew|au|oi|ou/.test(pattern))) {
+    return {
+      key: "vowel-team-needs",
+      label: "Vowel-team needs",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /r-controlled|ar|or|er/.test(pattern))) {
+    return {
+      key: "r-controlled-needs",
+      label: "R-controlled vowel needs",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /suffix|prefix|doubling|drop e|y to i|sion|tion|ture|ness|ment|able|ible/.test(pattern))) {
+    return {
+      key: "affix-needs",
+      label: "Prefix and suffix needs",
+    };
+  }
+
+  return {
+    key: `single-${candidate.key}`,
+    label: candidate.need,
+  };
+}
+
+function smallGroupScholarOverlapCount(
+  firstCandidate: CurriculumNeedCandidate,
+  secondCandidate: CurriculumNeedCandidate,
+) {
+  const secondScholars = new Set(secondCandidate.scholars.map(normalizeCurriculumNeedKey));
+
+  return firstCandidate.scholars
+    .map(normalizeCurriculumNeedKey)
+    .filter((scholar) => scholar && secondScholars.has(scholar))
+    .length;
+}
+
+function smallGroupCandidatesCanStack(
+  firstCandidate: CurriculumNeedCandidate,
+  secondCandidate: CurriculumNeedCandidate,
+) {
+  const firstFamily = smallGroupNeedFamily(firstCandidate);
+  const secondFamily = smallGroupNeedFamily(secondCandidate);
+
+  if (firstFamily.key !== secondFamily.key) return false;
+  if (firstFamily.key.startsWith("single-")) return false;
+
+  return smallGroupScholarOverlapCount(firstCandidate, secondCandidate) > 0;
+}
+
+function smallGroupNeedStackLabel(candidates: CurriculumNeedCandidate[]) {
+  if (!candidates.length) return "Small-group needs";
+  const family = smallGroupNeedFamily(candidates[0]);
+  const labels = new Set(candidates.map((candidate) => smallGroupNeedFamily(candidate).label));
+
+  if (labels.size === 1) return family.label;
+  return "Related small-group needs";
+}
+
+function buildSmallGroupNeedStacks(candidates: CurriculumNeedCandidate[]) {
+  const stacks: SmallGroupNeedStack[] = [];
+
+  candidates.forEach((candidate) => {
+    const matchingStack = stacks.find((stack) =>
+      stack.candidates.some((stackCandidate) =>
+        smallGroupCandidatesCanStack(candidate, stackCandidate),
+      ),
+    );
+
+    if (matchingStack) {
+      matchingStack.candidates.push(candidate);
+      return;
+    }
+
+    const family = smallGroupNeedFamily(candidate);
+    stacks.push({
+      candidates: [candidate],
+      count: 0,
+      key: `${family.key}-${candidate.key}`,
+      label: family.label,
+      scholarCount: 0,
+      scholars: [],
+      source: "",
+    });
+  });
+
+  return stacks
+    .map((stack) => {
+      const scholars = new Set<string>();
+      const sources = new Set<string>();
+
+      stack.candidates.forEach((candidate) => {
+        candidate.scholars.forEach((scholar) => scholars.add(scholar));
+        candidate.source.split(", ").filter(Boolean).forEach((source) => sources.add(source));
+      });
+
+      return {
+        ...stack,
+        candidates: stack.candidates.sort((a, b) =>
+          b.scholars.length - a.scholars.length
+          || b.count - a.count
+          || a.need.localeCompare(b.need),
+        ),
+        count: stack.candidates.reduce((total, candidate) => total + candidate.count, 0),
+        label: stack.candidates.length > 1
+          ? smallGroupNeedStackLabel(stack.candidates)
+          : stack.candidates[0]?.need ?? stack.label,
+        scholarCount: scholars.size || stack.candidates.reduce((highest, candidate) =>
+          Math.max(highest, curriculumNeedScholarCount(candidate)), 0),
+        scholars: Array.from(scholars).sort((a, b) => a.localeCompare(b)),
+        source: Array.from(sources).join(", "),
+      };
+    })
+    .sort((a, b) =>
+      b.scholarCount - a.scholarCount
+      || b.count - a.count
+      || a.label.localeCompare(b.label),
+    );
+}
+
 function curriculumNeedsFromRecord(record: ResultSubmission | ProgressSubmission) {
   const needs: string[] = [];
 
@@ -5101,6 +5275,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const [dataReportView, setDataReportView] =
     useState<DataReportView>("students");
   const [dateFilter, setDateFilter] = useState("");
+  const [dismissedSmallGroupNeedKeys, setDismissedSmallGroupNeedKeys] =
+    useState<string[]>([]);
   const [error, setError] = useState("");
   const [firstName, setFirstName] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
@@ -5163,6 +5339,34 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
     return rosterTeacherEmailForEmail(teacherAccount);
   }, [teacherAccount, teacherFilter]);
+
+  useEffect(() => {
+    try {
+      const savedKeys = window.localStorage.getItem(DISMISSED_SMALL_GROUP_NEEDS_STORAGE_KEY);
+      const parsedKeys = savedKeys ? JSON.parse(savedKeys) : [];
+
+      if (Array.isArray(parsedKeys)) {
+        setDismissedSmallGroupNeedKeys(
+          parsedKeys
+            .map((key) => String(key ?? ""))
+            .filter(Boolean),
+        );
+      }
+    } catch {
+      setDismissedSmallGroupNeedKeys([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        DISMISSED_SMALL_GROUP_NEEDS_STORAGE_KEY,
+        JSON.stringify(dismissedSmallGroupNeedKeys),
+      );
+    } catch {
+      // Local storage is only a convenience for keeping the planning list tidy.
+    }
+  }, [dismissedSmallGroupNeedKeys]);
 
   const loadDashboardData = async () => {
     setError("");
@@ -6072,8 +6276,15 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     skillsDataTargetSummaryRows,
     reportScholars,
   ]);
+  const visibleCurriculumNeedCandidates = useMemo(() => {
+    const dismissedKeys = new Set(dismissedSmallGroupNeedKeys);
+    return curriculumNeedCandidates.filter((candidate) => !dismissedKeys.has(candidate.key));
+  }, [curriculumNeedCandidates, dismissedSmallGroupNeedKeys]);
+  const smallGroupNeedStacks = useMemo(() =>
+    buildSmallGroupNeedStacks(visibleCurriculumNeedCandidates),
+  [visibleCurriculumNeedCandidates]);
   const curriculumRecommendationGroups = useMemo(() => {
-    return curriculumNeedCandidates.map((candidate) => ({
+    return visibleCurriculumNeedCandidates.map((candidate) => ({
       candidate,
       recommendations: recommendationsForNeedCandidate(curriculumRecommendations, candidate)
         .filter((recommendation) =>
@@ -6085,9 +6296,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           ),
         ),
     }));
-  }, [curriculumNeedCandidates, curriculumRecommendationFeedback, curriculumRecommendationSubject, curriculumRecommendations]);
+  }, [curriculumRecommendationFeedback, curriculumRecommendationSubject, curriculumRecommendations, visibleCurriculumNeedCandidates]);
   const selectedSmallGroupNeed =
-    curriculumNeedCandidates.find((need) => need.key === selectedSmallGroupNeedKey)
+    visibleCurriculumNeedCandidates.find((need) => need.key === selectedSmallGroupNeedKey)
     ?? null;
   const selectedSmallGroupRecommendations = selectedSmallGroupNeed
     ? (
@@ -6111,8 +6322,32 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     ? curriculumRecommendationErrorsByNeedKey[selectedSmallGroupNeed.key] ?? ""
     : "";
 
+  useEffect(() => {
+    if (
+      selectedSmallGroupNeedKey
+      && !visibleCurriculumNeedCandidates.some((candidate) => candidate.key === selectedSmallGroupNeedKey)
+    ) {
+      setSelectedSmallGroupNeedKey("");
+    }
+  }, [selectedSmallGroupNeedKey, visibleCurriculumNeedCandidates]);
+
+  const dismissSmallGroupNeed = (candidate: CurriculumNeedCandidate) => {
+    setDismissedSmallGroupNeedKeys((currentKeys) =>
+      currentKeys.includes(candidate.key) ? currentKeys : [...currentKeys, candidate.key],
+    );
+    if (selectedSmallGroupNeedKey === candidate.key) {
+      setSelectedSmallGroupNeedKey("");
+    }
+    setStatus(`Removed "${candidate.need}" from the small-group planning list. Student data was not deleted.`);
+  };
+
+  const restoreDismissedSmallGroups = () => {
+    setDismissedSmallGroupNeedKeys([]);
+    setStatus("Restored deleted small groups to the planning list.");
+  };
+
   const fetchCurriculumRecommendations = async (focusCandidate?: CurriculumNeedCandidate) => {
-    const searchCandidates = focusCandidate ? [focusCandidate] : curriculumNeedCandidates;
+    const searchCandidates = focusCandidate ? [focusCandidate] : visibleCurriculumNeedCandidates;
     const needs = Array.from(new Set(
       searchCandidates
         .flatMap(curriculumRecommendationSearchTerms)
@@ -7796,7 +8031,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         </div>
         <button
           className="teacher-control-button"
-          disabled={!curriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
+          disabled={!visibleCurriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
           onClick={() => void fetchCurriculumRecommendations()}
           type="button"
         >
@@ -7806,9 +8041,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       <p className="pin-helper">
         Uses charted data, QPS, teacher observations, and game/assessment results to suggest UFLI intervention lessons for Skills small groups.
       </p>
-      {curriculumNeedCandidates.length ? (
+      {visibleCurriculumNeedCandidates.length ? (
         <div className="curriculum-recommendation-need-summary">
-          {curriculumNeedCandidates.slice(0, 8).map((candidate) => (
+          {visibleCurriculumNeedCandidates.slice(0, 8).map((candidate) => (
             <span key={candidate.key}>
               {candidate.need} - {curriculumNeedScholarCount(candidate)} scholar{curriculumNeedScholarCount(candidate) === 1 ? "" : "s"}
             </span>
@@ -8223,27 +8458,82 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       <strong>Small-Group Needs</strong>
                       <em>Open to find UFLI lessons and make group plans.</em>
                     </span>
-                    <span>{curriculumNeedCandidates.length} need{curriculumNeedCandidates.length === 1 ? "" : "s"}</span>
+                    <span>{visibleCurriculumNeedCandidates.length} need{visibleCurriculumNeedCandidates.length === 1 ? "" : "s"}</span>
                   </summary>
-                  {curriculumNeedCandidates.length ? (
+                  {dismissedSmallGroupNeedKeys.length ? (
+                    <div className="small-group-restore-row">
+                      <span>{dismissedSmallGroupNeedKeys.length} deleted small group{dismissedSmallGroupNeedKeys.length === 1 ? "" : "s"} hidden</span>
+                      <button
+                        className="teacher-text-button"
+                        onClick={restoreDismissedSmallGroups}
+                        type="button"
+                      >
+                        Restore deleted
+                      </button>
+                    </div>
+                  ) : null}
+                  {smallGroupNeedStacks.length ? (
                     <div className="small-group-need-grid">
-                      {curriculumNeedCandidates.slice(0, 6).map((candidate) => (
-                        <button
-                          className="small-group-need-tile"
-                          key={candidate.key}
-                          onClick={() => setSelectedSmallGroupNeedKey(candidate.key)}
-                          type="button"
+                      {smallGroupNeedStacks.slice(0, 8).map((stack) => (
+                        <article
+                          className={`small-group-need-stack ${stack.candidates.length > 1 ? "is-stacked" : ""}`}
+                          key={stack.key}
                         >
-                          <strong>{curriculumNeedScholarCount(candidate)}</strong>
-                          <span>scholar{curriculumNeedScholarCount(candidate) === 1 ? "" : "s"}</span>
-                          <em>{candidate.need}</em>
-                          <small>{candidate.source}</small>
-                          <small>{candidate.count} evidence point{candidate.count === 1 ? "" : "s"}</small>
-                        </button>
+                          <div className="small-group-stack-head">
+                            <strong>{stack.scholarCount}</strong>
+                            <span>scholar{stack.scholarCount === 1 ? "" : "s"}</span>
+                            <em>{stack.label}</em>
+                            <small>
+                              {stack.candidates.length} related need{stack.candidates.length === 1 ? "" : "s"} - {stack.count} evidence point{stack.count === 1 ? "" : "s"}
+                            </small>
+                            {stack.candidates.length > 1 ? (
+                              <small>Stacked by similar skill type and overlapping scholars.</small>
+                            ) : null}
+                          </div>
+                          <div className="small-group-stack-items">
+                            {stack.candidates.map((candidate) => {
+                              const cachedRecommendations = curriculumRecommendationsByNeedKey[candidate.key] ?? [];
+                              const candidateRecommendationStatus =
+                                curriculumRecommendationStatusesByNeedKey[candidate.key] ?? "idle";
+
+                              return (
+                                <div className="small-group-stack-item" key={candidate.key}>
+                                  <button
+                                    className="small-group-stack-open"
+                                    onClick={() => setSelectedSmallGroupNeedKey(candidate.key)}
+                                    type="button"
+                                  >
+                                    <span>{candidate.need}</span>
+                                    <small>
+                                      {curriculumNeedScholarCount(candidate)} scholar{curriculumNeedScholarCount(candidate) === 1 ? "" : "s"} - {candidate.count} evidence point{candidate.count === 1 ? "" : "s"}
+                                    </small>
+                                  </button>
+                                  {cachedRecommendations.length ? (
+                                    <span className="small-group-ufli-chip">UFLI ready</span>
+                                  ) : candidateRecommendationStatus === "loading" ? (
+                                    <span className="small-group-ufli-chip">Finding</span>
+                                  ) : null}
+                                  <button
+                                    aria-label={`Delete ${candidate.need} small group`}
+                                    className="small-group-delete-button"
+                                    onClick={() => dismissSmallGroupNeed(candidate)}
+                                    type="button"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </article>
                       ))}
                     </div>
                   ) : (
-                    <p className="empty-results-message">No chart or game needs were recorded for this view.</p>
+                    <p className="empty-results-message">
+                      {curriculumNeedCandidates.length
+                        ? "All small groups are hidden. Restore deleted groups if you want them back."
+                        : "No chart or game needs were recorded for this view."}
+                    </p>
                   )}
                 </details>
 
@@ -8269,11 +8559,18 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       <div className="small-group-popup-actions">
                         <button
                           className="teacher-control-button"
-                          disabled={!curriculumNeedCandidates.length || selectedSmallGroupRecommendationStatus === "loading"}
+                          disabled={!visibleCurriculumNeedCandidates.length || selectedSmallGroupRecommendationStatus === "loading"}
                           onClick={() => void fetchCurriculumRecommendations(selectedSmallGroupNeed)}
                           type="button"
                         >
                           {selectedSmallGroupRecommendationStatus === "loading" ? "Finding..." : "Find UFLI Lessons"}
+                        </button>
+                        <button
+                          className="teacher-control-button secondary"
+                          onClick={() => dismissSmallGroupNeed(selectedSmallGroupNeed)}
+                          type="button"
+                        >
+                          Delete Small Group
                         </button>
                       </div>
                       {selectedSmallGroupRecommendationStatus === "loading" ? (
@@ -8298,7 +8595,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                             const sharedNeedLabels = sharedCurriculumRecommendationNeedLabels(
                               recommendation,
                               selectedSmallGroupNeed,
-                              curriculumNeedCandidates,
+                              visibleCurriculumNeedCandidates,
                             );
 
                             return (

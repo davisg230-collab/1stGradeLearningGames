@@ -1663,7 +1663,7 @@ button.area-card {
 
 .small-group-need-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 10px;
 }
 
@@ -1700,6 +1700,127 @@ button.area-card {
   font-style: normal;
   font-weight: 900;
   line-height: 1.25;
+}
+
+.small-group-restore-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px dashed #d7c5ac;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: #fffaf1;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.small-group-need-stack {
+  display: grid;
+  gap: 10px;
+  min-height: 132px;
+  border: 2px solid #eadcc8;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.small-group-need-stack.is-stacked {
+  border-color: #c8dced;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.small-group-stack-head {
+  display: grid;
+  gap: 4px;
+}
+
+.small-group-stack-head strong {
+  color: var(--ink);
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.small-group-stack-head span,
+.small-group-stack-head small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.small-group-stack-head em {
+  color: #2f4054;
+  font-size: 0.9rem;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.small-group-stack-items {
+  display: grid;
+  gap: 7px;
+}
+
+.small-group-stack-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid #eadcc8;
+  border-radius: 10px;
+  padding: 7px;
+  background: #fffdf8;
+}
+
+.small-group-stack-open {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: #2f4054;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.small-group-stack-open span {
+  overflow-wrap: anywhere;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.small-group-stack-open small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.small-group-ufli-chip {
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #24506b;
+  background: #e8f1f7;
+  font-size: 0.68rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.small-group-delete-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #9b2f2f;
+  background: #fff0ee;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .small-group-popup-backdrop {
