@@ -4677,19 +4677,68 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
   const printQpsSummaryReport = () => {
     const reportWindow = window.open("", "_blank");
-    const rowsHtml = qpsResults.map((result) => {
+    const qpsResultsForPrint = qpsResults.slice().sort((a, b) =>
+      (formatDate(b.completedAt)?.getTime() ?? 0) - (formatDate(a.completedAt)?.getTime() ?? 0),
+    );
+    const rowsHtml = qpsResultsForPrint.map((result) => {
       const match = matchResult(result, reportScholars);
       const completedAt = formatDate(result.completedAt);
+      const resultPercent = result.totalQuestions ? Math.round((result.score / result.totalQuestions) * 100) : 0;
       return `
         <tr>
           <th>${escapeReportHtml(match.label)}</th>
           <td>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")}</td>
-          <td>${result.score}/${result.totalQuestions}</td>
+          <td>${result.score}/${result.totalQuestions} (${resultPercent}%)</td>
           <td>${result.missedCount}</td>
           <td>${escapeReportHtml(result.missedQuestions.slice(0, 8).map((missed) =>
             `${missed.word || missed.correctAnswer || missed.category}: ${missed.incorrectSelections?.join(", ") || "needs review"}`
           ).join("; "))}</td>
         </tr>
+      `;
+    }).join("");
+    const detailCardsHtml = qpsResultsForPrint.map((result) => {
+      const match = matchResult(result, reportScholars);
+      const completedAt = formatDate(result.completedAt);
+      const resultPercent = result.totalQuestions ? Math.round((result.score / result.totalQuestions) * 100) : 0;
+      const sectionRowsHtml = Object.entries(result.categoryScores ?? {}).map(([section, score]) => {
+        const sectionPercent = score.total ? Math.round((score.correct / score.total) * 100) : 0;
+        return `
+          <tr>
+            <th>${escapeReportHtml(section)}</th>
+            <td>${score.correct}/${score.total}</td>
+            <td>${score.missed}</td>
+            <td>${sectionPercent}%</td>
+          </tr>
+        `;
+      }).join("");
+      const needsHtml = result.missedQuestions.length
+        ? `<ul>${result.missedQuestions.map((missed, index) => `
+            <li>
+              <strong>${escapeReportHtml(missed.levelName || missed.category || `Item ${missed.questionIndex ?? index + 1}`)}</strong>:
+              ${escapeReportHtml(missed.word || missed.correctAnswer || "QPS item")}
+              <span>said ${escapeReportHtml(missed.incorrectSelections?.join(", ") || "needs review")}</span>
+            </li>
+          `).join("")}</ul>`
+        : `<p class="empty-note">No missed QPS items recorded.</p>`;
+
+      return `
+        <section class="qps-card">
+          <header>
+            <div>
+              <h2>${escapeReportHtml(match.label)}</h2>
+              <p>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")}</p>
+            </div>
+            <strong>${result.score}/${result.totalQuestions} (${resultPercent}%)</strong>
+          </header>
+          <table>
+            <thead>
+              <tr><th>Section</th><th>Score</th><th>Needs Review</th><th>Percent</th></tr>
+            </thead>
+            <tbody>${sectionRowsHtml || `<tr><td colspan="4">No section breakdown saved for this QPS session.</td></tr>`}</tbody>
+          </table>
+          <h3>Needs Review Items</h3>
+          ${needsHtml}
+        </section>
       `;
     }).join("");
 
@@ -4705,24 +4754,44 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         <meta charset="utf-8">
         <title>QPS Screener Summary</title>
         <style>
-          body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#222}
+          @page{margin:10mm}
+          html,body{margin:0;padding:0}
+          body{font-family:Arial,Helvetica,sans-serif;color:#223044}
+          .report{padding:0}
+          .report-header{border-bottom:2px solid #223044;margin:0 0 12px;padding:0 0 10px}
           h1{margin:0 0 4px;font-size:24px}
-          p{margin:0 0 16px;color:#555;font-size:13px}
-          table{width:100%;border-collapse:collapse;font-size:12px}
-          th,td{border:1px solid #222;padding:6px;text-align:left;vertical-align:top}
-          thead th{background:#eef3f8}
-          @media print{tr{break-inside:avoid}}
+          h2{margin:0;font-size:16px}
+          h3{margin:10px 0 5px;font-size:13px}
+          p{margin:0;color:#56677d;font-size:12px}
+          table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:auto}
+          thead{display:table-header-group}
+          th,td{border:1px solid #cdd8e5;padding:5px;text-align:left;vertical-align:top}
+          thead th,tbody th{background:#eef3f8}
+          .qps-card{border:1px solid #cdd8e5;border-radius:8px;margin:12px 0 0;padding:10px;break-inside:avoid;page-break-inside:avoid}
+          .qps-card header{align-items:flex-start;display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}
+          .qps-card header strong{font-size:18px}
+          ul{margin:0;padding-left:18px;font-size:11px}
+          li{margin:3px 0}
+          li span{color:#56677d}
+          .empty-note{border:1px solid #cdd8e5;border-radius:8px;margin:0;padding:8px;color:#56677d}
+          tr{break-inside:avoid;page-break-inside:avoid}
         </style>
       </head>
       <body>
-        <h1>QPS Screener Summary</h1>
-        <p>${escapeReportHtml(new Date().toLocaleDateString())}</p>
+        <main class="report">
+        <header class="report-header">
+          <h1>QPS Screener Results</h1>
+          <p>${escapeReportHtml(new Date().toLocaleDateString())} - ${qpsResultsForPrint.length} saved session${qpsResultsForPrint.length === 1 ? "" : "s"}</p>
+        </header>
+        <h2>Class Summary</h2>
         <table>
           <thead>
             <tr><th>Scholar</th><th>Date</th><th>Score</th><th>Needs</th><th>Notes</th></tr>
           </thead>
           <tbody>${rowsHtml || `<tr><td colspan="5">No QPS sessions saved yet.</td></tr>`}</tbody>
         </table>
+        ${detailCardsHtml || ""}
+        </main>
       </body>
       </html>
     `);

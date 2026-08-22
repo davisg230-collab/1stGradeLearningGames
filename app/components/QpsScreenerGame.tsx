@@ -494,6 +494,30 @@ export function QpsScreenerGame() {
 
   const printQps = () => {
     const reportWindow = window.open("", "_blank");
+    const scholarName = selectedScholar ? `${selectedScholar.firstName} ${selectedScholar.lastName}` : "No scholar selected";
+    const sectionSummaryRows = Object.entries(sectionTotals(scores, qpsItems)).map(([section, total]) => {
+      const sectionPercent = total.total ? Math.round((total.correct / total.total) * 100) : 0;
+      return `
+        <tr>
+          <th>${escapeHtml(section)}</th>
+          <td>${total.correct}/${total.total}</td>
+          <td>${total.missed}</td>
+          <td>${sectionPercent}%</td>
+        </tr>
+      `;
+    }).join("");
+    const needsRows = qpsItems.filter((item) => scores[item.id]?.status === "missed").map((item, index) => {
+      const score = scores[item.id] ?? { note: "", said: "", status: "missed" as const };
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(item.section)}</td>
+          <td>${escapeHtml(item.display)}</td>
+          <td>${escapeHtml(score.said.trim() || "Needs review")}</td>
+          <td>${escapeHtml(score.note)}</td>
+        </tr>
+      `;
+    }).join("");
     const rows = qpsItems.map((item, index) => {
       const score = scores[item.id] ?? { note: "", said: "", status: "unscored" as const };
       return `
@@ -520,26 +544,65 @@ export function QpsScreenerGame() {
         <meta charset="utf-8">
         <title>QPS Screener</title>
         <style>
-          body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#223044}
+          @page{margin:10mm}
+          html,body{margin:0;padding:0}
+          body{font-family:Arial,Helvetica,sans-serif;color:#223044}
+          .report{padding:0}
+          .report-header{border-bottom:2px solid #223044;margin:0 0 12px;padding:0 0 10px}
           h1{margin:0 0 4px;font-size:24px}
-          p{margin:0 0 14px;color:#56677d}
-          table{width:100%;border-collapse:collapse;font-size:12px}
-          th,td{border:1px solid #cdd8e5;padding:6px;text-align:left;vertical-align:top}
+          h2{font-size:15px;margin:16px 0 6px;color:#223044}
+          p{margin:0;color:#56677d;font-size:12px}
+          .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+          .summary-card{border:1px solid #cdd8e5;border-radius:8px;padding:8px}
+          .summary-card span{display:block;color:#56677d;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+          .summary-card strong{display:block;font-size:18px;margin-top:3px}
+          table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:auto}
+          thead{display:table-header-group}
+          th,td{border:1px solid #cdd8e5;padding:5px;text-align:left;vertical-align:top}
           th{background:#eef4fa}
           tr.correct td{background:#f0fbf3}
           tr.missed td{background:#fff0ec}
-          @media print{tr,table{break-inside:avoid}}
+          tr.unscored td{color:#64748b}
+          .empty-note{border:1px solid #cdd8e5;border-radius:8px;padding:9px;color:#56677d}
+          tr,.summary-card{break-inside:avoid;page-break-inside:avoid}
         </style>
       </head>
       <body>
-        <h1>QPS Screener</h1>
-        <p>${escapeHtml(selectedForm.label)} - ${escapeHtml(selectedScholar ? `${selectedScholar.firstName} ${selectedScholar.lastName}` : "No scholar selected")} - ${correctCount}/${scoredItems.length} scored correct (${percent}%)</p>
+        <main class="report">
+        <header class="report-header">
+          <h1>QPS Screener Results</h1>
+          <p>${escapeHtml(selectedForm.label)} - ${escapeHtml(scholarName)} - ${new Date().toLocaleDateString()}</p>
+        </header>
+        <section class="summary-grid" aria-label="QPS summary">
+          <div class="summary-card"><span>Score</span><strong>${correctCount}/${scoredItems.length || 0}</strong></div>
+          <div class="summary-card"><span>Percent</span><strong>${percent}%</strong></div>
+          <div class="summary-card"><span>Needs Review</span><strong>${missedCount}</strong></div>
+          <div class="summary-card"><span>Items Scored</span><strong>${scoredItems.length}/${qpsItems.length}</strong></div>
+        </section>
+        <h2>Section Breakdown</h2>
+        <table>
+          <thead>
+            <tr><th>Section</th><th>Score</th><th>Needs Review</th><th>Percent</th></tr>
+          </thead>
+          <tbody>${sectionSummaryRows || `<tr><td colspan="4">No QPS items have been scored yet.</td></tr>`}</tbody>
+        </table>
+        <h2>Needs Review Items</h2>
+        ${needsRows ? `
+        <table>
+          <thead>
+            <tr><th>#</th><th>Section</th><th>Item</th><th>What scholar said</th><th>Notes</th></tr>
+          </thead>
+          <tbody>${needsRows}</tbody>
+        </table>
+        ` : `<p class="empty-note">No missed QPS items recorded.</p>`}
+        <h2>Full Score Sheet</h2>
         <table>
           <thead>
             <tr><th>#</th><th>Section</th><th>Item</th><th>Status</th><th>What scholar said</th><th>Notes</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
+        </main>
       </body>
       </html>
     `);
@@ -656,6 +719,12 @@ export function QpsScreenerGame() {
           <p>Run the screener like a game, while the teacher records the score sheet live.</p>
         </div>
         <div className="qps-toolbar-actions">
+          <a className="teacher-control-button secondary" href="/skills">
+            Back to Skills
+          </a>
+          <a className="teacher-control-button secondary" href="/">
+            Games Home
+          </a>
           <button className="teacher-control-button secondary" onClick={printQps} type="button">
             Print
           </button>

@@ -21,7 +21,6 @@ export type GameCard = {
 };
 
 export const skillsGames: GameCard[] = [
-  { adventure: "qps-screener", description: "Teacher-only Quick Phonics Screener for live scoring, printing, and Skills report evidence.", group: "CKLA Skills", icon: "QPS", slug: "qps-screener", teacherOnly: true, theme: "green", title: "QPS Screener" },
   { adventure: "skills-starting-point", description: "Use this to help find the best reading starting place for each scholar before first grade reading work.", group: "CKLA Skills", icon: "\u{1F4DD}", slug: "starting-point", theme: "purple", title: "Reading Starting Point" },
   { adventure: "letter-search-safari", description: "Use this for quick practice and check-ins with letters, sounds, digraphs, and spelling patterns.", group: "CKLA Skills", icon: "ABC", slug: "letter-search-safari", theme: "blue", title: "Letter Search Safari" },
   { adventure: "ckla-unit", unitNumber: 1, description: "Use this during or after Unit 1 lessons for extra practice, review, and confidence-building with the skills taught in class.", group: "CKLA Skills", icon: "\u{1F98B}", slug: "unit-1", theme: "coral", title: "Unit 1" },
@@ -31,6 +30,7 @@ export const skillsGames: GameCard[] = [
   { adventure: "ckla-unit", unitNumber: 5, description: "Build and practice Unit 5 skills and levels.", group: "CKLA Skills", icon: "\u{1F9E0}", slug: "unit-5", theme: "green", title: "Unit 5" },
   { adventure: "ckla-unit", unitNumber: 6, description: "Build and practice Unit 6 skills and levels.", group: "CKLA Skills", icon: "\u{270D}\u{FE0F}", slug: "unit-6", theme: "purple", title: "Unit 6" },
   { adventure: "ckla-unit", unitNumber: 7, description: "Build and practice Unit 7 skills and levels.", group: "CKLA Skills", icon: "\u{1F3A7}", slug: "unit-7", theme: "coral", title: "Unit 7" },
+  { adventure: "qps-screener", description: "Teacher-only Quick Phonics Screener for live scoring, printing, and Skills report evidence.", group: "CKLA Skills", icon: "QPS", slug: "qps-screener", teacherOnly: true, theme: "green", title: "QPS Screener" },
 ];
 
 export const listeningLearningGames: GameCard[] = [
