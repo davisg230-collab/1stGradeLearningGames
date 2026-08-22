@@ -283,6 +283,8 @@ export function GameCardGrid({ games }: GameCardGridProps) {
   const [nameError, setNameError] = useState("");
   const [pendingScholarProfile, setPendingScholarProfile] =
     useState<ScholarLaunchProfile | null>(null);
+  const [pendingLaunchProfile, setPendingLaunchProfile] =
+    useState<ScholarLaunchProfile | null>(null);
 
   const editingKey = editingGame ? cardKeyFor(editingGame) : "";
   const editingValues = editingGame
@@ -412,6 +414,7 @@ export function GameCardGrid({ games }: GameCardGridProps) {
     setNameDraft("");
     setNameError("");
     setPendingScholarProfile(null);
+    setPendingLaunchProfile(null);
   }
 
   function openScholarGameFromLocation(learningLocation: LearningLocation) {
@@ -426,7 +429,15 @@ export function GameCardGrid({ games }: GameCardGridProps) {
         learningLocation,
       };
 
-    window.location.href = scholarGameUrl(namePromptGame, profile);
+    setPendingLaunchProfile(profile);
+  }
+
+  function startScholarGameAfterReminder() {
+    if (!namePromptGame || !pendingLaunchProfile) {
+      return;
+    }
+
+    window.location.href = scholarGameUrl(namePromptGame, pendingLaunchProfile);
   }
 
   async function submitCklaAccess(event: FormEvent<HTMLFormElement>) {
@@ -636,7 +647,31 @@ export function GameCardGrid({ games }: GameCardGridProps) {
             onSubmit={submitCklaAccess}
             role="dialog"
           >
-            {pendingScholarProfile ? (
+            {pendingLaunchProfile ? (
+              <>
+                <h2 id="unit1-name-title">Take Charge of Your Learning</h2>
+                <div className="independent-learning-card" aria-hidden="true">
+                  <span>Think</span>
+                  <span>Try</span>
+                  <span>Grow</span>
+                </div>
+                <p>
+                  Try first. Think, choose, and do your best. Grown-ups can cheer you on,
+                  but your answers should be your own.
+                </p>
+                <p className="independent-learning-note">
+                  Mistakes help your teacher know what to practice next.
+                </p>
+                <div className="pin-actions">
+                  <button type="button" onClick={() => setPendingLaunchProfile(null)}>
+                    Back
+                  </button>
+                  <button type="button" onClick={startScholarGameAfterReminder}>
+                    I Will Try It Myself
+                  </button>
+                </div>
+              </>
+            ) : pendingScholarProfile ? (
               <>
                 <h2 id="unit1-name-title">Where is {pendingScholarProfile.firstName} playing?</h2>
                 <p>This adds Home or School to the saved game data for your reports.</p>

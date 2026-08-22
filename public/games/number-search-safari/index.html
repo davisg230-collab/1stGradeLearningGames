@@ -177,6 +177,24 @@
       cursor: not-allowed;
     }
 
+    .level-button.is-under-construction {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      color: #94a3b8;
+    }
+
+    .level-button .construction-badge {
+      display: inline-flex;
+      align-self: flex-start;
+      border-radius: 999px;
+      padding: 0.25rem 0.55rem;
+      background: #e2e8f0;
+      color: #475569;
+      font-size: 0.72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
     .level-button strong {
       font-size: 1.15rem;
       line-height: 1.2;
@@ -1246,6 +1264,7 @@
           next.detail = text(next.detail, "Search the field and tap the target.").trim();
           next.practiceLabel = text(next.practiceLabel).trim();
           next.completionMessage = text(next.completionMessage).trim();
+          next.underConstruction = next.underConstruction === true;
           return next.name ? next : null;
         })
         .filter(Boolean);
@@ -1851,6 +1870,7 @@
 
       content.levels.forEach((level, index) => {
         const questions = questionsForLevel(index);
+        const underConstruction = level.underConstruction === true;
         const locked =
           !wholeClassMode
           && scholarControl
@@ -1861,19 +1881,23 @@
             && scholarControl.unlockedLevelIndexes.includes(index)
           );
         const button = document.createElement("button");
-        button.className = "level-button";
+        button.className = `level-button${underConstruction ? " is-under-construction" : ""}`;
         button.type = "button";
-        button.disabled = !questions.length || locked || (!wholeClassMode && !scholarFirstNameKey);
+        button.disabled = underConstruction || !questions.length || locked || (!wholeClassMode && !scholarFirstNameKey);
         button.innerHTML = `
           <strong></strong>
           <span></span>
           <span></span>
+          <em class="construction-badge" hidden>Under Construction</em>
         `;
         button.querySelector("strong").textContent = text(level.name, `Level ${index + 1}`);
-        button.querySelectorAll("span")[0].textContent = locked
+        button.querySelectorAll("span")[0].textContent = underConstruction
+          ? "This level is not open for scholars yet."
+          : locked
           ? "Locked by teacher"
           : text(level.detail, "Search the field and tap the target.");
         button.querySelectorAll("span")[1].textContent = `${questions.length} target${questions.length === 1 ? "" : "s"}`;
+        button.querySelector(".construction-badge").hidden = !underConstruction;
         button.addEventListener("click", () => beginLevel(index));
         levelGrid.append(button);
       });
@@ -1883,6 +1907,11 @@
       activeLevelIndex = index;
       activeLevel = content.levels[index];
       activeQuestions = questionsForLevel(index);
+
+      if (activeLevel?.underConstruction === true) {
+        startError.textContent = "This level is under construction and is not open for scholars yet.";
+        return;
+      }
 
       if (!activeLevel || !activeQuestions.length) {
         startError.textContent = "This level does not have targets yet.";
@@ -2490,7 +2519,13 @@
       const restartIndex = scholarControl && Number.isInteger(scholarControl.restartLevelIndex)
         ? scholarControl.restartLevelIndex
         : -1;
-      if (!wholeClassMode && !autoStartedControl && restartIndex >= 0 && questionsForLevel(restartIndex).length) {
+      if (
+        !wholeClassMode
+        && !autoStartedControl
+        && restartIndex >= 0
+        && content.levels[restartIndex]?.underConstruction !== true
+        && questionsForLevel(restartIndex).length
+      ) {
         autoStartedControl = true;
         beginLevel(restartIndex);
       }

@@ -1329,6 +1329,32 @@ button.area-card {
   font-weight: 800;
 }
 
+.independent-learning-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 14px;
+}
+
+.independent-learning-card span {
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  border: 2px solid rgb(247 176 79 / 0.28);
+  border-radius: 16px;
+  background: #fff7d8;
+  color: #7a4b15;
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.independent-learning-note {
+  border-left: 4px solid var(--coral);
+  padding-left: 12px;
+  color: var(--muted);
+  font-weight: 850;
+}
+
 .scholar-results-overlay {
   position: fixed;
   inset: 0;
