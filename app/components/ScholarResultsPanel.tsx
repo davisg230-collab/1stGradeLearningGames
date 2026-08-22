@@ -70,6 +70,7 @@ type Scholar = {
   lastName: string;
   lastNameKey: string;
   teacherEmail: string;
+  trackingInitials: string;
 };
 
 type MissedQuestion = {
@@ -767,8 +768,20 @@ function normalizeNameKey(name: string) {
     .slice(0, 30);
 }
 
-function initialsForScholar(scholar: Pick<Scholar, "firstName" | "lastName">) {
+function cleanTrackingInitials(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 3);
+}
+
+function automaticInitialsForScholar(scholar: Pick<Scholar, "firstName" | "lastName">) {
   return `${scholar.firstName.trim().charAt(0)}${scholar.lastName.trim().charAt(0)}`.toUpperCase();
+}
+
+function initialsForScholar(scholar: Pick<Scholar, "firstName" | "lastName"> & { trackingInitials?: string }) {
+  return cleanTrackingInitials(scholar.trackingInitials) || automaticInitialsForScholar(scholar);
 }
 
 function isTestScholar(scholar: Pick<Scholar, "firstNameKey" | "lastNameKey">) {
@@ -1073,6 +1086,7 @@ function mapScholar(doc: FirestoreDocSnapshot): Scholar {
     lastName: asText(data.lastName),
     lastNameKey: asText(data.lastNameKey),
     teacherEmail: asText(data.teacherEmail),
+    trackingInitials: cleanTrackingInitials(data.trackingInitials),
   };
 
   return {
@@ -2316,8 +2330,10 @@ function curriculumNeedTermMatches(text: string, term: string) {
   if (!cleanText || !cleanTerm) return false;
   if (cleanText === cleanTerm) return true;
 
-  if (cleanTerm.length <= 2) {
-    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(cleanTerm)}([^a-z0-9]|$)`, "i").test(cleanText);
+  if (cleanText.length <= 2 || cleanTerm.length <= 2) {
+    const shortTerm = cleanText.length <= cleanTerm.length ? cleanText : cleanTerm;
+    const longText = cleanText.length <= cleanTerm.length ? cleanTerm : cleanText;
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(shortTerm)}([^a-z0-9]|$)`, "i").test(longText);
   }
 
   return cleanText.includes(cleanTerm) || cleanTerm.includes(cleanText);
@@ -2527,6 +2543,20 @@ function isStrongSmallGroupLessonMatch(
   return false;
 }
 
+function sharedCurriculumRecommendationNeedLabels(
+  recommendation: CurriculumRecommendation,
+  activeCandidate: CurriculumNeedCandidate,
+  candidates: CurriculumNeedCandidate[],
+) {
+  return candidates
+    .filter((candidate) => (
+      candidate.key !== activeCandidate.key
+      && recommendationMatchesNeedCandidate(recommendation, candidate)
+    ))
+    .map((candidate) => candidate.need)
+    .slice(0, 4);
+}
+
 function curriculumGroupUploadUrl(
   candidate: CurriculumNeedCandidate,
   subject: "skills" | "listening" | "math",
@@ -2661,6 +2691,7 @@ function smallGroupPlanObjective(
 function cleanSmallGroupSourceText(text: string) {
   return text
     .replace(/\u0000/g, "")
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
@@ -2668,12 +2699,58 @@ function cleanSmallGroupSourceText(text: string) {
     .slice(0, 30000);
 }
 
+function sourceTextReadability(text: string) {
+  const characters = Array.from(text);
+  const visibleCharacters = characters.filter((character) => !/\s/.test(character));
+  const weirdCharacters = characters.filter((character) => {
+    const code = character.charCodeAt(0);
+    if (character === "\n" || character === "\r" || character === "\t" || character === " ") return false;
+    if (code >= 32 && code <= 126) return false;
+    return !"’‘“”–—•".includes(character);
+  });
+  const words = text.match(/[A-Za-z][A-Za-z'’.-]{2,}/g) ?? [];
+  const letterCount = (text.match(/[A-Za-z]/g) ?? []).length;
+  const visibleCount = Math.max(1, visibleCharacters.length);
+
+  return {
+    letterRatio: letterCount / visibleCount,
+    weirdRatio: weirdCharacters.length / Math.max(1, characters.length),
+    wordCount: words.length,
+  };
+}
+
+function isReadableLessonSourceText(text: string, minWords = 12, minLength = 80) {
+  const cleanText = cleanSmallGroupSourceText(text);
+  const stats = sourceTextReadability(cleanText);
+
+  return (
+    cleanText.length >= minLength
+    && stats.wordCount >= minWords
+    && stats.letterRatio >= 0.45
+    && stats.weirdRatio <= 0.02
+  );
+}
+
+function isReadableLessonSourceSentence(text: string) {
+  const stats = sourceTextReadability(text);
+
+  return (
+    stats.wordCount >= 3
+    && stats.letterRatio >= 0.45
+    && stats.weirdRatio <= 0.02
+  );
+}
+
 function sourceSentences(text: string) {
   return cleanSmallGroupSourceText(text)
     .replace(/\r/g, "\n")
     .split(/(?<=[.!?])\s+|\n+/)
     .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length >= 24 && sentence.length <= 260);
+    .filter((sentence) => (
+      sentence.length >= 24
+      && sentence.length <= 260
+      && isReadableLessonSourceSentence(sentence)
+    ));
 }
 
 function relevantSmallGroupSourceNotes(
@@ -2947,7 +3024,7 @@ async function extractTextFromPdfFile(file: File) {
   const chunks = new Set<string>();
   const directText = textFromPdfContent(raw);
 
-  if (directText.length > 80) {
+  if (isReadableLessonSourceText(directText)) {
     chunks.add(directText);
   }
 
@@ -2976,13 +3053,14 @@ async function extractTextFromPdfFile(file: File) {
 
     contentBytes.forEach((contentByteChunk) => {
       const streamText = textFromPdfContent(latin1FromBytes(contentByteChunk));
-      if (streamText.length > 40) chunks.add(streamText);
+      if (isReadableLessonSourceText(streamText, 8, 50)) chunks.add(streamText);
     });
 
     searchIndex = endIndex + "endstream".length;
   }
 
-  return cleanSmallGroupSourceText(Array.from(chunks).join("\n\n"));
+  const extractedText = cleanSmallGroupSourceText(Array.from(chunks).join("\n\n"));
+  return isReadableLessonSourceText(extractedText) ? extractedText : "";
 }
 
 async function readSmallGroupLessonSourceFile(file: File) {
@@ -3235,6 +3313,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState("");
   const [teacherAccount, setTeacherAccount] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("all");
+  const [trackingInitialDrafts, setTrackingInitialDrafts] =
+    useState<Record<string, string>>({});
   const rosterAddTeacherEmail = useMemo(() => {
     if (authorizedTeachers.some((teacher) => teacher.email === teacherFilter)) {
       return teacherFilter;
@@ -3349,6 +3429,22 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       .filter((scholar) => (counts.get(`${scholar.teacherEmail}:${scholar.firstNameKey}`) ?? 0) > 1)
       .map((scholar) => `${scholar.firstName} (${teacherLabelForEmail(scholar.teacherEmail)})`)
       .filter((name, index, list) => list.indexOf(name) === index);
+  }, [scholars]);
+
+  const duplicateTrackingInitialGroups = useMemo(() => {
+    const groups = new Map<string, { initials: string; names: string[]; teacherEmail: string }>();
+
+    scholars.forEach((scholar) => {
+      const initials = initialsForScholar(scholar);
+      const key = `${scholar.teacherEmail}:${initials}`;
+      const group = groups.get(key) ?? { initials, names: [], teacherEmail: scholar.teacherEmail };
+      group.names.push(`${scholar.firstName} ${scholar.lastName}`);
+      groups.set(key, group);
+    });
+
+    return Array.from(groups.values())
+      .filter((group) => group.initials && group.names.length > 1)
+      .map((group) => `${group.initials}: ${group.names.sort((a, b) => a.localeCompare(b)).join(", ")} (${teacherLabelForEmail(group.teacherEmail)})`);
   }, [scholars]);
 
   const gameOptions = useMemo(() => {
@@ -4123,13 +4219,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         .slice(0, 4)
     : [];
 
-  const fetchCurriculumRecommendations = async () => {
+  const fetchCurriculumRecommendations = async (focusCandidate?: CurriculumNeedCandidate) => {
+    const searchCandidates = focusCandidate ? [focusCandidate] : curriculumNeedCandidates;
     const needs = Array.from(new Set(
-      curriculumNeedCandidates
+      searchCandidates
         .flatMap((candidate) => [candidate.need, ...candidate.searchTerms])
         .map(normalizeCurriculumNeedText)
         .filter(Boolean),
-    )).slice(0, 24);
+    )).slice(0, focusCandidate ? 12 : 24);
 
     if (!needs.length) {
       setCurriculumRecommendations([]);
@@ -4149,7 +4246,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          limit: 8,
+          limit: focusCandidate ? 12 : 8,
           needs,
           subject: curriculumRecommendationSubject,
         }),
@@ -4293,6 +4390,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         lastName: cleanLastName,
         lastNameKey,
         teacherEmail: rosterAddTeacherEmail,
+        trackingInitials: initialsForScholar({ firstName: cleanFirstName, lastName: cleanLastName }),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -4358,6 +4456,44 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       setStatus(`${scholar.firstName} ${scholar.lastName} is now ${nextInclude ? "included in" : "hidden from"} charts, reports, and small-group suggestions.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Test-student data visibility could not be changed.");
+    }
+  };
+  const saveScholarTrackingInitials = async (scholar: Scholar, value: string) => {
+    const nextInitials = cleanTrackingInitials(value);
+    setError("");
+    setStatus("");
+
+    if (!nextInitials) {
+      setError("Enter 1 to 3 letters for whole-group tracking initials.");
+      return;
+    }
+
+    try {
+      const { auth, db, firebase } = await loadFirebase();
+      const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
+
+      if (!isAuthorizedTeacherEmail(signedInEmail)) {
+        throw new Error("Sign in with an authorized teacher Google account to edit tracking initials.");
+      }
+
+      await db.collection(SCHOLAR_COLLECTION).doc(scholar.id).set({
+        trackingInitials: nextInitials,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      setScholars((currentScholars) =>
+        currentScholars.map((currentScholar) =>
+          currentScholar.id === scholar.id
+            ? { ...currentScholar, trackingInitials: nextInitials }
+            : currentScholar,
+        ),
+      );
+      setTrackingInitialDrafts((drafts) => ({
+        ...drafts,
+        [scholar.id]: nextInitials,
+      }));
+      setStatus(`Whole-group tracking initials for ${scholar.firstName} ${scholar.lastName} are now ${nextInitials}.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Tracking initials could not be saved.");
     }
   };
 
@@ -5239,7 +5375,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               <h2>Lesson Source Notes</h2>
               <ul>${sourceNotes.map((note) => `<li>${escapeReportHtml(note)}</li>`).join("")}</ul>
             ` : ""}
-            ${sourceTitle ? `<p class="meta">Source used: ${escapeReportHtml(sourceTitle)}</p>` : ""}
+            ${sourceText && sourceTitle ? `<p class="meta">Source used: ${escapeReportHtml(sourceTitle)}</p>` : ""}
           </main>
         </div>
       </body>
@@ -5479,6 +5615,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         {duplicateFirstNames.length ? (
           <div className="privacy-note">
             <strong>Duplicate first name found:</strong> {duplicateFirstNames.join(", ")}. For these scholars, use a private class code or icon choice later so the child can pick the right record without seeing last names.
+          </div>
+        ) : null}
+
+        {duplicateTrackingInitialGroups.length ? (
+          <div className="privacy-note">
+            <strong>Duplicate whole-group initials:</strong> {duplicateTrackingInitialGroups.join("; ")}. Change one scholar's tracking initials below, like JRB, so whole-group misses match the right scholar.
           </div>
         ) : null}
 
@@ -5790,7 +5932,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         <button
                           className="teacher-control-button"
                           disabled={!curriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
-                          onClick={() => void fetchCurriculumRecommendations()}
+                          onClick={() => void fetchCurriculumRecommendations(selectedSmallGroupNeed)}
                           type="button"
                         >
                           {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
@@ -5810,6 +5952,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                           selectedSmallGroupRecommendations.map((recommendation, index) => {
                             const lessonSource = smallGroupLessonSources[recommendation.id] ?? { fileName: "", text: "" };
                             const isStrongMatch = isStrongSmallGroupLessonMatch(recommendation, selectedSmallGroupNeed, index);
+                            const sharedNeedLabels = sharedCurriculumRecommendationNeedLabels(
+                              recommendation,
+                              selectedSmallGroupNeed,
+                              curriculumNeedCandidates,
+                            );
 
                             return (
                               <article
@@ -5825,6 +5972,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                   <strong className="small-group-match-star">Best small-group plan match</strong>
                                 ) : null}
                                 <p><strong>Why this lesson:</strong> {curriculumRecommendationReason(recommendation, selectedSmallGroupNeed)}</p>
+                                {sharedNeedLabels.length ? (
+                                  <p><strong>Also fits:</strong> {sharedNeedLabels.join(", ")}</p>
+                                ) : null}
                                 <div className="small-group-lesson-actions">
                                   <button
                                     className="teacher-text-button"
@@ -6302,6 +6452,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               {!isLoading && !visibleScholars.length ? <p>No students added yet for this view.</p> : null}
               {visibleScholars.map((scholar) => {
                 const scholarResults = resultsForScholar(scholar);
+                const trackingInitialDraft = trackingInitialDrafts[scholar.id] ?? initialsForScholar(scholar);
 
                 return (
                   <article className="roster-card" key={scholar.id}>
@@ -6315,6 +6466,31 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         ) : null}
                       </span>
                     </button>
+                    <div className="roster-initials-edit">
+                      <label>
+                        Tracking initials
+                        <input
+                          aria-label={`Whole-group tracking initials for ${scholar.firstName} ${scholar.lastName}`}
+                          maxLength={3}
+                          onChange={(event) => {
+                            const nextInitials = cleanTrackingInitials(event.target.value);
+                            setTrackingInitialDrafts((drafts) => ({
+                              ...drafts,
+                              [scholar.id]: nextInitials,
+                            }));
+                          }}
+                          value={trackingInitialDraft}
+                        />
+                      </label>
+                      <button
+                        className="teacher-text-button"
+                        disabled={!trackingInitialDraft || trackingInitialDraft === initialsForScholar(scholar)}
+                        onClick={() => void saveScholarTrackingInitials(scholar, trackingInitialDraft)}
+                        type="button"
+                      >
+                        Save Initials
+                      </button>
+                    </div>
                     {isTestScholar(scholar) ? (
                       <button
                         className="teacher-text-button"

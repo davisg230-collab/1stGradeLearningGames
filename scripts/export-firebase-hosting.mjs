@@ -10,7 +10,15 @@ const workerPath = path.join(root, "dist", "server", "index.js");
 const routes = [
   { path: "/", file: "index.html" },
   { path: "/skills", file: "skills.html" },
+  {
+    path: "/listening-learning",
+    file: "listening-learning.html",
+  },
   { path: "/math", file: "math.html" },
+  {
+    path: "/games/skills/qps-screener",
+    file: "games/skills/qps-screener.html",
+  },
 ];
 
 async function renderRoute(worker, routePath) {
@@ -46,6 +54,7 @@ const { default: worker } = await import(
 
 for (const route of routes) {
   const html = await renderRoute(worker, route.path);
+  await mkdir(path.dirname(path.join(outputDir, route.file)), { recursive: true });
   await writeFile(path.join(outputDir, route.file), html);
 }
 

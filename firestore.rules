@@ -43,6 +43,11 @@ service cloud.firestore {
         && value.matches('^[a-z]{1,30}$');
     }
 
+    function isValidTrackingInitials(value) {
+      return value is string
+        && value.matches('^[A-Z]{1,3}$');
+    }
+
     function isValidChoice(value) {
       return value is string
         && value.matches('^[A-Za-z0-9 _./-]{1,50}$');
@@ -548,6 +553,7 @@ service cloud.firestore {
           'lastName',
           'lastNameKey',
           'teacherEmail',
+          'trackingInitials',
           'updatedAt'
         ])
         && request.resource.data.keys().hasAll([
@@ -568,6 +574,10 @@ service cloud.firestore {
         && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
         && request.resource.data.createdAt is timestamp
         && request.resource.data.updatedAt is timestamp
+        && (
+          !request.resource.data.keys().hasAny(['trackingInitials'])
+          || isValidTrackingInitials(request.resource.data.trackingInitials)
+        )
         && (
           !request.resource.data.keys().hasAny(['includeInReports'])
           || request.resource.data.includeInReports is bool
