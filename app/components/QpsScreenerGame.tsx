@@ -465,6 +465,10 @@ function statusLabel(status: QpsItemScore["status"]) {
   return "Not scored";
 }
 
+function primaryQpsDisplay(value: string) {
+  return value.replace(/a/g, "ɑ");
+}
+
 function qpsItemTypeFor(value: unknown, display: string, section: string): QpsItem["type"] {
   if (value === "letter" || value === "sound" || value === "word" || value === "sentence") {
     return value;
@@ -644,7 +648,7 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
             <div className="qps-scholar-card">
               <p>{currentItem.section}</p>
               <strong className={`qps-reader-display is-${currentItem.type}`}>
-                {currentItem.display}
+                {primaryQpsDisplay(currentItem.display)}
               </strong>
               <span>Read or say this for your teacher.</span>
             </div>
@@ -942,6 +946,15 @@ export function QpsScreenerGame() {
     }));
   };
 
+  const markCorrect = () => {
+    updateCurrentScore({ said: "", status: "correct" });
+    setWholeClassMissStatus("");
+
+    if (currentIndex < qpsItems.length - 1) {
+      setCurrentIndex((index) => Math.min(qpsItems.length - 1, index + 1));
+    }
+  };
+
   const markNeedsReview = () => {
     updateCurrentScore({ status: "missed" });
     setWholeClassMissStatus("");
@@ -973,6 +986,7 @@ export function QpsScreenerGame() {
       const { db, firebase } = await loadFirebase();
       const serverTime = firebase.firestore.FieldValue.serverTimestamp();
       const selected = currentScore.said.trim() || "Needs review";
+      const note = currentScore.note.trim();
       const teacherForMiss =
         rosterTeacherEmailForEmail(teacherEmail)
         || selectedScholar?.teacherEmail
@@ -994,6 +1008,7 @@ export function QpsScreenerGame() {
           gameId: QPS_GAME_ID,
           gameTitle: QPS_GAME_TITLE,
           incorrectSelection: selected,
+          note,
           levelId: currentItem.section,
           levelName: currentItem.section,
           questionIndex: currentIndex + 1,
@@ -1006,6 +1021,7 @@ export function QpsScreenerGame() {
           gameId: QPS_GAME_ID,
           gameTitle: QPS_GAME_TITLE,
           incorrectSelections: [selected],
+          note,
           levelId: currentItem.section,
           levelName: currentItem.section,
           questionIndex: currentIndex + 1,
@@ -1233,6 +1249,7 @@ export function QpsScreenerGame() {
           gameTitle: QPS_GAME_TITLE,
           incorrectSelections: [score.said.trim() || "Needs review"],
           levelName: item.section,
+          note: score.note.trim(),
           questionIndex: qpsItems.findIndex((nextItem) => nextItem.id === item.id) + 1,
           word: item.display,
         };
@@ -1400,7 +1417,7 @@ export function QpsScreenerGame() {
             <div className="qps-reader-card">
               <p>{selectedForm.label} - {currentItem.section} - Item {currentIndex + 1} of {qpsItems.length}</p>
               <strong className={`qps-reader-display is-${currentItem.type}`}>
-                {currentItem.display}
+                {primaryQpsDisplay(currentItem.display)}
               </strong>
               <span>{currentItem.prompt}</span>
               {currentScore.status === "missed" && currentScore.said ? (
@@ -1411,7 +1428,7 @@ export function QpsScreenerGame() {
             <div className="qps-score-buttons" role="group" aria-label="Score current QPS item">
               <button
                 className={currentScore.status === "correct" ? "is-correct" : ""}
-                onClick={() => updateCurrentScore({ said: "", status: "correct" })}
+                onClick={markCorrect}
                 type="button"
               >
                 Correct
@@ -1493,7 +1510,7 @@ export function QpsScreenerGame() {
                   onClick={() => setCurrentIndex(index)}
                   type="button"
                 >
-                  <strong>{item.display}</strong>
+                  <strong>{primaryQpsDisplay(item.display)}</strong>
                   <span>{statusLabel(score.status)}</span>
                 </button>
               );
