@@ -5487,6 +5487,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       curriculumRecommendationsByNeedKey[selectedSmallGroupNeed.key]
         ?? recommendationsForNeedCandidate(curriculumRecommendations, selectedSmallGroupNeed)
     ).filter((recommendation) =>
+      Boolean(smallGroupLessonSources[recommendation.id]?.fileName || smallGroupLessonSources[recommendation.id]?.text)
+      ||
       !curriculumRecommendationBlockedByFeedback(
         recommendation,
         selectedSmallGroupNeed,
@@ -5778,7 +5780,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           fileName: file.name,
           text,
         });
-        await analyzeSmallGroupLessonSource(candidate, recommendation, text, file.name);
+        setStatus(`Attached ${file.name}. Click Analyze Source when you want to check whether it matches ${candidate.need} and rebuild the plans.`);
         return;
       }
 
