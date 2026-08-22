@@ -314,6 +314,7 @@ type CurriculumRecommendation = {
   matchedNeeds: string[];
   score: number;
   reason: string;
+  sourceText?: string;
   url: string;
 };
 type CurriculumRecommendationFeedback = {
@@ -530,6 +531,104 @@ const UFLI_INTERVENTION_LESSON_ROWS = `
 127|Additional Affixes Unit|bi-, tri-, uni-
 128|Additional Affixes Unit|Affixes Review 2
 `;
+const UFLI_UNIT_DESCRIPTIONS: Record<string, string> = {
+  "Additional Affixes Unit": "morpheme work with common suffixes, prefixes, and word parts so scholars can read, spell, and explain longer words.",
+  "Alphabet Review and Longer Words Unit": "short-vowel review and longer word reading after the alphabet sequence, with extra practice for CVC and advanced short-vowel patterns.",
+  "Alphabet Unit": "alphabet knowledge, letter names, letter-sound connections, short vowels, and early CVC reading and spelling.",
+  "Digraphs Unit": "consonant digraphs and high-utility ending spelling patterns, including ck, sh, th, ch, wh, ph, ng, nk, and review.",
+  "Diphthongs and Silent Letters Unit": "diphthongs, silent-letter patterns, and review of vowel-team learning in connected words.",
+  "Ending Spelling Patterns Unit": "ending spelling patterns such as tch, dge, long VCC words, final y, and consonant-le.",
+  "Long Vowel Teams Unit": "common long-vowel teams for long a, e, o, and i, plus review of vowel-team reading and spelling.",
+  "Low Frequency Spelling Unit": "less common spellings for r-controlled vowels, long vowels, ough, signal vowels, and consonant spellings.",
+  "Other Vowel Teams Unit": "additional vowel teams for oo, long u, aw, and other less predictable vowel spellings.",
+  "R-Controlled Vowels Unit": "r-controlled vowel spellings and sounds, including ar, or, ore, er, ir, ur, and review.",
+  "Reading Longer Words Unit": "inflectional endings, syllables, compound words, and open and closed syllable work for longer word reading.",
+  "Suffix Spelling Changes Unit": "spelling-change rules when adding suffixes, including doubling, drop e, and y to i.",
+  "Suffixes and Prefixes Unit": "common suffixes and prefixes, including -s, -es, -er, -est, -ly, -less, -ful, un-, pre-, re-, and dis-.",
+  "VCe Unit": "silent-e and vowel-consonant-e patterns for long vowels, soft c and g, and exceptions.",
+};
+const UFLI_PATTERN_ALIASES = [
+  { pattern: "short a", aliases: ["short a", "short vowel a", "short /a/"] },
+  { pattern: "short i", aliases: ["short i", "short vowel i", "short /i/"] },
+  { pattern: "short o", aliases: ["short o", "short vowel o", "short /o/"] },
+  { pattern: "short u", aliases: ["short u", "short vowel u", "short /u/"] },
+  { pattern: "short e", aliases: ["short e", "short vowel e", "short /e/"] },
+  { pattern: "short vowels", aliases: ["short vowels", "short vowel review", "cvc", "vc cvc"] },
+  { pattern: "nasalized a", aliases: ["nasalized a", "an am", "am an"] },
+  { pattern: "flsz", aliases: ["flsz", "flsz spelling rule", "double final f", "double final l", "double final s", "double final z"] },
+  { pattern: "all", aliases: ["all", "-all"] },
+  { pattern: "oll", aliases: ["oll", "-oll"] },
+  { pattern: "ull", aliases: ["ull", "-ull"] },
+  { pattern: "ck", aliases: ["ck", "ck digraph", "ck spelling"] },
+  { pattern: "sh", aliases: ["sh", "sh digraph"] },
+  { pattern: "th", aliases: ["th", "th digraph", "voiced th", "unvoiced th"] },
+  { pattern: "ch", aliases: ["ch", "ch digraph"] },
+  { pattern: "wh", aliases: ["wh", "wh digraph"] },
+  { pattern: "ph", aliases: ["ph", "ph digraph"] },
+  { pattern: "ng", aliases: ["ng", "ng digraph"] },
+  { pattern: "nk", aliases: ["nk", "nk ending"] },
+  { pattern: "digraphs", aliases: ["digraphs", "digraph review", "consonant digraphs"] },
+  { pattern: "vce", aliases: ["vce", "vowel consonant e", "silent e", "magic e", "long vowel silent e"] },
+  { pattern: "a_e", aliases: ["a e", "a_e", "a-e", "long a silent e"] },
+  { pattern: "i_e", aliases: ["i e", "i_e", "i-e", "long i silent e"] },
+  { pattern: "o_e", aliases: ["o e", "o_e", "o-e", "long o silent e"] },
+  { pattern: "e_e", aliases: ["e e", "e_e", "e-e", "long e silent e"] },
+  { pattern: "u_e", aliases: ["u e", "u_e", "u-e", "long u silent e"] },
+  { pattern: "soft c", aliases: ["soft c", "ce", "_ce", "c says s"] },
+  { pattern: "soft g", aliases: ["soft g", "ge", "_ge", "g says j"] },
+  { pattern: "es", aliases: ["-es", "es ending", "suffix es"] },
+  { pattern: "ed", aliases: ["-ed", "ed ending", "suffix ed", "past tense ed"] },
+  { pattern: "ing", aliases: ["-ing", "ing ending", "suffix ing"] },
+  { pattern: "syllables", aliases: ["syllables", "syllable", "longer words"] },
+  { pattern: "compound words", aliases: ["compound words", "compound word"] },
+  { pattern: "closed syllables", aliases: ["closed syllables", "closed closed"] },
+  { pattern: "open syllables", aliases: ["open syllables", "open and closed"] },
+  { pattern: "tch", aliases: ["tch", "tch spelling"] },
+  { pattern: "dge", aliases: ["dge", "dge spelling"] },
+  { pattern: "long vcc", aliases: ["long vcc", "ild", "old", "ind", "olt", "ost"] },
+  { pattern: "y long i", aliases: ["y long i", "final y long i", "y says long i"] },
+  { pattern: "y long e", aliases: ["y long e", "final y long e", "y says long e"] },
+  { pattern: "le", aliases: ["-le", "consonant le", "final stable syllable"] },
+  { pattern: "ar", aliases: ["ar", "r controlled ar", "r-controlled ar"] },
+  { pattern: "or", aliases: ["or", "ore", "r controlled or", "r-controlled or"] },
+  { pattern: "er", aliases: ["er", "ir", "ur", "r controlled er", "r-controlled er"] },
+  { pattern: "r-controlled vowels", aliases: ["r controlled", "r-controlled", "r controlled vowels", "r-controlled vowels"] },
+  { pattern: "ai", aliases: ["ai", "ay", "long a vowel team", "long a teams"] },
+  { pattern: "ee", aliases: ["ee", "ea", "ey", "long e vowel team", "long e teams"] },
+  { pattern: "oa", aliases: ["oa", "ow", "oe", "long o vowel team", "long o teams"] },
+  { pattern: "ie", aliases: ["ie", "igh", "long i vowel team", "long i teams"] },
+  { pattern: "oo", aliases: ["oo", "long u", "short oo"] },
+  { pattern: "ew", aliases: ["ew", "ui", "ue", "long u vowel team", "long u teams"] },
+  { pattern: "vowel teams", aliases: ["vowel teams", "vowel team", "long vowel teams"] },
+  { pattern: "au", aliases: ["au", "aw", "augh", "aw sound"] },
+  { pattern: "ea short e", aliases: ["ea short e", "short e ea"] },
+  { pattern: "oi", aliases: ["oi", "oy", "diphthong oi", "diphthong oy"] },
+  { pattern: "ou", aliases: ["ou", "ow", "diphthong ou", "diphthong ow"] },
+  { pattern: "silent letters", aliases: ["silent letters", "silent letter", "kn", "wr", "mb"] },
+  { pattern: "kn", aliases: ["kn", "silent k"] },
+  { pattern: "wr", aliases: ["wr", "silent w"] },
+  { pattern: "mb", aliases: ["mb", "silent b"] },
+  { pattern: "suffixes", aliases: ["suffix", "suffixes", "affixes"] },
+  { pattern: "prefixes", aliases: ["prefix", "prefixes"] },
+  { pattern: "er est", aliases: ["-er", "-est", "er est", "comparative", "superlative"] },
+  { pattern: "ly", aliases: ["-ly", "ly suffix"] },
+  { pattern: "less ful", aliases: ["-less", "-ful", "less ful"] },
+  { pattern: "un", aliases: ["un-", "prefix un"] },
+  { pattern: "pre re", aliases: ["pre-", "re-", "prefix pre", "prefix re"] },
+  { pattern: "dis", aliases: ["dis-", "prefix dis"] },
+  { pattern: "doubling rule", aliases: ["doubling rule", "doubling", "double before suffix"] },
+  { pattern: "drop e", aliases: ["drop e", "drop the e", "dropping e"] },
+  { pattern: "y to i", aliases: ["y to i", "change y to i"] },
+  { pattern: "sion tion", aliases: ["sion", "tion", "-sion", "-tion"] },
+  { pattern: "ture", aliases: ["ture", "-ture"] },
+  { pattern: "agent suffixes", aliases: ["-er", "-or", "-ist", "er or ist"] },
+  { pattern: "ish", aliases: ["-ish", "ish suffix"] },
+  { pattern: "y suffix", aliases: ["-y", "y suffix"] },
+  { pattern: "ness", aliases: ["-ness", "ness suffix"] },
+  { pattern: "ment", aliases: ["-ment", "ment suffix"] },
+  { pattern: "able ible", aliases: ["-able", "-ible", "able ible"] },
+  { pattern: "number prefixes", aliases: ["bi-", "tri-", "uni-", "number prefixes"] },
+];
 type UfliInterventionLesson = {
   concept: string;
   lessonNumber: string;
@@ -537,25 +636,6 @@ type UfliInterventionLesson = {
   unitName: string;
   url: string;
 };
-
-const UFLI_INTERVENTION_LESSONS: UfliInterventionLesson[] = UFLI_INTERVENTION_LESSON_ROWS
-  .trim()
-  .split("\n")
-  .map((row) => {
-    const [lessonNumber, unitName, concept] = row.split("|").map((part) => part.trim());
-    const lesson = {
-      concept,
-      lessonNumber,
-      sourceText: "",
-      unitName,
-      url: ufliToolboxUrlForLesson(lessonNumber),
-    };
-
-    return {
-      ...lesson,
-      sourceText: ufliSourceTextForLesson(lesson),
-    };
-  });
 
 function ufliToolboxUrlForLesson(lessonNumber: string) {
   const numericLesson = Number((lessonNumber.match(/\d+/) ?? ["0"])[0]);
@@ -582,24 +662,169 @@ function ufliLessonSortValue(lessonNumber: string) {
   return numericLesson * 10 + (suffix ? suffix.charCodeAt(0) - 96 : 0);
 }
 
+function normalizeUfliPatternText(value: unknown) {
+  return normalizeCurriculumNeedKey(value)
+    .replace(/[_/+]+/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function ufliPatternTermMatches(text: string, term: string) {
+  const cleanText = normalizeUfliPatternText(text);
+  const cleanTerm = normalizeUfliPatternText(term);
+
+  if (!cleanText || !cleanTerm) return false;
+  if (cleanText === cleanTerm) return true;
+
+  if (cleanTerm.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(cleanTerm)}([^a-z0-9]|$)`, "i").test(cleanText);
+  }
+
+  return cleanText.includes(cleanTerm) || cleanTerm.includes(cleanText);
+}
+
+function ufliUnitDescription(unitName: string) {
+  return UFLI_UNIT_DESCRIPTIONS[unitName] || "foundational reading and spelling intervention practice.";
+}
+
+function ufliPatternEntriesForText(text: string) {
+  return UFLI_PATTERN_ALIASES.filter((entry) =>
+    ufliPatternTermMatches(text, entry.pattern)
+    || entry.aliases.some((alias) => ufliPatternTermMatches(text, alias)),
+  );
+}
+
+function ufliPatternTermsForCandidate(candidate: CurriculumNeedCandidate) {
+  const terms = [candidate.need, ...candidate.searchTerms]
+    .map(normalizeCurriculumNeedText)
+    .filter(Boolean);
+  const patterns = new Set<string>();
+  const chunkNeed = smallGroupNeedChunk(candidate);
+
+  if (chunkNeed) patterns.add(chunkNeed);
+
+  terms.forEach((term) => {
+    ufliPatternEntriesForText(term).forEach((entry) => patterns.add(entry.pattern));
+  });
+
+  return Array.from(patterns);
+}
+
+const UFLI_PRACTICE_EXAMPLES_BY_PATTERN: Record<string, string[]> = {
+  "able ible": ["readable", "usable", "visible", "possible"],
+  ai: ["rain", "mail", "day", "play"],
+  all: ["ball", "fall", "tall", "mall"],
+  ar: ["car", "park", "star", "farm"],
+  au: ["saw", "paw", "fault", "pause"],
+  "ck": ["back", "duck", "sock", "pick"],
+  ch: ["chip", "chin", "lunch", "rich"],
+  dge: ["badge", "edge", "bridge", "fudge"],
+  dis: ["dislike", "disagree", "disconnect"],
+  "doubling rule": ["hopped", "running", "bigger", "hottest"],
+  "drop e": ["making", "riding", "hoped", "cutest"],
+  ed: ["jumped", "landed", "filled"],
+  ee: ["see", "seed", "team", "key"],
+  er: ["her", "bird", "turn", "word"],
+  "er est": ["faster", "fastest", "smaller", "smallest"],
+  ew: ["new", "chew", "fruit", "blue"],
+  flsz: ["buff", "fill", "mess", "buzz"],
+  ing: ["jumping", "running", "sitting"],
+  kn: ["knee", "know", "knock"],
+  le: ["table", "little", "bubble", "apple"],
+  "less ful": ["helpful", "careful", "hopeless", "fearless"],
+  "long vcc": ["wild", "cold", "find", "post"],
+  mb: ["lamb", "thumb", "comb"],
+  ment: ["payment", "movement", "enjoyment"],
+  nasalized: ["man", "fan", "ham", "jam"],
+  "nasalized a": ["man", "fan", "ham", "jam"],
+  ng: ["ring", "sing", "song", "king"],
+  nk: ["bank", "sink", "pink", "junk"],
+  ness: ["kindness", "sadness", "darkness"],
+  oa: ["boat", "road", "snow", "toe"],
+  oi: ["coin", "join", "toy", "boy"],
+  or: ["for", "corn", "more", "store"],
+  ou: ["out", "shout", "cow", "now"],
+  ph: ["phone", "photo", "graph"],
+  "pre re": ["redo", "reread", "preview", "preheat"],
+  sh: ["ship", "shop", "fish", "wish"],
+  "short a": ["map", "sat", "tap", "jam"],
+  "short e": ["bed", "men", "ten", "pet"],
+  "short i": ["sit", "pin", "dig", "him"],
+  "short o": ["hot", "pot", "dog", "mom"],
+  "short u": ["sun", "cup", "bug", "mud"],
+  "silent letters": ["knee", "write", "lamb"],
+  "sion tion": ["action", "motion", "vision"],
+  "soft c": ["face", "ice", "cent"],
+  "soft g": ["cage", "gem", "large"],
+  suffixes: ["jumps", "boxes", "jumped", "helpful"],
+  tch: ["catch", "match", "pitch", "latch"],
+  th: ["thin", "that", "this", "bath"],
+  ture: ["picture", "future", "nature"],
+  un: ["undo", "unhappy", "unfair"],
+  vce: ["make", "bike", "home", "cute"],
+  "vowel teams": ["rain", "feet", "boat", "night"],
+  wh: ["when", "whip", "whale"],
+  wr: ["write", "wrist", "wrong"],
+  "y long e": ["happy", "funny", "silly"],
+  "y long i": ["my", "try", "fly", "cry"],
+  "y to i": ["cried", "happier", "parties"],
+};
+
+function ufliPracticeExamplesForLesson(lesson: Omit<UfliInterventionLesson, "sourceText">) {
+  const patternEntries = ufliPatternEntriesForText(`${lesson.unitName} ${lesson.concept}`);
+  const examples = new Set<string>();
+
+  patternEntries.forEach((entry) => {
+    (UFLI_PRACTICE_EXAMPLES_BY_PATTERN[entry.pattern] ?? []).forEach((word) => examples.add(word));
+  });
+
+  return Array.from(examples).slice(0, 8);
+}
+
 function ufliSourceTextForLesson(lesson: Omit<UfliInterventionLesson, "sourceText">) {
   const letterFocus = lesson.concept.match(/^([a-z])\s+\//i)?.[1] ?? "";
   const letterFocusText = letterFocus
     ? `Letter focus: letter ${letterFocus}, lowercase ${letterFocus}, uppercase ${letterFocus}, and the sound/spelling in ${lesson.concept}.`
     : "";
+  const practiceExamples = ufliPracticeExamplesForLesson(lesson);
 
   return cleanSmallGroupSourceText([
     `UFLI Foundations Lesson ${lesson.lessonNumber}: ${lesson.concept}.`,
     `Unit: ${lesson.unitName}.`,
+    `Unit focus: ${ufliUnitDescription(lesson.unitName)}`,
     letterFocusText,
     UFLI_FOUNDATIONS_ROUTINE,
     `New concept and word work focus on ${lesson.concept}. Scholars practice accurate decoding, encoding, reading, spelling, and connected text with this target.`,
+    practiceExamples.length ? `Practice examples for planning: ${practiceExamples.join(", ")}.` : "",
+    `Teacher plan should include a quick model, guided word work, connected reading or sentence practice when available, spelling/encoding, and a 2-3 item data check.`,
+    `Family help should stay short: say the sound or pattern, read 2-4 words, write one word or sentence, and stop while practice is still positive.`,
+    `Toolbox connection: use the UFLI page for the lesson slide deck, decodable passage, home practice, and additional practice resources when provided.`,
     `For a small group, keep the full routine short and narrow the practice to the target need. Use visual drill, auditory drill, blending, word work, and a quick data check.`,
   ].filter(Boolean).join("\n"));
 }
 
+const UFLI_INTERVENTION_LESSONS: UfliInterventionLesson[] = UFLI_INTERVENTION_LESSON_ROWS
+  .trim()
+  .split("\n")
+  .map((row) => {
+    const [lessonNumber, unitName, concept] = row.split("|").map((part) => part.trim());
+    const lesson = {
+      concept,
+      lessonNumber,
+      sourceText: "",
+      unitName,
+      url: ufliToolboxUrlForLesson(lessonNumber),
+    };
+
+    return {
+      ...lesson,
+      sourceText: ufliSourceTextForLesson(lesson),
+    };
+  });
+
 function ufliConceptSearchText(lesson: UfliInterventionLesson) {
-  return normalizeCurriculumNeedKey(`${lesson.lessonNumber} ${lesson.unitName} ${lesson.concept}`);
+  return normalizeCurriculumNeedKey(`${lesson.lessonNumber} ${lesson.unitName} ${lesson.concept} ${lesson.sourceText}`);
 }
 
 function ufliConceptExplicitlyTargetsLetter(lesson: UfliInterventionLesson, letter: string) {
@@ -616,12 +841,23 @@ function ufliConceptExplicitlyTargetsChunk(lesson: UfliInterventionLesson, chunk
   const cleanChunk = chunk.toLowerCase();
   const chunkPattern = new RegExp(`(^|[^a-z])${escapeRegExp(cleanChunk)}(?:\\b|\\s*/|_)`, "i");
 
-  return chunkPattern.test(concept);
+  return chunkPattern.test(concept) || ufliPatternTermMatches(lesson.concept, cleanChunk);
+}
+
+function ufliConceptExplicitlyTargetsPattern(lesson: UfliInterventionLesson, pattern: string) {
+  return ufliPatternTermMatches(`${lesson.unitName} ${lesson.concept}`, pattern)
+    || ufliPatternEntriesForText(pattern).some((entry) =>
+      ufliPatternTermMatches(`${lesson.unitName} ${lesson.concept}`, entry.pattern)
+      || entry.aliases.some((alias) => ufliPatternTermMatches(`${lesson.unitName} ${lesson.concept}`, alias)),
+    );
 }
 
 function ufliLessonScoreForCandidate(lesson: UfliInterventionLesson, candidate: CurriculumNeedCandidate) {
   const letterNeed = smallGroupSingleLetterNeed(candidate);
   const chunkNeed = smallGroupNeedChunk(candidate);
+  const patternNeed = ufliPatternTermsForCandidate(candidate).find((pattern) =>
+    ufliConceptExplicitlyTargetsPattern(lesson, pattern),
+  );
   const conceptText = ufliConceptSearchText(lesson);
   const terms = curriculumCandidateMatchTerms(candidate);
 
@@ -655,6 +891,14 @@ function ufliLessonScoreForCandidate(lesson: UfliInterventionLesson, candidate: 
     }
 
     return null;
+  }
+
+  if (patternNeed) {
+    return {
+      matchType: /review/i.test(lesson.concept) ? "ufli-review" : "ufli-direct",
+      reason: `UFLI Lesson ${lesson.lessonNumber} teaches ${lesson.concept}, which directly matches the ${patternNeed} need in ${candidate.need}.`,
+      score: /review/i.test(lesson.concept) ? 84 : 96,
+    };
   }
 
   const exactTerm = terms.find((term) => term.length > 2 && curriculumNeedTermMatches(conceptText, term));
@@ -3118,6 +3362,10 @@ function curriculumRecommendationBlockedByFeedback(
   subject: "skills" | "listening" | "math",
   feedback: CurriculumRecommendationFeedback[],
 ) {
+  if (recommendation.id.startsWith("ufli-")) {
+    return false;
+  }
+
   const feedbackId = curriculumRecommendationFeedbackId(candidate, recommendation, subject);
 
   return feedback.some((entry) =>
@@ -3947,7 +4195,7 @@ function smallGroupLessonConnection(
   recommendation: CurriculumRecommendation | undefined,
 ) {
   if (!recommendation) {
-    return "the uploaded lesson";
+    return "the lesson source";
   }
 
   return `${curriculumRecommendationLessonLabel(recommendation)} - ${recommendation.lessonTitle}`;
@@ -3962,7 +4210,7 @@ function smallGroupUsefulSourceMoment(
     || recommendation?.objective
     || recommendation?.parentSummary
     || recommendation?.iCanStatement
-    || "Use one short, matching moment from the uploaded lesson."
+    || "Use one short, matching moment from the lesson source."
   );
 }
 
@@ -4055,7 +4303,7 @@ function buildSmallGroupLessonAnalysis(
   const letterNeed = smallGroupSingleLetterNeed(candidate);
   const lessonLabel = recommendation
     ? `${curriculumRecommendationLessonLabel(recommendation)} - ${recommendation.lessonTitle}`
-    : "the uploaded lesson";
+    : "the lesson source";
   const notes = relevantSmallGroupSourceNotes(sourceText, candidate, recommendation).slice(0, 4);
   const words = smallGroupSourceLessonWords(sourceText, candidate, subject);
   const sourceFeatures = smallGroupSourceFeatures(sourceText);
@@ -4080,7 +4328,7 @@ function buildSmallGroupLessonAnalysis(
       materials,
       model: `Model the target from ${lessonLabel}: show the story with objects or a drawing, think aloud, then connect it to the number sentence.`,
       notes,
-      summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
+      summary: `The lesson source was turned into a small-group plan for ${target}`,
       target,
       words: practiceExamples,
     });
@@ -4101,7 +4349,7 @@ function buildSmallGroupLessonAnalysis(
       materials,
       model: `Model one complete response from ${lessonLabel}. Think aloud: name the detail, explain why it matters, then say the sentence clearly.`,
       notes,
-      summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
+      summary: `The lesson source was turned into a small-group plan for ${target}`,
       target,
       words: practiceExamples,
     });
@@ -4131,7 +4379,7 @@ function buildSmallGroupLessonAnalysis(
       materials,
       model: `Show lowercase ${letterNeed}. Say, "This is ${letterNeed}." Point to ${letterNeed} in ${practiceExamples[0] || "a short word"}, say the letter name or sound, then write ${letterNeed}. Connect it to this lesson source moment: ${sourceMoment}`,
       notes,
-      summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
+      summary: `The lesson source was turned into a small-group plan for ${target}`,
       target,
       words: practiceExamples,
     });
@@ -4153,7 +4401,7 @@ function buildSmallGroupLessonAnalysis(
     materials,
     model: `Model the exact target from ${lessonLabel}. Say the thinking out loud, show the response, then have scholars echo the key step.`,
     notes,
-    summary: `The uploaded lesson was analyzed and turned into a small-group plan for ${target}`,
+    summary: `The lesson source was turned into a small-group plan for ${target}`,
     target,
     words: practiceExamples,
   });
@@ -4255,7 +4503,7 @@ function smallGroupAnalyzedSourcePractice(
 ) {
   const hasUsableSource = isReadableLessonSourceText(sourceText, 8, 40);
   const letterNeed = smallGroupSingleLetterNeed(candidate);
-  const lessonTitle = recommendation?.lessonTitle || "the uploaded lesson";
+  const lessonTitle = recommendation?.lessonTitle || "the lesson source";
 
   if (!hasUsableSource) {
     return smallGroupGuidedPracticeStep(candidate, recommendation, subject);
@@ -4270,18 +4518,18 @@ function smallGroupAnalyzedSourcePractice(
       features.hasWriting ? `write ${letterNeed} and one lesson word on whiteboards` : `trace ${letterNeed} in the air, then point to it again`,
     ].join("; ");
 
-    return `Use the uploaded ${lessonTitle} routine as the source: ${sourceActivity}. Keep the practice focused on the small-group need instead of rereading the whole lesson.`;
+    return `Use the ${lessonTitle} routine as the source: ${sourceActivity}. Keep the practice focused on the small-group need instead of rereading the whole lesson.`;
   }
 
   if (subject === "skills") {
-    return `Use the uploaded ${lessonTitle} routine to model the target, practice two lesson examples together, then have scholars read, build, or write one matching example independently.`;
+    return `Use the ${lessonTitle} routine to model the target, practice two lesson examples together, then have scholars read, build, or write one matching example independently.`;
   }
 
   if (subject === "math") {
-    return `Use the uploaded ${lessonTitle} routine to model one lesson problem with objects or drawings, solve one together, then have scholars try one parallel problem and explain their thinking.`;
+    return `Use the ${lessonTitle} routine to model one lesson problem with objects or drawings, solve one together, then have scholars try one parallel problem and explain their thinking.`;
   }
 
-  return `Use the uploaded ${lessonTitle} routine to revisit one important text moment, model a complete response, then have scholars practice with one lesson detail or vocabulary word.`;
+  return `Use the ${lessonTitle} routine to revisit one important text moment, model a complete response, then have scholars practice with one lesson detail or vocabulary word.`;
 }
 
 function smallGroupUploadedLessonSummary(
@@ -4297,7 +4545,7 @@ function smallGroupUploadedLessonSummary(
   const target = smallGroupTeachingTarget(candidate, subject);
   const lessonTitle = recommendation?.lessonTitle || "the selected lesson";
 
-  return `Uploaded source analyzed: this plan uses ${lessonTitle} as the classroom routine and narrows it to this target: ${target}`;
+  return `Lesson source analyzed: this plan uses ${lessonTitle} as the classroom routine and narrows it to this target: ${target}`;
 }
 
 function smallGroupFamilyPractice(
@@ -7303,36 +7551,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    const sourceText = lessonSource?.text.trim() || recommendations[0]?.sourceText?.trim() || "";
-
-    if (isReadableLessonSourceText(sourceText, 8, 40)) {
-      const targetMatch = smallGroupSourceTargetMatch(
-        sourceText,
-        candidate,
-        bestLesson,
-        curriculumRecommendationSubject,
-      );
-
-      if (!targetMatch.matches) {
-        updateSmallGroupLessonSource(bestLesson.id, {
-          analysis: undefined,
-          analysisStatus: "mismatch",
-          mismatchReason: targetMatch.reason,
-          text: sourceText,
-        });
-
-        try {
-          await saveCurriculumRecommendationNotMatch(candidate, bestLesson, targetMatch.reason);
-          setStatus(`${bestLesson.lessonTitle} does not match ${candidate.need}. I saved that note and did not send it to the Hub plan folder.`);
-        } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : "The not-a-match note could not be saved yet.");
-          setStatus(targetMatch.reason);
-        }
-
-        return;
-      }
-    }
-
     try {
       setStatus("Saving small-group plan to the Hub Teacher Workspace...");
       const bundle = buildSmallGroupHubPlanResource(
@@ -7447,7 +7665,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             ${connectedLessonHtml}
             ${sourceSummary ? `
               <section class="box">
-                <h2>Uploaded Lesson Alignment</h2>
+                <h2>Lesson Source Alignment</h2>
                 <p>${escapeReportHtml(sourceSummary)}</p>
               </section>
             ` : ""}
@@ -7508,9 +7726,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         steps: sourceAnalysis.familySteps,
       }
       : smallGroupFamilyPractice(candidate, bestLesson, curriculumRecommendationSubject);
-    const sourceSummary = sourceAnalysis?.summary || (sourceText
-      ? smallGroupUploadedLessonSummary(candidate, bestLesson, curriculumRecommendationSubject, sourceText)
-      : "");
 
     if (!reportWindow) {
       window.print();
@@ -7561,13 +7776,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             <p>${escapeReportHtml(practice.lookFor)}</p>
             <p class="prompt">${escapeReportHtml(practice.prompt)}</p>
           </section>
-
-          ${sourceSummary ? `
-            <section>
-              <h2>Classroom Connection</h2>
-              <p>${escapeReportHtml(sourceSummary.replace(/^Uploaded source analyzed[:.]?\s*/i, ""))}</p>
-            </section>
-          ` : ""}
 
           <p class="quiet">Keep practice short and encouraging. If your child gets stuck, model one example, then let them try again.</p>
         </main>
@@ -8086,7 +8294,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       <div className="curriculum-recommendation-list compact">
                         {selectedSmallGroupRecommendations.length ? (
                           selectedSmallGroupRecommendations.map((recommendation, index) => {
-                            const lessonSource = smallGroupLessonSources[recommendation.id] ?? { fileName: "", text: "" };
                             const isStrongMatch = isStrongSmallGroupLessonMatch(recommendation, selectedSmallGroupNeed, index);
                             const sharedNeedLabels = sharedCurriculumRecommendationNeedLabels(
                               recommendation,
@@ -8114,74 +8321,26 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                 <div className="small-group-lesson-actions">
                                   <button
                                     className="teacher-text-button"
-                                    onClick={() => printCurriculumGroupPlan(selectedSmallGroupNeed, [recommendation], lessonSource)}
+                                    onClick={() => printCurriculumGroupPlan(selectedSmallGroupNeed, [recommendation])}
                                     type="button"
                                   >
                                     Print Teacher Plan
                                   </button>
                                   <button
                                     className="teacher-text-button"
-                                    onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, [recommendation], lessonSource)}
+                                    onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, [recommendation])}
                                     type="button"
                                   >
                                     Print Family Help
                                   </button>
                                   <button
                                     className="teacher-text-button"
-                                    onClick={() => void saveSmallGroupPlanToHub(selectedSmallGroupNeed, [recommendation], lessonSource)}
+                                    onClick={() => void saveSmallGroupPlanToHub(selectedSmallGroupNeed, [recommendation])}
                                     type="button"
                                   >
                                     Save to Hub
                                   </button>
-                                  <label className="curriculum-source-upload-button">
-                                    Upload Source
-                                    <input
-                                      accept=".txt,.md,.csv,.pdf,application/pdf,text/*"
-                                      onChange={(event) => {
-                                        void attachSmallGroupLessonSourceFile(
-                                          selectedSmallGroupNeed,
-                                          recommendation,
-                                          event.currentTarget.files?.[0] ?? null,
-                                        );
-                                        event.currentTarget.value = "";
-                                      }}
-                                      type="file"
-                                    />
-                                  </label>
-                                  <button
-                                    className="teacher-text-button"
-                                    disabled={!lessonSource.text.trim()}
-                                    onClick={() => void analyzeSmallGroupLessonSource(selectedSmallGroupNeed, recommendation)}
-                                    type="button"
-                                  >
-                                    Analyze Source
-                                  </button>
                                 </div>
-                                {lessonSource.fileName || lessonSource.text ? (
-                                  <div className="small-group-source-box">
-                                    {lessonSource.fileName ? <small>Source: {lessonSource.fileName}</small> : null}
-                                    {lessonSource.analysisStatus === "ready" ? (
-                                      <small className="source-analysis-status ready">Analyzed source will shape the teacher and family print plans.</small>
-                                    ) : lessonSource.analysisStatus === "mismatch" ? (
-                                      <small className="source-analysis-status warning">{lessonSource.mismatchReason || "This uploaded source does not match the selected target need."}</small>
-                                    ) : lessonSource.analysisStatus === "needs-text" ? (
-                                      <small className="source-analysis-status warning">Readable lesson text is needed before this can make a stronger plan.</small>
-                                    ) : (
-                                      <small className="source-analysis-status">Click Analyze Source after uploading or editing source text.</small>
-                                    )}
-                                    <textarea
-                                      onChange={(event) => updateSmallGroupLessonSource(recommendation.id, {
-                                        analysis: undefined,
-                                        analysisStatus: "none",
-                                        mismatchReason: "",
-                                        text: event.target.value,
-                                      })}
-                                      placeholder="Lesson source text will appear here when the upload can be read. You can edit it before printing."
-                                      rows={4}
-                                      value={lessonSource.text}
-                                    />
-                                  </div>
-                                ) : null}
                               </article>
                             );
                           })
