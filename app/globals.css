@@ -2446,11 +2446,13 @@ button.area-card {
 .qps-report-list {
   display: grid;
   gap: 8px;
+  max-height: 330px;
+  overflow: auto;
 }
 
 .qps-report-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) auto auto auto;
+  grid-template-columns: minmax(140px, 1fr) auto auto auto auto;
   gap: 8px;
   align-items: center;
   border-radius: 10px;

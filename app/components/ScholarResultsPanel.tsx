@@ -158,6 +158,8 @@ type ProgressSubmission = {
   updatedAt: unknown;
 };
 
+type QpsReportRecord = ResultSubmission | ProgressSubmission;
+
 type GameLevelControl = {
   commandId: string;
   lockedLevelIndexes: number[];
@@ -946,8 +948,16 @@ function qpsCurrentWeekRange() {
   };
 }
 
-function resultIsWithinDateInputs(result: ResultSubmission, startInput: string, endInput: string) {
-  const completedAt = formatDate(result.completedAt);
+function reportRecordDate(record: QpsReportRecord) {
+  return formatDate("completedAt" in record ? record.completedAt : record.updatedAt);
+}
+
+function reportRecordStatus(record: QpsReportRecord) {
+  return "completedAt" in record ? "Saved" : "In progress";
+}
+
+function resultIsWithinDateInputs(result: QpsReportRecord, startInput: string, endInput: string) {
+  const completedAt = reportRecordDate(result);
 
   if (!completedAt) {
     return false;
@@ -4696,14 +4706,26 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         (formatDate(b.completedAt)?.getTime() ?? 0) - (formatDate(a.completedAt)?.getTime() ?? 0),
       );
   }, [results, reportScholars]);
+  const qpsReportRecords = useMemo<QpsReportRecord[]>(() => {
+    const savedRecords = qpsResults;
+    const activeProgressRecords = progressRecords.filter((progress) =>
+      progress.gameId === QPS_SCREENER_GAME_ID
+      && progress.status !== "completed"
+      && matchResult(progress, reportScholars).scholar,
+    );
+
+    return [...savedRecords, ...activeProgressRecords].sort((a, b) =>
+      (reportRecordDate(b)?.getTime() ?? 0) - (reportRecordDate(a)?.getTime() ?? 0),
+    );
+  }, [progressRecords, qpsResults, reportScholars]);
   const currentWeekQpsRange = qpsCurrentWeekRange();
   const qpsPanelResults = (qpsShowCurrentWeekOnly
-    ? qpsResults.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end))
-    : qpsResults
-  ).slice(0, 5);
+    ? qpsReportRecords.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end))
+    : qpsReportRecords
+  );
   const qpsPanelTotalCount = qpsShowCurrentWeekOnly
-    ? qpsResults.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end)).length
-    : qpsResults.length;
+    ? qpsReportRecords.filter((result) => resultIsWithinDateInputs(result, currentWeekQpsRange.start, currentWeekQpsRange.end)).length
+    : qpsReportRecords.length;
   const curriculumNeedCandidates = useMemo(() => {
     const candidates = new Map<string, CurriculumNeedCandidate>();
 
@@ -5368,18 +5390,19 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
   const printQpsSummaryReport = () => {
     const reportWindow = window.open("", "_blank");
-    const qpsResultsForPrint = qpsResults.filter((result) =>
+    const qpsResultsForPrint = qpsReportRecords.filter((result) =>
       resultIsWithinDateInputs(result, qpsPrintStartDate, qpsPrintEndDate),
     );
     const rangeLabel = qpsDateRangeLabel(qpsPrintStartDate, qpsPrintEndDate);
     const rowsHtml = qpsResultsForPrint.map((result) => {
       const match = matchResult(result, reportScholars);
-      const completedAt = formatDate(result.completedAt);
+      const completedAt = reportRecordDate(result);
       const resultPercent = result.totalQuestions ? Math.round((result.score / result.totalQuestions) * 100) : 0;
       return `
         <tr>
           <th>${escapeReportHtml(match.label)}</th>
           <td>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")}</td>
+          <td>${escapeReportHtml(reportRecordStatus(result))}</td>
           <td>${result.score}/${result.totalQuestions} (${resultPercent}%)</td>
           <td>${result.missedCount}</td>
           <td>${escapeReportHtml(result.missedQuestions.slice(0, 8).map((missed, index) => {
@@ -5391,7 +5414,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     }).join("");
     const detailCardsHtml = qpsResultsForPrint.map((result) => {
       const match = matchResult(result, reportScholars);
-      const completedAt = formatDate(result.completedAt);
+      const completedAt = reportRecordDate(result);
       const resultPercent = result.totalQuestions ? Math.round((result.score / result.totalQuestions) * 100) : 0;
       const sectionRowsHtml = Object.entries(result.categoryScores ?? {}).map(([section, score]) => {
         const sectionPercent = score.total ? Math.round((score.correct / score.total) * 100) : 0;
@@ -5423,7 +5446,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           <header>
             <div>
               <h2>${escapeReportHtml(match.label)}</h2>
-              <p>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")}</p>
+              <p>${escapeReportHtml(completedAt ? completedAt.toLocaleDateString() : "Date pending")} - ${escapeReportHtml(reportRecordStatus(result))}</p>
             </div>
             <strong>${result.score}/${result.totalQuestions} (${resultPercent}%)</strong>
           </header>
@@ -5478,14 +5501,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         <main class="report">
         <header class="report-header">
           <h1>QPS Screener Results</h1>
-          <p>${escapeReportHtml(rangeLabel)} - Printed ${escapeReportHtml(new Date().toLocaleDateString())} - ${qpsResultsForPrint.length} saved session${qpsResultsForPrint.length === 1 ? "" : "s"}</p>
+          <p>${escapeReportHtml(rangeLabel)} - Printed ${escapeReportHtml(new Date().toLocaleDateString())} - ${qpsResultsForPrint.length} QPS record${qpsResultsForPrint.length === 1 ? "" : "s"}</p>
         </header>
         <h2>Class Summary</h2>
         <table>
           <thead>
-            <tr><th>Scholar</th><th>Date</th><th>Score</th><th>Needs</th><th>Notes</th></tr>
+            <tr><th>Scholar</th><th>Date</th><th>Status</th><th>Score</th><th>Needs</th><th>Notes</th></tr>
           </thead>
-          <tbody>${rowsHtml || `<tr><td colspan="5">No QPS sessions saved for this date range.</td></tr>`}</tbody>
+          <tbody>${rowsHtml || `<tr><td colspan="6">No QPS records saved for this date range.</td></tr>`}</tbody>
         </table>
         ${detailCardsHtml || ""}
         </main>
@@ -6992,23 +7015,24 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </button>
                 </div>
                 <p className="pin-helper">
-                  Showing {qpsPanelResults.length} of {qpsPanelTotalCount} {qpsShowCurrentWeekOnly ? "current-week" : "saved"} QPS session{qpsPanelTotalCount === 1 ? "" : "s"}.
+                  Showing {qpsPanelResults.length} of {qpsPanelTotalCount} {qpsShowCurrentWeekOnly ? "current-week" : "saved"} QPS record{qpsPanelTotalCount === 1 ? "" : "s"}.
                 </p>
                 <div className="qps-report-list">
                   {qpsPanelResults.length ? qpsPanelResults.map((result) => {
                     const match = matchResult(result, reportScholars);
-                    const completedAt = formatDate(result.completedAt);
+                    const completedAt = reportRecordDate(result);
                     return (
-                      <article className="qps-report-row" key={result.id}>
+                      <article className="qps-report-row" key={`${reportRecordStatus(result)}-${result.id}`}>
                         <strong>{match.label}</strong>
                         <span>{completedAt ? completedAt.toLocaleDateString() : "Date pending"}</span>
+                        <span>{reportRecordStatus(result)}</span>
                         <span>{result.score}/{result.totalQuestions}</span>
                         <em>{result.missedCount} need{result.missedCount === 1 ? "" : "s"}</em>
                       </article>
                     );
                   }) : (
                     <p className="empty-results-message">
-                      {qpsResults.length ? "No QPS sessions saved for this week." : "No QPS sessions saved yet."}
+                      {qpsReportRecords.length ? "No QPS records saved for this week." : "No QPS records saved yet."}
                     </p>
                   )}
                 </div>
