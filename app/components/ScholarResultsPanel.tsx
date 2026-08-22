@@ -225,6 +225,7 @@ type SmallGroupNeedSummary = {
   students: string[];
 };
 type SkillsDataReportId =
+  | "letter-names"
   | "letter-sounds"
   | "digraphs"
   | "math-starting-point"
@@ -1049,6 +1050,9 @@ const LETTER_SOUND_TARGETS = [
   "k",
   "q",
 ];
+const LETTER_NAME_TARGETS = "abcdefghijklmnopqrstuvwxyz"
+  .split("")
+  .flatMap((letter) => [letter.toUpperCase(), letter]);
 const DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ph", "ng", "ck"];
 const NUMBER_TARGETS = Array.from({ length: 20 }, (_, index) => String(index + 1));
 const SKILLS_DATA_REPORTS: {
@@ -1057,6 +1061,12 @@ const SKILLS_DATA_REPORTS: {
   subject: SkillsDataReportSubject;
   targets: string[];
 }[] = [
+  {
+    id: "letter-names",
+    label: "Letter Names",
+    subject: "skills",
+    targets: LETTER_NAME_TARGETS,
+  },
   {
     id: "letter-sounds",
     label: "Letter Sounds",
@@ -2054,7 +2064,10 @@ function preassessmentGameIdForControlId(controlId: string) {
 
 function skillsDataReportId(value: unknown): SkillsDataReportId {
   if (
-    value === "digraphs"
+    value === "letter-names"
+    || value === "letter-sounds"
+    || value === "math-starting-point"
+    || value === "digraphs"
     || value === "number-recognition"
     || value === "counting-quantities"
   ) {
@@ -2446,6 +2459,29 @@ function normalizeSkillTarget(value: unknown) {
   return cleaned.length >= 1 && cleaned.length <= 3 ? cleaned : "";
 }
 
+function normalizeLetterNameTarget(value: unknown, ...contextValues: unknown[]) {
+  const raw = asText(value).trim();
+  const clean = raw.replace(/[^a-z]/gi, "");
+
+  if (clean.length !== 1) {
+    return "";
+  }
+
+  const context = contextValues.map((contextValue) => asText(contextValue).toLowerCase()).join(" ");
+
+  if (/capital|uppercase|upper case/.test(context)) {
+    return clean.toUpperCase();
+  }
+
+  if (/lowercase|lower case/.test(context)) {
+    return clean.toLowerCase();
+  }
+
+  return raw === raw.toUpperCase() && /[A-Z]/.test(raw)
+    ? clean.toUpperCase()
+    : clean.toLowerCase();
+}
+
 function normalizeNumberTarget(value: unknown) {
   const raw = asText(value).trim();
   const directNumber = Number(raw);
@@ -2490,6 +2526,10 @@ function normalizeDataAtGlanceTarget(value: unknown, reportId: SkillsDataReportI
     return normalizeMathStartingPointTarget(value);
   }
 
+  if (reportId === "letter-names") {
+    return normalizeLetterNameTarget(value);
+  }
+
   return reportId === "number-recognition" || reportId === "counting-quantities"
     ? normalizeNumberTarget(value)
     : normalizeSkillTarget(value);
@@ -2508,6 +2548,29 @@ function recognizedNumberTarget(...values: unknown[]) {
 
 function reportIdForSkillTarget(target: string): SkillsDataReportId {
   return DIGRAPH_TARGETS.includes(target) ? "digraphs" : "letter-sounds";
+}
+
+function reportIdForSkillsEvidence(target: string, ...contextValues: unknown[]): SkillsDataReportId {
+  const context = contextValues.map((value) => asText(value).toLowerCase()).join(" ");
+
+  if (DIGRAPH_TARGETS.includes(target)) {
+    return "digraphs";
+  }
+
+  if (
+    /\bletter names?\b/.test(context)
+    || /\bletter identification\b/.test(context)
+    || /\bcapital letter\b/.test(context)
+    || /\buppercase\b/.test(context)
+    || /\blowercase\b/.test(context)
+    || /\bupper case\b/.test(context)
+    || /\blower case\b/.test(context)
+    || /\buppercase and lowercase\b/.test(context)
+  ) {
+    return "letter-names";
+  }
+
+  return "letter-sounds";
 }
 
 function reportIdForNumberSearchResponse(response: Record<string, unknown>) {
@@ -2534,6 +2597,25 @@ function recognizedSkillsDataTarget(...values: unknown[]) {
 
   for (const value of values) {
     const target = normalizeSkillTarget(value);
+    if (validTargets.has(target)) {
+      return target;
+    }
+  }
+
+  return "";
+}
+
+function recognizedSkillsDataTargetForReport(reportId: SkillsDataReportId, ...values: unknown[]) {
+  const validTargets = new Set(
+    reportId === "letter-names"
+      ? LETTER_NAME_TARGETS
+      : reportId === "digraphs"
+        ? DIGRAPH_TARGETS
+        : LETTER_SOUND_TARGETS,
+  );
+
+  for (const value of values) {
+    const target = normalizeDataAtGlanceTarget(value, reportId);
     if (validTargets.has(target)) {
       return target;
     }
@@ -2574,6 +2656,28 @@ function questionResponseEvidence(
   const numberReportId = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
     ? reportIdForNumberSearchResponse(response)
     : "";
+  const skillsReportId = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
+    ? ""
+    : reportIdForSkillsEvidence(
+        normalizeSkillTarget(firstTextValue(
+          response.target,
+          response.letter,
+          response.sound,
+          response.answer,
+          response.correctAnswer,
+          response.word,
+          response.display,
+        )),
+        response.section,
+        response.levelId,
+        response.levelName,
+        response.category,
+        response.skill,
+        response.itemType,
+        response.type,
+        response.prompt,
+        record.levelName,
+      );
   const target = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
     ? recognizedNumberTarget(
         response.target,
@@ -2582,7 +2686,8 @@ function questionResponseEvidence(
         response.word,
         response.display,
       )
-    : recognizedSkillsDataTarget(
+    : recognizedSkillsDataTargetForReport(
+        skillsReportId || "letter-sounds",
         response.target,
         response.letter,
         response.sound,
@@ -2596,7 +2701,7 @@ function questionResponseEvidence(
     return null;
   }
 
-  const reportId: SkillsDataReportId = numberReportId || reportIdForSkillTarget(target);
+  const reportId: SkillsDataReportId = numberReportId || skillsReportId || reportIdForSkillTarget(target);
 
   const selected = firstTextValue(
     firstAttempt?.selected,
@@ -2657,6 +2762,18 @@ function missedQuestionEvidence(
         levelName: missed.levelName || record.levelName,
       })
     : "";
+  const skillsReportId = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
+    ? ""
+    : reportIdForSkillsEvidence(
+        normalizeSkillTarget(firstTextValue(
+          missed.correctAnswer,
+          missed.word,
+          "correctAnswer" in record ? record.correctAnswer : "",
+          "word" in record ? record.word : "",
+        )),
+        missed.category,
+        missed.levelName || record.levelName,
+      );
   const target = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
     ? recognizedNumberTarget(
         missed.correctAnswer,
@@ -2664,7 +2781,8 @@ function missedQuestionEvidence(
         "correctAnswer" in record ? record.correctAnswer : "",
         "word" in record ? record.word : "",
       )
-    : recognizedSkillsDataTarget(
+    : recognizedSkillsDataTargetForReport(
+        skillsReportId || "letter-sounds",
         missed.correctAnswer,
         missed.word,
         "correctAnswer" in record ? record.correctAnswer : "",
@@ -2675,7 +2793,7 @@ function missedQuestionEvidence(
     return null;
   }
 
-  const reportId: SkillsDataReportId = numberReportId || reportIdForSkillTarget(target);
+  const reportId: SkillsDataReportId = numberReportId || skillsReportId || reportIdForSkillTarget(target);
 
   const selected = firstTextValue(
     missed.incorrectSelections?.[0],

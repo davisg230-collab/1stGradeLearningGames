@@ -144,7 +144,7 @@ type QpsCallOnRecord = {
 type QpsSkillsOverride = {
   createdAt?: unknown;
   id: string;
-  reportId: "letter-sounds" | "digraphs";
+  reportId: "letter-names" | "letter-sounds" | "digraphs";
   scholarFirstNameKey: string;
   scholarId: string;
   status: Exclude<QpsCallOnStatus, "unassessed">;
@@ -437,6 +437,7 @@ function qpsFormIdFor(value: unknown): QpsFormId {
 }
 
 function qpsOverrideReportId(value: unknown): QpsSkillsOverride["reportId"] {
+  if (value === "letter-names") return "letter-names";
   return value === "digraphs" ? "digraphs" : "letter-sounds";
 }
 
@@ -478,13 +479,52 @@ function qpsChartReportIdForTarget(target: string): QpsSkillsOverride["reportId"
   return "";
 }
 
+function qpsChartReportIdForItem(item: QpsItem | undefined, target: string): QpsSkillsOverride["reportId"] | "" {
+  if (!item) return "";
+
+  if (QPS_CHART_DIGRAPH_TARGETS.includes(target)) {
+    return "digraphs";
+  }
+
+  if (item.section.includes("Letter Names") || item.type === "letter") {
+    return QPS_CHART_LETTER_TARGETS.includes(target) ? "letter-names" : "";
+  }
+
+  if (item.section.includes("Letter Sounds") || item.type === "sound") {
+    return QPS_CHART_LETTER_TARGETS.includes(target) ? "letter-sounds" : "";
+  }
+
+  return qpsChartReportIdForTarget(target);
+}
+
+function qpsChartReportIdForEvidenceTarget(target: string, ...contextValues: unknown[]): QpsSkillsOverride["reportId"] | "" {
+  const context = contextValues.map((value) => asText(value).toLowerCase()).join(" ");
+
+  if (QPS_CHART_DIGRAPH_TARGETS.includes(target)) {
+    return "digraphs";
+  }
+
+  if (QPS_CHART_LETTER_TARGETS.includes(target)) {
+    if (/letter names?|letter identification/.test(context)) return "letter-names";
+    if (/letter sounds?|sound/.test(context)) return "letter-sounds";
+  }
+
+  return qpsChartReportIdForTarget(target);
+}
+
+function qpsChartReportLabel(reportId: QpsSkillsOverride["reportId"]) {
+  if (reportId === "letter-names") return "Letter Names";
+  if (reportId === "digraphs") return "Digraphs";
+  return "Letter Sounds";
+}
+
 function qpsChartTargetForItem(item: QpsItem | undefined) {
   if (!item) return null;
 
   const target =
     normalizeQpsSkillTarget(item.target)
     || normalizeQpsSkillTarget(item.display);
-  const reportId = qpsChartReportIdForTarget(target);
+  const reportId = qpsChartReportIdForItem(item, target);
 
   if (!target || !reportId) {
     return null;
@@ -778,7 +818,20 @@ function qpsTargetEvidenceFromResponse(
     || raw.display,
   );
 
-  if (target !== chartTarget.target || qpsChartReportIdForTarget(target) !== chartTarget.reportId) {
+  const reportId = qpsChartReportIdForEvidenceTarget(
+    target,
+    raw.section,
+    raw.levelName,
+    raw.levelId,
+    raw.category,
+    raw.skill,
+    raw.itemType,
+    raw.type,
+    raw.prompt,
+    record.levelName,
+  );
+
+  if (target !== chartTarget.target || reportId !== chartTarget.reportId) {
     return null;
   }
 
@@ -831,7 +884,19 @@ function qpsTargetEvidenceFromMiss(
     || record.word,
   );
 
-  if (target !== chartTarget.target || qpsChartReportIdForTarget(target) !== chartTarget.reportId) {
+  const reportId = qpsChartReportIdForEvidenceTarget(
+    target,
+    raw.section,
+    raw.levelName,
+    raw.levelId,
+    raw.category,
+    raw.skill,
+    raw.itemType,
+    raw.type,
+    record.levelName,
+  );
+
+  if (target !== chartTarget.target || reportId !== chartTarget.reportId) {
     return null;
   }
 
@@ -2113,7 +2178,7 @@ export function QpsScreenerGame() {
                     <strong>Suggested Call-On List</strong>
                     <span>
                       {currentChartTarget
-                        ? `${currentChartTarget.reportId === "digraphs" ? "Digraphs" : "Letter Sounds"} chart: ${primaryQpsDisplay(currentChartTarget.target)}`
+                        ? `${qpsChartReportLabel(currentChartTarget.reportId)} chart: ${primaryQpsDisplay(currentChartTarget.target)}`
                         : "Letter and digraph chart targets"}
                     </span>
                   </div>
@@ -2122,7 +2187,7 @@ export function QpsScreenerGame() {
                 {!isAuthorizedTeacherEmail(teacherEmail) ? (
                   <p className="pin-helper">Sign in with a teacher account to use chart-based call-on suggestions.</p>
                 ) : !currentChartTarget ? (
-                  <p className="pin-helper">This slide is not tied to the current Letter Sounds or Digraphs chart yet.</p>
+                  <p className="pin-helper">This slide is not tied to the current Letter Names, Letter Sounds, or Digraphs chart yet.</p>
                 ) : qpsCallOnScholars.length ? (
                   <div className="qps-call-on-list">
                     {qpsCallOnScholars.map((scholar) => (
