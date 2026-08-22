@@ -215,6 +215,7 @@ type SmallGroupNeedSummary = {
 type SkillsDataReportId =
   | "letter-sounds"
   | "digraphs"
+  | "math-starting-point"
   | "number-recognition"
   | "counting-quantities";
 type SkillsDataReportSubject = "skills" | "math";
@@ -297,6 +298,14 @@ type CurriculumRecommendation = {
   score: number;
   reason: string;
   url: string;
+};
+type CurriculumNeedCandidate = {
+  count: number;
+  key: string;
+  need: string;
+  scholars: string[];
+  searchTerms: string[];
+  source: string;
 };
 type CurriculumRecommendationResponse = {
   count?: number;
@@ -389,6 +398,12 @@ const SKILLS_DATA_REPORTS: {
     label: "Digraphs",
     subject: "skills",
     targets: DIGRAPH_TARGETS,
+  },
+  {
+    id: "math-starting-point",
+    label: "Math Starting Point",
+    subject: "math",
+    targets: MATH_STARTING_POINT_CATEGORIES,
   },
   {
     id: "number-recognition",
@@ -1435,6 +1450,7 @@ function VisualSearchAttemptList({
 function isSkillsDataSourceGameId(gameId: string) {
   return gameId === SKILLS_PREASSESSMENT_GAME_ID
     || gameId === LETTER_SEARCH_SAFARI_GAME_ID
+    || gameId === MATH_PREASSESSMENT_GAME_ID
     || gameId === NUMBER_SEARCH_SAFARI_GAME_ID
     || gameId.startsWith("unit1-zone")
     || /^ckla-unit-[3-7]-skills-quest$/.test(gameId);
@@ -1506,7 +1522,33 @@ function normalizeNumberTarget(value: unknown) {
   return "";
 }
 
+function normalizeMathStartingPointTarget(value: unknown) {
+  const raw = asText(value)
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ");
+
+  if (!raw) {
+    return "";
+  }
+
+  return MATH_STARTING_POINT_CATEGORIES.find((category) => {
+    const normalizedCategory = category
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, " ");
+    return raw === normalizedCategory
+      || raw.includes(normalizedCategory)
+      || normalizedCategory.includes(raw);
+  }) ?? "";
+}
+
 function normalizeDataAtGlanceTarget(value: unknown, reportId: SkillsDataReportId) {
+  if (reportId === "math-starting-point") {
+    return normalizeMathStartingPointTarget(value);
+  }
+
   return reportId === "number-recognition" || reportId === "counting-quantities"
     ? normalizeNumberTarget(value)
     : normalizeSkillTarget(value);
@@ -1719,9 +1761,82 @@ function missedQuestionEvidence(
   };
 }
 
+function mathStartingPointCategoryEvidenceForRecord(
+  record: ResultSubmission | ProgressSubmission,
+) {
+  const date = recordEvidenceDate(record);
+  const evidence: SkillsDataEvidence[] = [];
+
+  Object.entries(record.categoryScores ?? {}).forEach(([category, score]) => {
+    const target = normalizeMathStartingPointTarget(category);
+
+    if (!target || score.total <= 0) {
+      return;
+    }
+
+    const correct = score.missed <= 0
+      && score.skipped <= 0
+      && score.correct >= score.total;
+
+    evidence.push({
+      attempts: [`${score.correct}/${score.total} correct${score.missed || score.skipped ? `, ${score.missed + score.skipped} needs review` : ""}`],
+      correct,
+      date,
+      gameId: record.gameId,
+      levelName: record.levelName ?? "",
+      mode: record.mode,
+      prompt: `${target}: ${score.correct}/${score.total} correct`,
+      recordId: record.id,
+      reportId: "math-starting-point",
+      selected: correct ? "Category mastered" : "Category needs review",
+      skill: category,
+      source: gameTitleFor(record.gameId, record.gameTitle),
+      target,
+      timestampMs: date?.getTime() ?? 0,
+    });
+  });
+
+  if (evidence.length) {
+    return evidence;
+  }
+
+  record.missedQuestions.forEach((missed) => {
+    const target = normalizeMathStartingPointTarget(missed.category);
+
+    if (!target) {
+      return;
+    }
+
+    evidence.push({
+      attempts: missed.incorrectSelections?.length
+        ? missed.incorrectSelections.map((selection) => `${selection} miss`)
+        : ["Missed question"],
+      correct: false,
+      date,
+      gameId: record.gameId,
+      levelName: missed.levelName || record.levelName || "",
+      mode: record.mode,
+      prompt: missed.word || missed.correctAnswer || "",
+      recordId: record.id,
+      reportId: "math-starting-point",
+      selected: firstTextValue(missed.incorrectSelections?.[0], "Needs review"),
+      skill: missed.category ?? "",
+      source: gameTitleFor(record.gameId, record.gameTitle),
+      target,
+      timestampMs: date?.getTime() ?? 0,
+    });
+  });
+
+  return evidence;
+}
+
 function skillsDataEvidenceForRecord(record: ResultSubmission | ProgressSubmission) {
   if (!isSkillsDataSourceGameId(record.gameId)) {
     return [];
+  }
+
+  if (record.gameId === MATH_PREASSESSMENT_GAME_ID) {
+    return mathStartingPointCategoryEvidenceForRecord(record);
   }
 
   const responseEvidence = (record.questionResponses ?? [])
@@ -2096,12 +2211,65 @@ function normalizeCurriculumNeedText(value: unknown) {
     .slice(0, 90);
 }
 
+function normalizeCurriculumNeedKey(value: unknown) {
+  return normalizeCurriculumNeedText(value).toLowerCase();
+}
+
 function addCurriculumNeed(needs: string[], value: unknown) {
   const need = normalizeCurriculumNeedText(value);
   if (!need) return;
-  const key = need.toLowerCase();
+  const key = normalizeCurriculumNeedKey(need);
   if (needs.some((existing) => existing.toLowerCase() === key)) return;
   needs.push(need);
+}
+
+function addCurriculumNeedCandidate(
+  candidates: Map<string, CurriculumNeedCandidate>,
+  value: unknown,
+  options: {
+    count?: number;
+    scholars?: string[];
+    searchTerms?: unknown[];
+    source: string;
+  },
+) {
+  const need = normalizeCurriculumNeedText(value);
+  const key = normalizeCurriculumNeedKey(need);
+
+  if (!key) {
+    return;
+  }
+
+  const existing = candidates.get(key) ?? {
+    count: 0,
+    key,
+    need,
+    scholars: [],
+    searchTerms: [],
+    source: "",
+  };
+  const sources = new Set(existing.source.split(", ").filter(Boolean));
+  sources.add(options.source);
+  const scholars = new Set(existing.scholars);
+  const searchTerms = new Set(existing.searchTerms);
+
+  options.scholars?.forEach((scholar) => {
+    const name = normalizeCurriculumNeedText(scholar);
+    if (name) scholars.add(name);
+  });
+  [need, ...(options.searchTerms ?? [])].forEach((term) => {
+    const normalized = normalizeCurriculumNeedText(term);
+    if (normalized) searchTerms.add(normalized);
+  });
+
+  candidates.set(key, {
+    count: existing.count + Math.max(1, options.count ?? 1),
+    key,
+    need: existing.need,
+    scholars: Array.from(scholars).sort((a, b) => a.localeCompare(b)),
+    searchTerms: Array.from(searchTerms),
+    source: Array.from(sources).join(", "),
+  });
 }
 
 function curriculumNeedsFromRecord(record: ResultSubmission | ProgressSubmission) {
@@ -2143,6 +2311,26 @@ function curriculumRecommendationLessonLabel(recommendation: CurriculumRecommend
     recommendation.unitOrModule,
     lessonNumber,
   ].filter(Boolean).join(" - ");
+}
+
+function recommendationMatchesNeedCandidate(
+  recommendation: CurriculumRecommendation,
+  candidate: CurriculumNeedCandidate,
+) {
+  const terms = [candidate.need, ...candidate.searchTerms]
+    .map(normalizeCurriculumNeedKey)
+    .filter(Boolean);
+  const matchedNeeds = recommendation.matchedNeeds
+    .map(normalizeCurriculumNeedKey)
+    .filter(Boolean);
+
+  return matchedNeeds.some((matchedNeed) =>
+    terms.some((term) =>
+      matchedNeed === term
+      || matchedNeed.includes(term)
+      || term.includes(matchedNeed),
+    ),
+  );
 }
 
 function rosterScopedTeacherEmail(email: string) {
@@ -3106,41 +3294,94 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const recentResults = dashboardResults.slice(0, 8);
   const recentProgress = dashboardProgress.slice(0, 8);
   const curriculumNeedCandidates = useMemo(() => {
-    const needs: string[] = [];
+    const candidates = new Map<string, CurriculumNeedCandidate>();
 
     if (dataReportView === "skills" || dataReportView === "math") {
       skillsDataTargetSummaryRows
         .filter((summary) => summary.needsReviewCount > 0)
         .sort((a, b) => b.needsReviewCount - a.needsReviewCount || a.target.localeCompare(b.target))
-        .slice(0, 8)
+        .slice(0, 10)
         .forEach((summary) => {
-          addCurriculumNeed(needs, summary.target);
-          addCurriculumNeed(needs, `${selectedSkillsDataReport.label} ${summary.target}`);
+          const scholarsForTarget = skillsDataRows
+            .filter((row) =>
+              row.cells.some((cell) =>
+                cell.target === summary.target && cell.status === "needs-review",
+              ),
+            )
+            .map((row) => `${row.scholar.firstName} ${row.scholar.lastName}`);
+
+          addCurriculumNeedCandidate(candidates, summary.target, {
+            count: summary.needsReviewCount,
+            scholars: scholarsForTarget,
+            searchTerms: [summary.target, `${selectedSkillsDataReport.label} ${summary.target}`],
+            source: "Data at a Glance chart",
+          });
         });
     }
 
-    dashboardStruggles.forEach((struggle) => addCurriculumNeed(needs, struggle.label));
+    dashboardStruggles.forEach((struggle) => {
+      addCurriculumNeedCandidate(candidates, struggle.label, {
+        count: struggle.count,
+        scholars: struggle.students,
+        searchTerms: [struggle.label],
+        source: "Small-Group Needs",
+      });
+    });
     dashboardResults.forEach((result) => {
-      curriculumNeedsFromRecord(result).forEach((need) => addCurriculumNeed(needs, need));
+      const match = matchResult(result, visibleScholars);
+      curriculumNeedsFromRecord(result).forEach((need) => {
+        addCurriculumNeedCandidate(candidates, need, {
+          count: 1,
+          scholars: [match.label],
+          source: "Game and assessment results",
+        });
+      });
     });
     dashboardProgress.forEach((progress) => {
-      curriculumNeedsFromRecord(progress).forEach((need) => addCurriculumNeed(needs, need));
+      const match = matchResult(progress, visibleScholars);
+      curriculumNeedsFromRecord(progress).forEach((need) => {
+        addCurriculumNeedCandidate(candidates, need, {
+          count: 1,
+          scholars: [match.label],
+          source: "Game and assessment results",
+        });
+      });
     });
 
-    return needs.slice(0, 14);
+    return Array.from(candidates.values())
+      .sort((a, b) =>
+        b.scholars.length - a.scholars.length
+        || b.count - a.count
+        || a.need.localeCompare(b.need),
+      )
+      .slice(0, 14);
   }, [
     dashboardProgress,
     dashboardResults,
     dashboardStruggles,
     dataReportView,
     selectedSkillsDataReport.label,
+    skillsDataRows,
     skillsDataTargetSummaryRows,
+    visibleScholars,
   ]);
-  const curriculumNeedsToDisplay =
-    curriculumRecommendationNeeds.length ? curriculumRecommendationNeeds : curriculumNeedCandidates;
+  const curriculumRecommendationGroups = useMemo(() => {
+    return curriculumNeedCandidates.map((candidate) => ({
+      candidate,
+      recommendations: curriculumRecommendations
+        .filter((recommendation) => recommendationMatchesNeedCandidate(recommendation, candidate))
+        .slice(0, 4),
+    }));
+  }, [curriculumNeedCandidates, curriculumRecommendations]);
 
   const fetchCurriculumRecommendations = async () => {
-    const needs = curriculumNeedCandidates;
+    const needs = Array.from(new Set(
+      curriculumNeedCandidates
+        .flatMap((candidate) => [candidate.need, ...candidate.searchTerms])
+        .map(normalizeCurriculumNeedText)
+        .filter(Boolean),
+    )).slice(0, 24);
+
     if (!needs.length) {
       setCurriculumRecommendations([]);
       setCurriculumRecommendationNeeds([]);
@@ -3198,7 +3439,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setCurriculumRecommendationStatus("idle");
 
     if (view === "math") {
-      setSkillsDataReportId("number-recognition");
+      setSkillsDataReportId("math-starting-point");
     } else if (view === "skills") {
       setSkillsDataReportId("letter-sounds");
     }
@@ -4011,6 +4252,108 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setTimeout(() => reportWindow.print(), 100);
   };
 
+  const curriculumRecommendationSection = dataReportView !== "students" ? (
+    <section className="curriculum-recommendation-card">
+      <div className="result-row-head">
+        <div>
+          <p className="eyebrow">Curriculum Match</p>
+          <h4>Recommended Curriculum Lessons</h4>
+        </div>
+        <button
+          className="teacher-control-button"
+          disabled={!curriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
+          onClick={() => void fetchCurriculumRecommendations()}
+          type="button"
+        >
+          {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
+        </button>
+      </div>
+      <p className="pin-helper">
+        Uses the subject chart, Small-Group Needs, and current game/assessment results to connect scholars with saved Hub lessons.
+      </p>
+      {curriculumNeedCandidates.length ? (
+        <div className="curriculum-recommendation-need-summary">
+          {curriculumNeedCandidates.slice(0, 8).map((candidate) => (
+            <span key={candidate.key}>
+              {candidate.need} - {candidate.scholars.length || candidate.count} scholar{(candidate.scholars.length || candidate.count) === 1 ? "" : "s"}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-results-message">
+          Use the subject chart or choose Today/This Week so the system can find small-group needs first.
+        </p>
+      )}
+      {curriculumRecommendationError ? (
+        <p className="teacher-message error">{curriculumRecommendationError}</p>
+      ) : null}
+      {curriculumRecommendationStatus === "success" && curriculumRecommendationNeeds.length ? (
+        <p className="pin-helper">
+          Searched {curriculumRecommendationNeeds.length} curriculum term{curriculumRecommendationNeeds.length === 1 ? "" : "s"} from the chart and small-group data.
+        </p>
+      ) : null}
+      {curriculumRecommendationStatus === "success" ? (
+        <div className="curriculum-recommendation-group-list">
+          {curriculumRecommendationGroups.map(({ candidate, recommendations }, index) => (
+            <details className="curriculum-recommendation-group" key={candidate.key} open={index === 0}>
+              <summary>
+                <span>
+                  <strong>{candidate.need}</strong>
+                  <em>{candidate.source}</em>
+                </span>
+                <span>
+                  {candidate.scholars.length || candidate.count} scholar{(candidate.scholars.length || candidate.count) === 1 ? "" : "s"}
+                </span>
+              </summary>
+              {candidate.scholars.length ? (
+                <div className="curriculum-recommendation-scholars">
+                  {candidate.scholars.map((scholar) => (
+                    <span key={scholar}>{scholar}</span>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-results-message">No roster names were attached to this need yet.</p>
+              )}
+              {recommendations.length ? (
+                <div className="curriculum-recommendation-list">
+                  {recommendations.map((recommendation) => (
+                    <article className="curriculum-recommendation-item" key={recommendation.id}>
+                      <div>
+                        <span>{curriculumRecommendationLessonLabel(recommendation)}</span>
+                        <h5>{recommendation.lessonTitle}</h5>
+                      </div>
+                      {recommendation.priorityStandard ? (
+                        <p><strong>Standard:</strong> {recommendation.priorityStandard}</p>
+                      ) : null}
+                      {recommendation.iCanStatement ? (
+                        <p><strong>I Can:</strong> {recommendation.iCanStatement}</p>
+                      ) : null}
+                      {recommendation.objective || recommendation.parentSummary ? (
+                        <p>{recommendation.objective || recommendation.parentSummary}</p>
+                      ) : null}
+                      <a
+                        className="curriculum-recommendation-link"
+                        href={recommendation.url || HUB_CLASS_URL}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open Lesson in Hub
+                      </a>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-results-message">
+                  No saved Hub lesson matched this need yet.
+                </p>
+              )}
+            </details>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  ) : null;
+
   return (
     <div aria-modal="true" className="scholar-results-overlay" role="dialog">
       <section className="scholar-results-panel">
@@ -4384,80 +4727,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            <section className="curriculum-recommendation-card">
-              <div className="result-row-head">
-                <div>
-                  <p className="eyebrow">Curriculum Match</p>
-                  <h4>Recommended Curriculum Lessons</h4>
-                </div>
-                <button
-                  className="teacher-control-button"
-                  disabled={!curriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
-                  onClick={() => void fetchCurriculumRecommendations()}
-                  type="button"
-                >
-                  {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
-                </button>
-              </div>
-              <p className="pin-helper">
-                Uses the current report needs to search saved Hub lessons. Scholar names and individual records stay in Learning Games.
-              </p>
-              {curriculumNeedsToDisplay.length ? (
-                <div className="curriculum-recommendation-needs" aria-label="Needs being searched">
-                  {curriculumNeedsToDisplay.slice(0, 10).map((need) => (
-                    <span key={need}>{need}</span>
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-results-message">
-                  Pick Today, This Week, a lesson lookup, or a Data at a Glance report with needs to search matching lessons.
-                </p>
-              )}
-              {curriculumRecommendationError ? (
-                <p className="teacher-message error">{curriculumRecommendationError}</p>
-              ) : null}
-              {curriculumRecommendationStatus === "success" && !curriculumRecommendations.length ? (
-                <p className="empty-results-message">
-                  No saved lessons matched these needs yet. Try a different report or add more lesson metadata in the Hub.
-                </p>
-              ) : null}
-              {curriculumRecommendations.length ? (
-                <div className="curriculum-recommendation-list">
-                  {curriculumRecommendations.map((recommendation) => (
-                    <article className="curriculum-recommendation-item" key={recommendation.id}>
-                      <div>
-                        <span>{curriculumRecommendationLessonLabel(recommendation)}</span>
-                        <h5>{recommendation.lessonTitle}</h5>
-                      </div>
-                      {recommendation.priorityStandard ? (
-                        <p><strong>Standard:</strong> {recommendation.priorityStandard}</p>
-                      ) : null}
-                      {recommendation.iCanStatement ? (
-                        <p><strong>I Can:</strong> {recommendation.iCanStatement}</p>
-                      ) : null}
-                      {recommendation.objective || recommendation.parentSummary ? (
-                        <p>{recommendation.objective || recommendation.parentSummary}</p>
-                      ) : null}
-                      {recommendation.matchedNeeds.length ? (
-                        <div className="curriculum-recommendation-needs compact">
-                          {recommendation.matchedNeeds.slice(0, 5).map((need) => (
-                            <span key={need}>{need}</span>
-                          ))}
-                        </div>
-                      ) : null}
-                      <a
-                        className="curriculum-recommendation-link"
-                        href={recommendation.url || HUB_CLASS_URL}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Open Lesson in Hub
-                      </a>
-                    </article>
-                  ))}
-                </div>
-              ) : null}
-            </section>
+            {dataReportView === "listening" ? curriculumRecommendationSection : null}
           </section>
           ) : null}
 
@@ -4585,6 +4855,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 </tbody>
               </table>
             </div>
+
+            {curriculumRecommendationSection}
 
             {selectedSkillsDataCell ? (
               <div className="skills-data-detail">

@@ -1271,6 +1271,68 @@ button.area-card {
   font-size: 0.78rem;
 }
 
+.curriculum-recommendation-need-summary,
+.curriculum-recommendation-scholars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.curriculum-recommendation-need-summary span,
+.curriculum-recommendation-scholars span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #2f4054;
+  background: #e8f1f7;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.curriculum-recommendation-group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.curriculum-recommendation-group {
+  border: 1px solid rgb(124 111 91 / 0.16);
+  border-radius: 12px;
+  background: #fffdf8;
+  overflow: hidden;
+}
+
+.curriculum-recommendation-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  color: var(--ink);
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.curriculum-recommendation-group summary span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.curriculum-recommendation-group summary em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.curriculum-recommendation-group > .curriculum-recommendation-scholars,
+.curriculum-recommendation-group > .curriculum-recommendation-list,
+.curriculum-recommendation-group > .empty-results-message {
+  margin: 0 12px 12px;
+}
+
+.curriculum-recommendation-scholars span {
+  background: #fff0dc;
+}
+
 .curriculum-recommendation-list {
   display: grid;
   gap: 10px;
