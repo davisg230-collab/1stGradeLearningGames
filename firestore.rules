@@ -72,6 +72,7 @@ service cloud.firestore {
         'letter-search-safari',
         'math-starting-point-quest',
         'number-search-safari',
+        'qps-screener',
         'skills-starting-point',
         'unit1-zone1-sound-safari'
       ] || (
@@ -893,6 +894,7 @@ service cloud.firestore {
               'letter-search-safari',
               'math-starting-point-quest',
               'number-search-safari',
+              'qps-screener',
               'skills-starting-point'
             ]
             && request.resource.data.questionIndex <= 300
@@ -1356,12 +1358,27 @@ service cloud.firestore {
         && request.resource.data.scholarId is string
         && request.resource.data.scholarId.size() > 0
         && request.resource.data.scholarId.size() <= 150
-        && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
+        && (
+          isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
+          || (
+            sessionId == 'wcm'
+            && request.resource.data.teacherEmail == 'unassigned'
+            && request.resource.data.scholarId == 'whole-class-mode'
+          )
+        )
         && request.resource.data.updatedAt is timestamp
         && (
           !request.resource.data.keys().hasAny(['createdAt'])
           || request.resource.data.createdAt is timestamp
         );
+    }
+
+    function isValidPublicWholeClassQpsLiveSession(sessionId) {
+      return sessionId == 'wcm'
+        && request.resource.data.scholarFirstNameKey == 'wcm'
+        && request.resource.data.scholarId == 'whole-class-mode'
+        && request.resource.data.teacherEmail == 'unassigned'
+        && isValidQpsLiveSession(sessionId);
     }
 
     function isValidScholarQpsLiveMove(sessionId) {
@@ -1467,12 +1484,15 @@ service cloud.firestore {
     match /gameHubQpsLiveSessions/{sessionId} {
       allow get: if sessionId.matches('^[a-z]{1,30}$');
       allow list: if isTeacherEditor();
-      allow create: if isTeacherEditor()
-        && isValidQpsLiveSession(sessionId);
+      allow create: if (
+          isTeacherEditor()
+          && isValidQpsLiveSession(sessionId)
+        ) || isValidPublicWholeClassQpsLiveSession(sessionId);
       allow update: if (
           isTeacherEditor()
           && isValidQpsLiveSession(sessionId)
-        ) || isValidScholarQpsLiveMove(sessionId);
+        ) || isValidPublicWholeClassQpsLiveSession(sessionId)
+        || isValidScholarQpsLiveMove(sessionId);
       allow delete: if isTeacherEditor();
     }
 

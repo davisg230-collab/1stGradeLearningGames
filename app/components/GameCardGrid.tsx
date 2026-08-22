@@ -185,7 +185,7 @@ type ScholarLaunchProfile = {
 
 function wholeClassGameUrl(game: GameCard | null) {
   if (game?.adventure === "qps-screener") {
-    return QPS_SCREENER_URL;
+    return `${QPS_SCREENER_URL}?wholeClass=1`;
   }
 
   if (isPreassessmentGame(game)) {
@@ -440,6 +440,18 @@ export function GameCardGrid({ games }: GameCardGridProps) {
       return;
     }
 
+    if (
+      namePromptGame?.adventure === "qps-screener"
+      && ["WCM", "WHOLECLASS", "WHOLECLASSMODE"].includes(cleanEntry.replace(/\s+/g, "").toUpperCase())
+    ) {
+      window.location.href = scholarGameUrl(namePromptGame, {
+        firstName: "WCM",
+        firstNameKey: "wcm",
+        learningLocation: "school",
+      });
+      return;
+    }
+
     if (!cleanEntry) {
       setNameError("Type your full first name or the teacher code first.");
       return;
@@ -658,7 +670,7 @@ export function GameCardGrid({ games }: GameCardGridProps) {
             ) : (
               <>
                 <h2 id="unit1-name-title">Who is {namePromptGame.adventure === "qps-screener" ? "doing" : "playing"} {namePromptGame.title}?</h2>
-                <p>{namePromptGame.adventure === "qps-screener" ? "Scholars type a first name. If your teacher has started live QPS, your screen will connect." : "Scholars type a first name. Teachers type the class code."}</p>
+                <p>{namePromptGame.adventure === "qps-screener" ? "Scholars type a first name to connect to live QPS. Teachers type the class code for the QPS control screen." : "Scholars type a first name. Teachers type the class code."}</p>
                 <label>
                   First name or teacher code
                   <input

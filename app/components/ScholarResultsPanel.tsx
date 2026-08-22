@@ -2481,6 +2481,24 @@ function recommendationMatchesNeedCandidate(
   );
 }
 
+function recommendationsForNeedCandidate(
+  recommendations: CurriculumRecommendation[],
+  candidate: CurriculumNeedCandidate,
+  options: { allowFocusedFallback?: boolean } = {},
+) {
+  const matchingRecommendations = recommendations
+    .filter((recommendation) => recommendationMatchesNeedCandidate(recommendation, candidate));
+
+  if (matchingRecommendations.length || !options.allowFocusedFallback) {
+    return matchingRecommendations.slice(0, 4);
+  }
+
+  // A focused search only sends terms for one need. If the Hub returns lessons
+  // but the local matcher is too strict for that wording, show those focused
+  // results instead of making the button appear broken.
+  return recommendations.slice(0, 4);
+}
+
 function recommendationExplicitlyTeachesLetter(
   recommendation: CurriculumRecommendation,
   letter: string,
@@ -3407,6 +3425,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     useState<CurriculumRecommendationStatus>("idle");
   const [curriculumRecommendations, setCurriculumRecommendations] =
     useState<CurriculumRecommendation[]>([]);
+  const [curriculumRecommendationsByNeedKey, setCurriculumRecommendationsByNeedKey] =
+    useState<Record<string, CurriculumRecommendation[]>>({});
+  const [curriculumRecommendationErrorsByNeedKey, setCurriculumRecommendationErrorsByNeedKey] =
+    useState<Record<string, string>>({});
+  const [curriculumRecommendationStatusesByNeedKey, setCurriculumRecommendationStatusesByNeedKey] =
+    useState<Record<string, CurriculumRecommendationStatus>>({});
   const [dashboardFocus, setDashboardFocus] =
     useState<DashboardFocus>("mostWrong");
   const [dashboardSubject, setDashboardSubject] =
@@ -4356,19 +4380,22 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const curriculumRecommendationGroups = useMemo(() => {
     return curriculumNeedCandidates.map((candidate) => ({
       candidate,
-      recommendations: curriculumRecommendations
-        .filter((recommendation) => recommendationMatchesNeedCandidate(recommendation, candidate))
-        .slice(0, 4),
+      recommendations: recommendationsForNeedCandidate(curriculumRecommendations, candidate),
     }));
   }, [curriculumNeedCandidates, curriculumRecommendations]);
   const selectedSmallGroupNeed =
     curriculumNeedCandidates.find((need) => need.key === selectedSmallGroupNeedKey)
     ?? null;
   const selectedSmallGroupRecommendations = selectedSmallGroupNeed
-    ? curriculumRecommendations
-        .filter((recommendation) => recommendationMatchesNeedCandidate(recommendation, selectedSmallGroupNeed))
-        .slice(0, 4)
+    ? curriculumRecommendationsByNeedKey[selectedSmallGroupNeed.key]
+      ?? recommendationsForNeedCandidate(curriculumRecommendations, selectedSmallGroupNeed)
     : [];
+  const selectedSmallGroupRecommendationStatus = selectedSmallGroupNeed
+    ? curriculumRecommendationStatusesByNeedKey[selectedSmallGroupNeed.key] ?? "idle"
+    : "idle";
+  const selectedSmallGroupRecommendationError = selectedSmallGroupNeed
+    ? curriculumRecommendationErrorsByNeedKey[selectedSmallGroupNeed.key] ?? ""
+    : "";
 
   const fetchCurriculumRecommendations = async (focusCandidate?: CurriculumNeedCandidate) => {
     const searchCandidates = focusCandidate ? [focusCandidate] : curriculumNeedCandidates;
@@ -4380,15 +4407,42 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     )).slice(0, focusCandidate ? 12 : 24);
 
     if (!needs.length) {
-      setCurriculumRecommendations([]);
-      setCurriculumRecommendationNeeds([]);
-      setCurriculumRecommendationError("Choose Today, This Week, or a Data at a Glance report with needs first.");
-      setCurriculumRecommendationStatus("error");
+      const message = "Choose Today, This Week, or a Data at a Glance report with needs first.";
+      if (focusCandidate) {
+        setCurriculumRecommendationsByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: [],
+        }));
+        setCurriculumRecommendationErrorsByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: message,
+        }));
+        setCurriculumRecommendationStatusesByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: "error",
+        }));
+      } else {
+        setCurriculumRecommendations([]);
+        setCurriculumRecommendationNeeds([]);
+        setCurriculumRecommendationError(message);
+        setCurriculumRecommendationStatus("error");
+      }
       return;
     }
 
-    setCurriculumRecommendationStatus("loading");
-    setCurriculumRecommendationError("");
+    if (focusCandidate) {
+      setCurriculumRecommendationStatusesByNeedKey((current) => ({
+        ...current,
+        [focusCandidate.key]: "loading",
+      }));
+      setCurriculumRecommendationErrorsByNeedKey((current) => ({
+        ...current,
+        [focusCandidate.key]: "",
+      }));
+    } else {
+      setCurriculumRecommendationStatus("loading");
+      setCurriculumRecommendationError("");
+    }
 
     try {
       const response = await fetch(HUB_CURRICULUM_RECOMMENDATION_URL, {
@@ -4408,17 +4462,54 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       }
 
       const data = (await response.json()) as CurriculumRecommendationResponse;
-      setCurriculumRecommendations(data.recommendations ?? []);
-      setCurriculumRecommendationNeeds(data.needs?.length ? data.needs : needs);
-      setCurriculumRecommendationStatus("success");
+      const nextRecommendations = data.recommendations ?? [];
+
+      if (focusCandidate) {
+        setCurriculumRecommendationsByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: recommendationsForNeedCandidate(
+            nextRecommendations,
+            focusCandidate,
+            { allowFocusedFallback: true },
+          ),
+        }));
+        setCurriculumRecommendationErrorsByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: "",
+        }));
+        setCurriculumRecommendationStatusesByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: "success",
+        }));
+      } else {
+        setCurriculumRecommendations(nextRecommendations);
+        setCurriculumRecommendationNeeds(data.needs?.length ? data.needs : needs);
+        setCurriculumRecommendationStatus("success");
+      }
     } catch (nextError) {
-      setCurriculumRecommendations([]);
-      setCurriculumRecommendationError(
+      const message =
         nextError instanceof Error
           ? nextError.message
-          : "Curriculum recommendations could not load yet.",
-      );
-      setCurriculumRecommendationStatus("error");
+          : "Curriculum recommendations could not load yet.";
+
+      if (focusCandidate) {
+        setCurriculumRecommendationsByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: [],
+        }));
+        setCurriculumRecommendationErrorsByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: message,
+        }));
+        setCurriculumRecommendationStatusesByNeedKey((current) => ({
+          ...current,
+          [focusCandidate.key]: "error",
+        }));
+      } else {
+        setCurriculumRecommendations([]);
+        setCurriculumRecommendationError(message);
+        setCurriculumRecommendationStatus("error");
+      }
     }
   };
 
@@ -6151,13 +6242,19 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       <div className="small-group-popup-actions">
                         <button
                           className="teacher-control-button"
-                          disabled={!curriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
+                          disabled={!curriculumNeedCandidates.length || selectedSmallGroupRecommendationStatus === "loading"}
                           onClick={() => void fetchCurriculumRecommendations(selectedSmallGroupNeed)}
                           type="button"
                         >
-                          {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
+                          {selectedSmallGroupRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
                         </button>
                       </div>
+                      {selectedSmallGroupRecommendationStatus === "loading" ? (
+                        <p className="pin-helper">Searching saved Hub lessons for this exact group need.</p>
+                      ) : null}
+                      {selectedSmallGroupRecommendationError ? (
+                        <p className="teacher-message error">{selectedSmallGroupRecommendationError}</p>
+                      ) : null}
                       {selectedSmallGroupNeed.scholars.length ? (
                         <div className="small-group-student-list">
                           {selectedSmallGroupNeed.scholars.map((student) => (
@@ -6241,7 +6338,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                           })
                         ) : (
                           <p className="empty-results-message">
-                            Click Find Lessons to pull saved curriculum lessons for this group.
+                            {selectedSmallGroupRecommendationStatus === "success"
+                              ? "No saved Hub lesson matched this group yet."
+                              : "Click Find Lessons to pull saved curriculum lessons for this group."}
                           </p>
                         )}
                       </div>

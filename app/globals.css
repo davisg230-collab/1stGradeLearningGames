@@ -927,6 +927,45 @@ button.area-card {
   background: #ffe2da;
 }
 
+.qps-whole-class-tools {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  border: 2px solid #f0d7a4;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff8e6;
+}
+
+.qps-whole-class-tools label {
+  display: grid;
+  gap: 6px;
+  color: #2f4054;
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.qps-whole-class-tools input {
+  width: 100%;
+  border: 2px solid #eadcc8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.qps-whole-class-tools p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
 .qps-notes-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

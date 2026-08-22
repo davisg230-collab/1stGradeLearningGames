@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   firebaseConfig,
   isAuthorizedTeacherEmail,
   rosterTeacherEmailForEmail,
   teacherLabelForEmail,
 } from "../firebase-config";
+import { hasTeacherCklaAccess } from "./scholar-profile";
 
 type FirebaseUser = {
   email: string | null;
@@ -72,6 +73,7 @@ type QpsScholar = {
   id: string;
   lastName: string;
   teacherEmail: string;
+  trackingInitials: string;
 };
 
 type QpsItem = {
@@ -133,6 +135,7 @@ const GAME_DEFINITION_COLLECTION = "gameHubGameDefinitions";
 const QPS_LIVE_SESSION_COLLECTION = "gameHubQpsLiveSessions";
 const QPS_GAME_ID = "qps-screener";
 const QPS_GAME_TITLE = "QPS Screener";
+const QPS_WHOLE_CLASS_MODE = "whole-class";
 const QPS_DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ck", "ng", "qu"];
 const QPS_FORM_RAW = {
   A: {
@@ -342,6 +345,21 @@ function normalizeNameKey(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z]/g, "").slice(0, 30);
 }
 
+function cleanTrackingInitials(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 3);
+}
+
+function automaticInitials(firstName: string, lastName: string) {
+  return `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 3);
+}
+
 function qpsFormIdFor(value: unknown): QpsFormId {
   return value === "B" || value === "C" ? value : "A";
 }
@@ -374,6 +392,9 @@ function mapScholar(doc: FirestoreDocSnapshot): QpsScholar | null {
   const lastName = asText(data.lastName).trim();
   const firstNameKey = asText(data.firstNameKey).trim() || normalizeNameKey(firstName);
   const teacherEmail = rosterTeacherEmailForEmail(asText(data.teacherEmail)) || asText(data.teacherEmail);
+  const trackingInitials =
+    cleanTrackingInitials(data.trackingInitials)
+    || automaticInitials(firstName, lastName);
 
   if (!firstName || !firstNameKey || !teacherEmail) {
     return null;
@@ -385,6 +406,7 @@ function mapScholar(doc: FirestoreDocSnapshot): QpsScholar | null {
     id: doc.id,
     lastName,
     teacherEmail,
+    trackingInitials,
   };
 }
 
@@ -658,9 +680,11 @@ export function QpsScreenerGame() {
   const [error, setError] = useState("");
   const [formId, setFormId] = useState<QpsFormId>("A");
   const [hasCheckedScholarMode, setHasCheckedScholarMode] = useState(false);
+  const [hasPinTeacherAccess, setHasPinTeacherAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiveSessionSaving, setIsLiveSessionSaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingWholeClassMiss, setIsSavingWholeClassMiss] = useState(false);
   const [liveSessionActive, setLiveSessionActive] = useState(false);
   const [liveSessionStatus, setLiveSessionStatus] = useState("");
   const [forms, setForms] = useState<Record<QpsFormId, QpsForm>>(QPS_FORMS);
@@ -670,12 +694,29 @@ export function QpsScreenerGame() {
   const [selectedScholarId, setSelectedScholarId] = useState("");
   const [status, setStatus] = useState("");
   const [teacherEmail, setTeacherEmail] = useState("");
+  const [wholeClassInitials, setWholeClassInitials] = useState("");
+  const [wholeClassMissStatus, setWholeClassMissStatus] = useState("");
+  const wholeClassInitialsRef = useRef<HTMLInputElement | null>(null);
 
   const selectedForm = forms[formId] ?? QPS_FORMS[formId];
   const qpsItems = selectedForm.items;
   const currentItem = qpsItems[currentIndex] ?? qpsItems[0];
   const currentScore = scores[currentItem.id] ?? { note: "", said: "", status: "unscored" as const };
   const selectedScholar = scholars.find((scholar) => scholar.id === selectedScholarId) ?? null;
+  const isWholeClassMode = selectedScholarId === QPS_WHOLE_CLASS_MODE;
+  const canUseTeacherBoard = hasPinTeacherAccess || isAuthorizedTeacherEmail(teacherEmail);
+  const wholeClassLiveTarget = useMemo(
+    () => isWholeClassMode
+      ? {
+        firstName: "Whole Class Mode",
+        firstNameKey: "wcm",
+        id: "whole-class-mode",
+        teacherEmail: rosterTeacherEmailForEmail(teacherEmail) || "unassigned",
+      }
+      : null,
+    [isWholeClassMode, teacherEmail],
+  );
+  const selectedLiveTarget = selectedScholar ?? wholeClassLiveTarget;
   const scoredItems = useMemo(
     () => qpsItems.filter((item) => scores[item.id]?.status !== "unscored"),
     [qpsItems, scores],
@@ -688,6 +729,12 @@ export function QpsScreenerGame() {
     const params = new URLSearchParams(window.location.search);
     const firstName = asText(params.get("player")).trim();
     const firstNameKey = asText(params.get("key")).trim() || normalizeNameKey(firstName);
+    const isWholeClassLaunch = params.get("wholeClass") === "1";
+
+    if (isWholeClassLaunch && hasTeacherCklaAccess()) {
+      setHasPinTeacherAccess(true);
+      setSelectedScholarId(QPS_WHOLE_CLASS_MODE);
+    }
 
     if (params.get("live") === "1" && firstName && firstNameKey && normalizeNameKey(firstName) === firstNameKey) {
       setScholarSlideProfile({ firstName, firstNameKey });
@@ -706,13 +753,13 @@ export function QpsScreenerGame() {
       const signedInEmail = user?.email?.trim().toLowerCase() ?? "";
 
       setTeacherEmail(signedInEmail);
+      setForms(await loadEditableQpsForms(db));
 
       if (!isAuthorizedTeacherEmail(signedInEmail)) {
         setScholars([]);
         return;
       }
 
-      setForms(await loadEditableQpsForms(db));
       const snapshot = await db.collection(SCHOLAR_COLLECTION).get();
       setScholars(
         snapshot.docs
@@ -764,10 +811,11 @@ export function QpsScreenerGame() {
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    const liveTarget = selectedLiveTarget;
 
-    if (!selectedScholar || !isAuthorizedTeacherEmail(teacherEmail)) {
+    if (!liveTarget || (!isWholeClassMode && !isAuthorizedTeacherEmail(teacherEmail))) {
       setLiveSessionActive(false);
-      setLiveSessionStatus("");
+      setLiveSessionStatus(isWholeClassMode ? "Whole Class Mode is on. Start live slides, then type WCM on the smart board." : "");
       return () => {
         unsubscribe?.();
       };
@@ -777,13 +825,13 @@ export function QpsScreenerGame() {
       .then(({ db }) => {
         unsubscribe = db
           .collection(QPS_LIVE_SESSION_COLLECTION)
-          .doc(selectedScholar.firstNameKey)
+          .doc(liveTarget.firstNameKey)
           .onSnapshot((snapshot) => {
             const session = mapQpsLiveSession(snapshot);
 
-            if (!session?.active || session.scholarFirstNameKey !== selectedScholar.firstNameKey) {
+            if (!session?.active || session.scholarFirstNameKey !== liveTarget.firstNameKey) {
               setLiveSessionActive(false);
-              setLiveSessionStatus("Live slides are off for this scholar.");
+              setLiveSessionStatus(isWholeClassMode ? "Whole Class Mode is on. Start live slides, then type WCM on the smart board." : "Live slides are off for this scholar.");
               return;
             }
 
@@ -804,7 +852,7 @@ export function QpsScreenerGame() {
     return () => {
       unsubscribe?.();
     };
-  }, [selectedScholar, selectedScholarId, teacherEmail, formId]);
+  }, [selectedLiveTarget, selectedScholarId, teacherEmail, formId, isWholeClassMode]);
 
   const signIn = async () => {
     setError("");
@@ -819,8 +867,10 @@ export function QpsScreenerGame() {
   };
 
   const writeLiveSession = async (active: boolean, silent = false) => {
-    if (!selectedScholar) {
-      setLiveSessionStatus("Choose a scholar before starting live QPS.");
+    const liveTarget = selectedLiveTarget;
+
+    if (!liveTarget) {
+      setLiveSessionStatus("Choose a scholar or Whole Class Mode before starting live QPS.");
       return;
     }
 
@@ -833,14 +883,14 @@ export function QpsScreenerGame() {
       const { auth, db, firebase } = await loadFirebase();
       const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
 
-      if (!isAuthorizedTeacherEmail(signedInEmail)) {
+      if (!isWholeClassMode && !isAuthorizedTeacherEmail(signedInEmail)) {
         throw new Error("Sign in with an authorized teacher account before starting live QPS.");
       }
 
       const serverTime = firebase.firestore.FieldValue.serverTimestamp();
       await db
         .collection(QPS_LIVE_SESSION_COLLECTION)
-        .doc(selectedScholar.firstNameKey)
+        .doc(liveTarget.firstNameKey)
         .set({
           active,
           createdAt: serverTime,
@@ -848,15 +898,17 @@ export function QpsScreenerGame() {
           formId,
           lastChangedBy: "teacher",
           schemaVersion: 1,
-          scholarFirstName: selectedScholar.firstName,
-          scholarFirstNameKey: selectedScholar.firstNameKey,
-          scholarId: selectedScholar.id,
-          teacherEmail: selectedScholar.teacherEmail,
+          scholarFirstName: liveTarget.firstName,
+          scholarFirstNameKey: liveTarget.firstNameKey,
+          scholarId: liveTarget.id,
+          teacherEmail: isWholeClassMode
+            ? rosterTeacherEmailForEmail(signedInEmail) || "unassigned"
+            : liveTarget.teacherEmail,
           updatedAt: serverTime,
         }, { merge: true });
 
       setLiveSessionActive(active);
-      setLiveSessionStatus(active ? `Live slides are on for ${selectedScholar.firstName}.` : `Live slides ended for ${selectedScholar.firstName}.`);
+      setLiveSessionStatus(active ? `Live slides are on for ${liveTarget.firstName}.` : `Live slides ended for ${liveTarget.firstName}.`);
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "Live QPS could not update.";
       setError(message);
@@ -869,7 +921,7 @@ export function QpsScreenerGame() {
   };
 
   useEffect(() => {
-    if (!liveSessionActive || !selectedScholar || scholarSlideProfile) {
+    if (!liveSessionActive || !selectedLiveTarget || scholarSlideProfile) {
       return;
     }
 
@@ -878,7 +930,7 @@ export function QpsScreenerGame() {
     }, 175);
 
     return () => window.clearTimeout(handle);
-  }, [currentIndex, formId, liveSessionActive, selectedScholar, scholarSlideProfile]);
+  }, [currentIndex, formId, liveSessionActive, selectedLiveTarget, scholarSlideProfile]);
 
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     setScores((currentScores) => ({
@@ -890,18 +942,121 @@ export function QpsScreenerGame() {
     }));
   };
 
+  const markNeedsReview = () => {
+    updateCurrentScore({ status: "missed" });
+    setWholeClassMissStatus("");
+
+    if (isWholeClassMode) {
+      window.setTimeout(() => wholeClassInitialsRef.current?.focus(), 50);
+    }
+  };
+
+  const saveWholeClassMiss = async () => {
+    if (!isWholeClassMode) {
+      setWholeClassMissStatus("Choose Whole Class Mode first.");
+      return;
+    }
+
+    const initials = cleanTrackingInitials(wholeClassInitials);
+
+    if (!initials) {
+      setWholeClassMissStatus("Type the scholar's initials first.");
+      wholeClassInitialsRef.current?.focus();
+      return;
+    }
+
+    setIsSavingWholeClassMiss(true);
+    setWholeClassMissStatus("");
+    setError("");
+
+    try {
+      const { db, firebase } = await loadFirebase();
+      const serverTime = firebase.firestore.FieldValue.serverTimestamp();
+      const selected = currentScore.said.trim() || "Needs review";
+      const teacherForMiss =
+        rosterTeacherEmailForEmail(teacherEmail)
+        || selectedScholar?.teacherEmail
+        || "unassigned";
+
+      updateCurrentScore({ said: selected, status: "missed" });
+
+      await db.collection(RESULT_COLLECTION).add({
+        attempts: 1,
+        completedAt: serverTime,
+        correctAnswer: currentItem.display,
+        createdAt: serverTime,
+        gameId: QPS_GAME_ID,
+        gameTitle: QPS_GAME_TITLE,
+        incorrectSelection: selected,
+        incorrectSelections: [{
+          category: currentItem.skill,
+          correctAnswer: currentItem.display,
+          gameId: QPS_GAME_ID,
+          gameTitle: QPS_GAME_TITLE,
+          incorrectSelection: selected,
+          levelId: currentItem.section,
+          levelName: currentItem.section,
+          questionIndex: currentIndex + 1,
+          word: currentItem.display,
+        }],
+        missedCount: 1,
+        missedQuestions: [{
+          category: currentItem.skill,
+          correctAnswer: currentItem.display,
+          gameId: QPS_GAME_ID,
+          gameTitle: QPS_GAME_TITLE,
+          incorrectSelections: [selected],
+          levelId: currentItem.section,
+          levelName: currentItem.section,
+          questionIndex: currentIndex + 1,
+          word: currentItem.display,
+        }],
+        mode: "whole-class-miss",
+        questionIndex: currentIndex + 1,
+        schemaVersion: 1,
+        scholarDisplayName: initials,
+        scholarFirstName: "Class Miss",
+        scholarFirstNameKey: "classmiss",
+        scholarId: null,
+        score: 0,
+        teacherEmail: teacherForMiss,
+        totalQuestions: 1,
+        word: currentItem.display,
+      });
+
+      setWholeClassMissStatus(`Saved ${currentItem.display} for ${initials}.`);
+      setWholeClassInitials("");
+    } catch (nextError) {
+      setWholeClassMissStatus(nextError instanceof Error ? nextError.message : "This QPS miss could not save yet.");
+    } finally {
+      setIsSavingWholeClassMiss(false);
+    }
+  };
+
+  const handleScholarSelection = (nextScholarId: string) => {
+    setSelectedScholarId(nextScholarId);
+    setWholeClassMissStatus("");
+
+    if (nextScholarId === QPS_WHOLE_CLASS_MODE) {
+      setLiveSessionStatus("Whole Class Mode is on. Enter initials when a scholar needs review.");
+    }
+  };
+
   const goToNext = () => {
     setCurrentIndex((index) => Math.min(qpsItems.length - 1, index + 1));
+    setWholeClassMissStatus("");
   };
 
   const goToPrevious = () => {
     setCurrentIndex((index) => Math.max(0, index - 1));
+    setWholeClassMissStatus("");
   };
 
   const resetScores = () => {
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
     setStatus("");
+    setWholeClassMissStatus("");
   };
 
   const printQps = () => {
@@ -1132,7 +1287,8 @@ export function QpsScreenerGame() {
     return <QpsScholarLiveSlides profile={scholarSlideProfile} />;
   }
 
-  const signedInButUnauthorized = teacherEmail && !isAuthorizedTeacherEmail(teacherEmail);
+  const signedInButUnauthorized = teacherEmail && !isAuthorizedTeacherEmail(teacherEmail) && !hasPinTeacherAccess;
+  const needsTeacherSignIn = !isAuthorizedTeacherEmail(teacherEmail);
 
   return (
     <section className="qps-screener-page">
@@ -1152,7 +1308,7 @@ export function QpsScreenerGame() {
           <button className="teacher-control-button secondary" onClick={printQps} type="button">
             Print
           </button>
-          <button className="teacher-control-button" disabled={isSaving} onClick={() => void saveQps()} type="button">
+          <button className="teacher-control-button" disabled={isSaving || isWholeClassMode} onClick={() => void saveQps()} type="button">
             {isSaving ? "Saving..." : "Save QPS"}
           </button>
         </div>
@@ -1162,15 +1318,18 @@ export function QpsScreenerGame() {
       {signedInButUnauthorized ? (
         <p className="pin-error">This QPS screener is teacher-only. Sign in with an authorized teacher account.</p>
       ) : null}
-      {!teacherEmail || signedInButUnauthorized ? (
+      {needsTeacherSignIn ? (
         <button className="teacher-control-button" onClick={() => void signIn()} type="button">
-          Teacher Sign In
+          Teacher Sign In for Roster
         </button>
+      ) : null}
+      {hasPinTeacherAccess && needsTeacherSignIn ? (
+        <p className="pin-helper">PIN mode is on. Whole Class Mode works now; sign in only if you need the scholar roster or individual QPS saves.</p>
       ) : null}
       {error ? <p className="pin-error">{error}</p> : null}
       {status ? <p className="card-edit-message">{status}</p> : null}
 
-      {isAuthorizedTeacherEmail(teacherEmail) ? (
+      {canUseTeacherBoard ? (
         <div className="qps-layout">
           <aside className="qps-score-panel">
             <label>
@@ -1183,11 +1342,12 @@ export function QpsScreenerGame() {
             </label>
             <label>
               Scholar
-              <select onChange={(event) => setSelectedScholarId(event.target.value)} value={selectedScholarId}>
+              <select onChange={(event) => handleScholarSelection(event.target.value)} value={selectedScholarId}>
+                <option value={QPS_WHOLE_CLASS_MODE}>Whole Class Mode</option>
                 <option value="">Choose a scholar</option>
                 {scholars.map((scholar) => (
                   <option key={scholar.id} value={scholar.id}>
-                    {scholar.firstName} {scholar.lastName} - {teacherLabelForEmail(scholar.teacherEmail)}
+                    {scholar.firstName} {scholar.lastName} ({scholar.trackingInitials}) - {teacherLabelForEmail(scholar.teacherEmail)}
                   </option>
                 ))}
               </select>
@@ -1195,7 +1355,7 @@ export function QpsScreenerGame() {
             <div className="qps-live-controls">
               <button
                 className="teacher-control-button"
-                disabled={!selectedScholar || isLiveSessionSaving}
+                disabled={!selectedLiveTarget || isLiveSessionSaving}
                 onClick={() => void writeLiveSession(true)}
                 type="button"
               >
@@ -1203,13 +1363,13 @@ export function QpsScreenerGame() {
               </button>
               <button
                 className="teacher-control-button secondary"
-                disabled={!selectedScholar || !liveSessionActive || isLiveSessionSaving}
+                disabled={!selectedLiveTarget || !liveSessionActive || isLiveSessionSaving}
                 onClick={() => void writeLiveSession(false)}
                 type="button"
               >
                 End Live
               </button>
-              <p>{liveSessionStatus || "Start live slides when the scholar is ready on their iPad."}</p>
+              <p>{liveSessionStatus || (isWholeClassMode ? "Start live slides, then type WCM on the smart board." : "Start live slides when the scholar is ready on their iPad.")}</p>
             </div>
             <div className="qps-score-summary">
               <strong>{correctCount}/{scoredItems.length || 0}</strong>
@@ -1258,7 +1418,7 @@ export function QpsScreenerGame() {
               </button>
               <button
                 className={currentScore.status === "missed" ? "is-missed" : ""}
-                onClick={() => updateCurrentScore({ status: "missed" })}
+                onClick={markNeedsReview}
                 type="button"
               >
                 Needs Review
@@ -1267,6 +1427,32 @@ export function QpsScreenerGame() {
                 Clear
               </button>
             </div>
+
+            {isWholeClassMode ? (
+              <div className="qps-whole-class-tools">
+                <label>
+                  Whole Class miss initials
+                  <input
+                    ref={wholeClassInitialsRef}
+                    autoComplete="off"
+                    inputMode="text"
+                    maxLength={3}
+                    onChange={(event) => setWholeClassInitials(cleanTrackingInitials(event.target.value))}
+                    placeholder="JRB"
+                    value={wholeClassInitials}
+                  />
+                </label>
+                <button
+                  className="teacher-control-button"
+                  disabled={isSavingWholeClassMiss}
+                  onClick={() => void saveWholeClassMiss()}
+                  type="button"
+                >
+                  {isSavingWholeClassMiss ? "Saving..." : "Save Miss"}
+                </button>
+                <p>{wholeClassMissStatus || "Use the scholar's gray tracking initials when this item needs review."}</p>
+              </div>
+            ) : null}
 
             <div className="qps-notes-grid">
               <label>
