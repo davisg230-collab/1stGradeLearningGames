@@ -1231,6 +1231,13 @@ button.area-card {
   font-weight: 900;
 }
 
+.small-group-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
 .dashboard-detail-list summary {
   color: #2f4054;
   font-weight: 900;
@@ -1325,8 +1332,28 @@ button.area-card {
 
 .curriculum-recommendation-group > .curriculum-recommendation-scholars,
 .curriculum-recommendation-group > .curriculum-recommendation-list,
+.curriculum-recommendation-group > .curriculum-recommendation-group-tools,
 .curriculum-recommendation-group > .empty-results-message {
   margin: 0 12px 12px;
+}
+
+.curriculum-recommendation-group-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.curriculum-recommendation-group-tools p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.curriculum-recommendation-group-tools > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .curriculum-recommendation-scholars span {
@@ -1360,6 +1387,12 @@ button.area-card {
   font-size: 1rem;
 }
 
+.curriculum-recommendation-item small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .curriculum-recommendation-item p {
   margin: 0;
   color: var(--muted);
@@ -1377,6 +1410,11 @@ button.area-card {
   font-size: 0.84rem;
   font-weight: 900;
   text-decoration: none;
+}
+
+.curriculum-recommendation-link.secondary {
+  color: #2f4054;
+  background: #fff0c8;
 }
 
 .teacher-filter-tabs {
@@ -1415,7 +1453,7 @@ button.area-card {
 
 .roster-card {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr repeat(3, auto);
   align-items: center;
   gap: 8px;
   border: 1px solid rgb(124 111 91 / 0.12);

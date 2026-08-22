@@ -66,6 +66,7 @@ type Scholar = {
   id: string;
   firstName: string;
   firstNameKey: string;
+  includeInReports: boolean;
   lastName: string;
   lastNameKey: string;
   teacherEmail: string;
@@ -294,6 +295,11 @@ type CurriculumRecommendation = {
   iCanStatement: string;
   objective: string;
   parentSummary: string;
+  matchDetails?: {
+    matchType: string;
+    need: string;
+    reason: string;
+  }[];
   matchedNeeds: string[];
   score: number;
   reason: string;
@@ -758,6 +764,18 @@ function initialsForScholar(scholar: Pick<Scholar, "firstName" | "lastName">) {
   return `${scholar.firstName.trim().charAt(0)}${scholar.lastName.trim().charAt(0)}`.toUpperCase();
 }
 
+function isTestScholar(scholar: Pick<Scholar, "firstNameKey" | "lastNameKey">) {
+  return (
+    scholar.firstNameKey === "jane" && scholar.lastNameKey === "doe"
+  ) || (
+    scholar.firstNameKey === "doe" && scholar.lastNameKey === "jane"
+  );
+}
+
+function scholarIncludedInReports(scholar: Scholar) {
+  return !isTestScholar(scholar) || scholar.includeInReports;
+}
+
 function asText(value: unknown) {
   return typeof value === "string" ? value : "";
 }
@@ -1040,14 +1058,21 @@ async function loadManagedGameMetadata(db: FirestoreDb) {
 
 function mapScholar(doc: FirestoreDocSnapshot): Scholar {
   const data = doc.data() ?? {};
-
-  return {
+  const scholar = {
     id: doc.id,
     firstName: asText(data.firstName),
     firstNameKey: asText(data.firstNameKey),
+    includeInReports: Boolean(data.includeInReports),
     lastName: asText(data.lastName),
     lastNameKey: asText(data.lastNameKey),
     teacherEmail: asText(data.teacherEmail),
+  };
+
+  return {
+    ...scholar,
+    includeInReports: typeof data.includeInReports === "boolean"
+      ? Boolean(data.includeInReports)
+      : !isTestScholar(scholar),
   };
 }
 
@@ -1283,6 +1308,17 @@ function matchResult(result: ResultSubmission | ProgressSubmission, scholars: Sc
   }
 
   return { label: "No roster match yet", tone: "unmatched" };
+}
+
+function recordBelongsToScholar(
+  record: ResultSubmission | ProgressSubmission,
+  scholar: Scholar,
+) {
+  return (
+    Boolean(record.scholarId) && record.scholarId === scholar.id
+  ) || (
+    Boolean(record.scholarFirstNameKey) && record.scholarFirstNameKey === scholar.firstNameKey
+  );
 }
 
 function formatMissedText(word = "", incorrect = "", correct = "") {
@@ -2333,6 +2369,155 @@ function recommendationMatchesNeedCandidate(
   );
 }
 
+function curriculumNeedScholarCount(candidate: CurriculumNeedCandidate) {
+  return candidate.scholars.length || candidate.count;
+}
+
+function curriculumGroupReason(candidate: CurriculumNeedCandidate) {
+  const scholarCount = curriculumNeedScholarCount(candidate);
+  const evidenceLabel = `${candidate.count} evidence point${candidate.count === 1 ? "" : "s"}`;
+  const scholarLabel = `${scholarCount} scholar${scholarCount === 1 ? "" : "s"}`;
+  return `${candidate.source || "Game and assessment data"} found ${evidenceLabel} connected to ${scholarLabel}.`;
+}
+
+function curriculumRecommendationDetailsForCandidate(
+  recommendation: CurriculumRecommendation,
+  candidate: CurriculumNeedCandidate,
+) {
+  const terms = [candidate.need, ...candidate.searchTerms]
+    .map(normalizeCurriculumNeedKey)
+    .filter(Boolean);
+
+  return (recommendation.matchDetails ?? []).filter((detail) => {
+    const detailNeed = normalizeCurriculumNeedKey(detail.need);
+    return terms.some((term) =>
+      detailNeed === term
+      || detailNeed.includes(term)
+      || term.includes(detailNeed),
+    );
+  });
+}
+
+function curriculumRecommendationMatchLabel(
+  recommendation: CurriculumRecommendation,
+  candidate: CurriculumNeedCandidate,
+) {
+  const detail = curriculumRecommendationDetailsForCandidate(recommendation, candidate)[0];
+
+  if (detail?.matchType === "direct") return "Direct lesson skill";
+  if (detail?.matchType === "standard") return "Priority standard match";
+  if (detail?.matchType === "lesson") return "Lesson title match";
+  if (detail?.matchType === "related") return "Related lesson focus";
+  if (detail?.matchType === "source") return "Source text match";
+  return recommendation.matchedNeeds.length ? "Curriculum match" : "Suggested lesson";
+}
+
+function curriculumRecommendationReason(
+  recommendation: CurriculumRecommendation,
+  candidate: CurriculumNeedCandidate,
+) {
+  const detail = curriculumRecommendationDetailsForCandidate(recommendation, candidate)[0];
+
+  if (detail?.reason) return detail.reason;
+  if (recommendation.reason) return recommendation.reason;
+  if (recommendation.matchedNeeds.length) {
+    return `Matched ${recommendation.matchedNeeds.slice(0, 4).join(", ")} in the saved Hub lesson.`;
+  }
+  return `Suggested for ${candidate.need} based on the current data view.`;
+}
+
+function curriculumGroupUploadUrl(
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+) {
+  const params = new URLSearchParams();
+  params.set("teacherTool", "curriculum");
+  params.set("uploadNeed", candidate.need);
+  params.set("groupNeed", candidate.need);
+  params.set("groupSubject", subject);
+  params.set("groupSource", candidate.source);
+  if (candidate.scholars.length) params.set("groupScholars", candidate.scholars.join("|"));
+  if (candidate.searchTerms.length) params.set("groupTerms", candidate.searchTerms.slice(0, 12).join("|"));
+  return `${HUB_CLASS_URL}?${params.toString()}`;
+}
+
+function curriculumFamilyPracticeTips(
+  candidate: CurriculumNeedCandidate,
+  subject: "skills" | "listening" | "math",
+) {
+  const need = candidate.need.toLowerCase();
+
+  if (subject === "math") {
+    return {
+      lookFor: "Your child can explain the math idea with objects, drawings, words, or numbers.",
+      steps: [
+        `Use small objects at home to practice ${candidate.need}.`,
+        "Ask your child to tell a quick math story, act it out, draw it, and say what the numbers mean.",
+        "Keep the numbers small at first. If it feels easy, ask your child to explain the answer in a full sentence.",
+      ],
+      prompt: "Tell a math story, show it with objects or a drawing, and explain how you know.",
+    };
+  }
+
+  if (subject === "listening") {
+    return {
+      lookFor: "Your child can talk about the story or topic using details from what they heard.",
+      steps: [
+        `Read or listen to a short story together and focus on ${candidate.need}.`,
+        "Pause to ask who, what, where, when, why, and how questions.",
+        "Have your child answer in a complete sentence and use one important word from the lesson or story.",
+      ],
+      prompt: "Tell me the most important part and one detail that helped you know.",
+    };
+  }
+
+  if (need.includes("segment") || need.includes("blend")) {
+    return {
+      lookFor: "Your child can hear each sound in a word and put the sounds back together.",
+      steps: [
+        "Say a short word slowly and have your child tap one finger for each sound.",
+        "Then have your child blend the sounds back together to say the whole word.",
+        "Try 5 words, then stop while it still feels successful.",
+      ],
+      prompt: "Tap the sounds, blend the word, then say the word in a sentence.",
+    };
+  }
+
+  if (need.includes("ch") || need.includes("sh") || need.includes("th") || need.includes("digraph")) {
+    return {
+      lookFor: "Your child can notice the two-letter sound, say it, read it in words, and write it.",
+      steps: [
+        `Look for ${candidate.need} in books, signs, or words around the house.`,
+        "Have your child underline the sound, say the sound, then read the whole word.",
+        "Ask your child to write 3 words with that sound and read them back to you.",
+      ],
+      prompt: "Find the sound, say the sound, read the word, and write one more word like it.",
+    };
+  }
+
+  if (need.includes("vowel") || need.includes("letter") || need.length <= 3) {
+    return {
+      lookFor: "Your child can connect the letter or spelling to the sound and use it in a word.",
+      steps: [
+        `Practice the sound or spelling: ${candidate.need}.`,
+        "Say the sound, find it in a word, read the word, then write the word.",
+        "Mix in 2 words your child already knows so the practice feels confident.",
+      ],
+      prompt: "Say the sound, read the word, write the word, and use it in a sentence.",
+    };
+  }
+
+  return {
+    lookFor: "Your child can explain and practice the skill without guessing.",
+    steps: [
+      `Practice ${candidate.need} for 5 to 10 minutes.`,
+      "Ask your child to show the skill, explain their thinking, and try one more example.",
+      "Keep it short and positive. A little correct practice is better than a long frustrating session.",
+    ],
+    prompt: "Show me how you know, then try one more.",
+  };
+}
+
 function rosterScopedTeacherEmail(email: string) {
   return rosterTeacherEmailForEmail(email) || email;
 }
@@ -2711,6 +2896,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
     return scholars.filter((scholar) => scholar.teacherEmail === teacherFilter);
   }, [scholars, teacherFilter]);
+  const reportScholars = useMemo(
+    () => visibleScholars.filter(scholarIncludedInReports),
+    [visibleScholars],
+  );
+  const hiddenReportScholars = useMemo(
+    () => visibleScholars.filter((scholar) => !scholarIncludedInReports(scholar)),
+    [visibleScholars],
+  );
 
   const reportSubject: DashboardSubject =
     dataReportView === "skills" || dataReportView === "listening" || dataReportView === "math"
@@ -2739,7 +2932,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     () => buildSkillsDataRows(
       selectedSkillsDataReport.id,
       selectedSkillsDataReport.targets,
-      visibleScholars,
+      reportScholars,
       results,
       progressRecords,
       skillsDataOverrides,
@@ -2751,7 +2944,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       selectedSkillsDataReport,
       skillsDataOverrides,
       skillsDataSortMode,
-      visibleScholars,
+      reportScholars,
     ],
   );
   const skillsDataTargetSummaryRows = useMemo(
@@ -2836,7 +3029,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   }, [selectedSkillsDataCell, selectedSkillsDataReport.id, skillsDataOverrides]);
   const skillsDataManualEvidenceCount = skillsDataOverrides.filter((override) =>
     override.reportId === selectedSkillsDataReport.id
-    && visibleScholars.some((scholar) =>
+    && reportScholars.some((scholar) =>
       scholar.id === override.scholarId
       || scholar.firstNameKey === override.scholarFirstNameKey,
     ),
@@ -2853,10 +3046,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
+      if (hiddenReportScholars.some((scholar) => recordBelongsToScholar(result, scholar))) {
+        return false;
+      }
+
       const teacherScopedScholars =
         teacherFilter === "all"
-          ? scholars
-          : scholars.filter((scholar) => scholar.teacherEmail === teacherFilter);
+          ? reportScholars
+          : reportScholars.filter((scholar) => scholar.teacherEmail === teacherFilter);
       const match = matchResult(result, teacherScopedScholars);
 
       if (teacherFilter !== "all") {
@@ -2906,11 +3103,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     effectiveDashboardSubject,
     dateFilter,
     gameFilter,
+    hiddenReportScholars,
     lessonLookupActive,
     lessonMatchedLevelIndexes,
     results,
     scholarFilter,
-    scholars,
+    reportScholars,
     selectedLessonLookupGame,
     teacherFilter,
   ]);
@@ -2921,10 +3119,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         return false;
       }
 
+      if (hiddenReportScholars.some((scholar) => recordBelongsToScholar(progress, scholar))) {
+        return false;
+      }
+
       const teacherScopedScholars =
         teacherFilter === "all"
-          ? scholars
-          : scholars.filter((scholar) => scholar.teacherEmail === teacherFilter);
+          ? reportScholars
+          : reportScholars.filter((scholar) => scholar.teacherEmail === teacherFilter);
       const match = matchResult(progress, teacherScopedScholars);
 
       if (teacherFilter !== "all") {
@@ -2974,11 +3176,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     effectiveDashboardSubject,
     dateFilter,
     gameFilter,
+    hiddenReportScholars,
     lessonLookupActive,
     lessonMatchedLevelIndexes,
     progressRecords,
     scholarFilter,
-    scholars,
+    reportScholars,
     selectedLessonLookupGame,
     teacherFilter,
   ]);
@@ -3106,7 +3309,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const ensureSummary = (
       record: ResultSubmission | ProgressSubmission,
     ) => {
-      const match = matchResult(record, visibleScholars);
+      const match = matchResult(record, reportScholars);
       const id =
         match.scholar?.id
         || `${match.tone}:${match.label}:${record.scholarFirstNameKey}`;
@@ -3235,7 +3438,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     dashboardFocus,
     dashboardProgress,
     dashboardResults,
-    visibleScholars,
+    reportScholars,
   ]);
   const dashboardStruggles = useMemo(() => {
     const summaries = new Map<
@@ -3244,7 +3447,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     >();
 
     const addRecord = (record: ResultSubmission | ProgressSubmission) => {
-      const match = matchResult(record, visibleScholars);
+      const match = matchResult(record, reportScholars);
       const studentKey =
         match.scholar?.id
         || `${match.tone}:${match.label}:${record.scholarFirstNameKey}`;
@@ -3276,10 +3479,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       } satisfies SmallGroupNeedSummary))
       .sort((a, b) => b.studentCount - a.studentCount || b.count - a.count)
       .slice(0, 4);
-  }, [dashboardProgress, dashboardResults, visibleScholars]);
-  const selectedSmallGroupNeed =
-    dashboardStruggles.find((need) => need.key === selectedSmallGroupNeedKey)
-    ?? null;
+  }, [dashboardProgress, dashboardResults, reportScholars]);
   const dashboardWrongTotal = dashboardStudentSummaries.reduce(
     (total, summary) => total + summary.wrongCount,
     0,
@@ -3328,7 +3528,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       });
     });
     dashboardResults.forEach((result) => {
-      const match = matchResult(result, visibleScholars);
+      const match = matchResult(result, reportScholars);
       curriculumNeedsFromRecord(result).forEach((need) => {
         addCurriculumNeedCandidate(candidates, need, {
           count: 1,
@@ -3338,7 +3538,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       });
     });
     dashboardProgress.forEach((progress) => {
-      const match = matchResult(progress, visibleScholars);
+      const match = matchResult(progress, reportScholars);
       curriculumNeedsFromRecord(progress).forEach((need) => {
         addCurriculumNeedCandidate(candidates, need, {
           count: 1,
@@ -3363,7 +3563,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     selectedSkillsDataReport.label,
     skillsDataRows,
     skillsDataTargetSummaryRows,
-    visibleScholars,
+    reportScholars,
   ]);
   const curriculumRecommendationGroups = useMemo(() => {
     return curriculumNeedCandidates.map((candidate) => ({
@@ -3373,6 +3573,15 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         .slice(0, 4),
     }));
   }, [curriculumNeedCandidates, curriculumRecommendations]);
+  const selectedSmallGroupNeed =
+    curriculumNeedCandidates.find((need) => need.key === selectedSmallGroupNeedKey)
+    ?? null;
+  const selectedSmallGroupRecommendations = selectedSmallGroupNeed
+    ? curriculumRecommendations
+        .filter((recommendation) => recommendationMatchesNeedCandidate(recommendation, selectedSmallGroupNeed))
+        .slice(0, 4)
+    : [];
+  const curriculumRecommendationSubject = curriculumSubjectForReportView(dataReportView);
 
   const fetchCurriculumRecommendations = async () => {
     const needs = Array.from(new Set(
@@ -3402,7 +3611,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({
           limit: 8,
           needs,
-          subject: curriculumSubjectForReportView(dataReportView),
+          subject: curriculumRecommendationSubject,
         }),
       });
 
@@ -3524,6 +3733,40 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
       await loadDashboardData();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "The scholar could not be deleted.");
+    }
+  };
+
+  const toggleTestScholarReportVisibility = async (scholar: Scholar) => {
+    if (!isTestScholar(scholar)) {
+      return;
+    }
+
+    const nextInclude = !scholar.includeInReports;
+    setError("");
+    setStatus("");
+
+    try {
+      const { auth, db, firebase } = await loadFirebase();
+      const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
+
+      if (!isAuthorizedTeacherEmail(signedInEmail)) {
+        throw new Error("Sign in with an authorized teacher Google account to edit test-student data visibility.");
+      }
+
+      await db.collection(SCHOLAR_COLLECTION).doc(scholar.id).set({
+        includeInReports: nextInclude,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      setScholars((currentScholars) =>
+        currentScholars.map((currentScholar) =>
+          currentScholar.id === scholar.id
+            ? { ...currentScholar, includeInReports: nextInclude }
+            : currentScholar,
+        ),
+      );
+      setStatus(`${scholar.firstName} ${scholar.lastName} is now ${nextInclude ? "included in" : "hidden from"} charts, reports, and small-group suggestions.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Test-student data visibility could not be changed.");
     }
   };
 
@@ -4252,12 +4495,155 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setTimeout(() => reportWindow.print(), 100);
   };
 
+  const printCurriculumGroupPlan = (
+    candidate: CurriculumNeedCandidate,
+    recommendations: CurriculumRecommendation[],
+  ) => {
+    const reportWindow = window.open("", "_blank");
+    const scholarItems = candidate.scholars.length
+      ? candidate.scholars.map((scholar) => `<li>${escapeReportHtml(scholar)}</li>`).join("")
+      : "<li>No roster names were attached to this need yet.</li>";
+    const recommendationsHtml = recommendations.length
+      ? recommendations.map((recommendation) => `
+        <article class="lesson-card">
+          <p class="match">${escapeReportHtml(curriculumRecommendationMatchLabel(recommendation, candidate))}</p>
+          <h2>${escapeReportHtml(curriculumRecommendationLessonLabel(recommendation))}</h2>
+          <h3>${escapeReportHtml(recommendation.lessonTitle || "Saved Hub lesson")}</h3>
+          ${recommendation.priorityStandard ? `<p><strong>Standard:</strong> ${escapeReportHtml(recommendation.priorityStandard)}</p>` : ""}
+          ${recommendation.iCanStatement ? `<p><strong>I Can:</strong> ${escapeReportHtml(recommendation.iCanStatement)}</p>` : ""}
+          ${recommendation.objective || recommendation.parentSummary ? `<p>${escapeReportHtml(recommendation.objective || recommendation.parentSummary)}</p>` : ""}
+          <p><strong>Why this lesson:</strong> ${escapeReportHtml(curriculumRecommendationReason(recommendation, candidate))}</p>
+        </article>
+      `).join("")
+      : `<p>No saved Hub lesson matched this need yet. Use the upload option to add a lesson source for this group.</p>`;
+
+    if (!reportWindow) {
+      window.print();
+      return;
+    }
+
+    reportWindow.document.write(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeReportHtml(candidate.need)} Small Group</title>
+        <style>
+          body{font-family:Arial,Helvetica,sans-serif;margin:28px;color:#222}
+          h1{margin:0 0 6px;font-size:26px}
+          h2{margin:0 0 4px;font-size:17px}
+          h3{margin:0 0 8px;font-size:15px;color:#2f4054}
+          p,li{font-size:13px;line-height:1.45}
+          .meta{color:#555;margin:0 0 18px}
+          .layout{display:grid;grid-template-columns:220px 1fr;gap:22px;align-items:start}
+          ul{margin:8px 0 0;padding-left:18px}
+          .lesson-card{break-inside:avoid;border:1px solid #ddd;border-radius:10px;padding:12px;margin:0 0 12px}
+          .match{margin:0 0 6px;color:#6f5b2f;font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
+          @media print{body{margin:12mm}.lesson-card{break-inside:avoid}.layout{grid-template-columns:190px 1fr}}
+        </style>
+      </head>
+      <body>
+        <h1>Small-Group Curriculum Plan</h1>
+        <p class="meta">${escapeReportHtml(activeReportLabel)} - ${escapeReportHtml(new Date().toLocaleDateString())}</p>
+        <div class="layout">
+          <aside>
+            <h2>${escapeReportHtml(candidate.need)}</h2>
+            <p>${escapeReportHtml(curriculumGroupReason(candidate))}</p>
+            <h3>Scholars</h3>
+            <ul>${scholarItems}</ul>
+          </aside>
+          <main>
+            <h2>Recommended Hub Lessons</h2>
+            ${recommendationsHtml}
+          </main>
+        </div>
+      </body>
+      </html>
+    `);
+    reportWindow.document.close();
+    reportWindow.focus();
+    setTimeout(() => reportWindow.print(), 100);
+  };
+
+  const printFamilyPracticePlan = (
+    candidate: CurriculumNeedCandidate,
+    recommendations: CurriculumRecommendation[],
+  ) => {
+    const reportWindow = window.open("", "_blank");
+    const bestLesson = recommendations[0];
+    const tips = curriculumFamilyPracticeTips(candidate, curriculumRecommendationSubject);
+    const lessonFocus =
+      bestLesson?.iCanStatement
+      || bestLesson?.objective
+      || bestLesson?.parentSummary
+      || candidate.need;
+
+    if (!reportWindow) {
+      window.print();
+      return;
+    }
+
+    reportWindow.document.write(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeReportHtml(candidate.need)} Family Practice</title>
+        <style>
+          body{font-family:Arial,Helvetica,sans-serif;margin:28px;color:#223044;background:#fff}
+          .page{max-width:760px;margin:0 auto}
+          h1{margin:0 0 6px;font-size:28px;color:#26384d}
+          h2{margin:22px 0 8px;font-size:18px;color:#26384d}
+          p,li{font-size:15px;line-height:1.55}
+          .subtitle{margin:0 0 18px;color:#65758b;font-weight:700}
+          .focus{border:1px solid #d8e2ec;border-radius:12px;background:#f8fbff;padding:14px;margin:16px 0}
+          .steps{border:1px solid #f1d6bf;border-radius:12px;background:#fff8f0;padding:14px;margin:16px 0}
+          .prompt{border-left:5px solid #f9735b;background:#fff3ef;padding:12px 14px;font-weight:700}
+          ul{margin:8px 0 0;padding-left:22px}
+          .quiet{color:#65758b;font-size:13px}
+          @media print{body{margin:12mm}.focus,.steps,.prompt{break-inside:avoid}}
+        </style>
+      </head>
+      <body>
+        <main class="page">
+          <h1>Family Practice: ${escapeReportHtml(candidate.need)}</h1>
+          <p class="subtitle">A short, simple way to help your child practice at home.</p>
+
+          <section class="focus">
+            <h2>What We Are Practicing</h2>
+            <p>${escapeReportHtml(lessonFocus)}</p>
+            ${bestLesson ? `<p class="quiet">Connected classroom lesson: ${escapeReportHtml(curriculumRecommendationLessonLabel(bestLesson))}${bestLesson.lessonTitle ? ` - ${escapeReportHtml(bestLesson.lessonTitle)}` : ""}</p>` : ""}
+          </section>
+
+          <section class="steps">
+            <h2>Try This At Home</h2>
+            <ul>
+              ${tips.steps.map((step) => `<li>${escapeReportHtml(step)}</li>`).join("")}
+            </ul>
+          </section>
+
+          <section>
+            <h2>What To Listen Or Look For</h2>
+            <p>${escapeReportHtml(tips.lookFor)}</p>
+            <p class="prompt">${escapeReportHtml(tips.prompt)}</p>
+          </section>
+
+          <p class="quiet">Keep practice short and encouraging. If your child gets stuck, model one example, then let them try again.</p>
+        </main>
+      </body>
+      </html>
+    `);
+    reportWindow.document.close();
+    reportWindow.focus();
+    setTimeout(() => reportWindow.print(), 100);
+  };
+
   const curriculumRecommendationSection = dataReportView !== "students" ? (
     <section className="curriculum-recommendation-card">
       <div className="result-row-head">
         <div>
           <p className="eyebrow">Curriculum Match</p>
-          <h4>Recommended Curriculum Lessons</h4>
+          <h4>Plan From These Groups</h4>
         </div>
         <button
           className="teacher-control-button"
@@ -4269,13 +4655,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <p className="pin-helper">
-        Uses the subject chart, Small-Group Needs, and current game/assessment results to connect scholars with saved Hub lessons.
+        Uses the charted data, small-group evidence, and current game/assessment results together so each suggestion shows who needs help, why, and which Hub lessons may fit.
       </p>
       {curriculumNeedCandidates.length ? (
         <div className="curriculum-recommendation-need-summary">
           {curriculumNeedCandidates.slice(0, 8).map((candidate) => (
             <span key={candidate.key}>
-              {candidate.need} - {candidate.scholars.length || candidate.count} scholar{(candidate.scholars.length || candidate.count) === 1 ? "" : "s"}
+              {candidate.need} - {curriculumNeedScholarCount(candidate)} scholar{curriculumNeedScholarCount(candidate) === 1 ? "" : "s"}
             </span>
           ))}
         </div>
@@ -4302,9 +4688,36 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   <em>{candidate.source}</em>
                 </span>
                 <span>
-                  {candidate.scholars.length || candidate.count} scholar{(candidate.scholars.length || candidate.count) === 1 ? "" : "s"}
+                  {curriculumNeedScholarCount(candidate)} scholar{curriculumNeedScholarCount(candidate) === 1 ? "" : "s"}
                 </span>
               </summary>
+              <div className="curriculum-recommendation-group-tools">
+                <p>{curriculumGroupReason(candidate)}</p>
+                <div>
+                  <button
+                    className="teacher-text-button"
+                    onClick={() => printCurriculumGroupPlan(candidate, recommendations)}
+                    type="button"
+                  >
+                    Print Group
+                  </button>
+                  <button
+                    className="teacher-text-button"
+                    onClick={() => printFamilyPracticePlan(candidate, recommendations)}
+                    type="button"
+                  >
+                    Print Family Help
+                  </button>
+                  <a
+                    className="curriculum-recommendation-link secondary"
+                    href={curriculumGroupUploadUrl(candidate, curriculumRecommendationSubject)}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Upload Lesson to Hub
+                  </a>
+                </div>
+              </div>
               {candidate.scholars.length ? (
                 <div className="curriculum-recommendation-scholars">
                   {candidate.scholars.map((scholar) => (
@@ -4319,8 +4732,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   {recommendations.map((recommendation) => (
                     <article className="curriculum-recommendation-item" key={recommendation.id}>
                       <div>
-                        <span>{curriculumRecommendationLessonLabel(recommendation)}</span>
+                        <span>{curriculumRecommendationMatchLabel(recommendation, candidate)}</span>
                         <h5>{recommendation.lessonTitle}</h5>
+                        <small>{curriculumRecommendationLessonLabel(recommendation)}</small>
                       </div>
                       {recommendation.priorityStandard ? (
                         <p><strong>Standard:</strong> {recommendation.priorityStandard}</p>
@@ -4331,6 +4745,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       {recommendation.objective || recommendation.parentSummary ? (
                         <p>{recommendation.objective || recommendation.parentSummary}</p>
                       ) : null}
+                      <p><strong>Why this lesson:</strong> {curriculumRecommendationReason(recommendation, candidate)}</p>
                       <a
                         className="curriculum-recommendation-link"
                         href={recommendation.url || HUB_CLASS_URL}
@@ -4344,7 +4759,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 </div>
               ) : (
                 <p className="empty-results-message">
-                  No saved Hub lesson matched this need yet.
+                  No saved Hub lesson matched this need yet. Use Upload Lesson to Hub to add the source lesson for this group.
                 </p>
               )}
             </details>
@@ -4640,24 +5055,25 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
                 <div className="struggle-board">
                   <h4>Small-Group Needs</h4>
-                  {dashboardStruggles.length ? (
+                  {curriculumNeedCandidates.length ? (
                     <div className="small-group-need-grid">
-                      {dashboardStruggles.map((struggle) => (
+                      {curriculumNeedCandidates.slice(0, 6).map((candidate) => (
                         <button
                           className="small-group-need-tile"
-                          key={struggle.key}
-                          onClick={() => setSelectedSmallGroupNeedKey(struggle.key)}
+                          key={candidate.key}
+                          onClick={() => setSelectedSmallGroupNeedKey(candidate.key)}
                           type="button"
                         >
-                          <strong>{struggle.studentCount}</strong>
-                          <span>scholar{struggle.studentCount === 1 ? "" : "s"}</span>
-                          <em>{struggle.label}</em>
-                          <small>{struggle.count} miss{struggle.count === 1 ? "" : "es"}</small>
+                          <strong>{curriculumNeedScholarCount(candidate)}</strong>
+                          <span>scholar{curriculumNeedScholarCount(candidate) === 1 ? "" : "s"}</span>
+                          <em>{candidate.need}</em>
+                          <small>{candidate.source}</small>
+                          <small>{candidate.count} evidence point{candidate.count === 1 ? "" : "s"}</small>
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <p className="empty-results-message">No specific missed questions were recorded for this view.</p>
+                    <p className="empty-results-message">No chart or game needs were recorded for this view.</p>
                   )}
                 </div>
 
@@ -4667,7 +5083,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       <div className="result-row-head">
                         <div>
                           <p className="eyebrow">Small Group</p>
-                          <h3>{selectedSmallGroupNeed.label}</h3>
+                          <h3>{selectedSmallGroupNeed.need}</h3>
                         </div>
                         <button
                           className="teacher-control-button secondary"
@@ -4678,12 +5094,74 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         </button>
                       </div>
                       <p className="pin-helper">
-                        {selectedSmallGroupNeed.studentCount} scholar{selectedSmallGroupNeed.studentCount === 1 ? "" : "s"} - {selectedSmallGroupNeed.count} miss{selectedSmallGroupNeed.count === 1 ? "" : "es"}
+                        {curriculumGroupReason(selectedSmallGroupNeed)}
                       </p>
-                      <div className="small-group-student-list">
-                        {selectedSmallGroupNeed.students.map((student) => (
-                          <span key={student}>{student}</span>
-                        ))}
+                      <div className="small-group-popup-actions">
+                        <button
+                          className="teacher-control-button"
+                          disabled={!curriculumNeedCandidates.length || curriculumRecommendationStatus === "loading"}
+                          onClick={() => void fetchCurriculumRecommendations()}
+                          type="button"
+                        >
+                          {curriculumRecommendationStatus === "loading" ? "Finding..." : "Find Lessons"}
+                        </button>
+                        <button
+                          className="teacher-control-button secondary"
+                          onClick={() => printCurriculumGroupPlan(selectedSmallGroupNeed, selectedSmallGroupRecommendations)}
+                          type="button"
+                        >
+                          Print Group
+                        </button>
+                        <button
+                          className="teacher-control-button secondary"
+                          onClick={() => printFamilyPracticePlan(selectedSmallGroupNeed, selectedSmallGroupRecommendations)}
+                          type="button"
+                        >
+                          Print Family Help
+                        </button>
+                        <a
+                          className="curriculum-recommendation-link secondary"
+                          href={curriculumGroupUploadUrl(selectedSmallGroupNeed, curriculumRecommendationSubject)}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Upload Lesson to Hub
+                        </a>
+                      </div>
+                      {selectedSmallGroupNeed.scholars.length ? (
+                        <div className="small-group-student-list">
+                          {selectedSmallGroupNeed.scholars.map((student) => (
+                            <span key={student}>{student}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="empty-results-message">No roster names were attached to this need yet.</p>
+                      )}
+                      <div className="curriculum-recommendation-list compact">
+                        {selectedSmallGroupRecommendations.length ? (
+                          selectedSmallGroupRecommendations.map((recommendation) => (
+                            <article className="curriculum-recommendation-item" key={recommendation.id}>
+                              <div>
+                                <span>{curriculumRecommendationMatchLabel(recommendation, selectedSmallGroupNeed)}</span>
+                                <h5>{recommendation.lessonTitle}</h5>
+                                <small>{curriculumRecommendationLessonLabel(recommendation)}</small>
+                              </div>
+                              <p><strong>Why this lesson:</strong> {curriculumRecommendationReason(recommendation, selectedSmallGroupNeed)}</p>
+                              <a
+                                className="curriculum-recommendation-link"
+                                href={recommendation.url || HUB_CLASS_URL}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                Open Lesson in Hub
+                              </a>
+                            </article>
+                          ))
+                        ) : (
+                          <p className="empty-results-message">
+                            Click Find Lessons to pull possible saved Hub lessons for this group, or upload a source lesson for this need.
+                          </p>
+                        )}
                       </div>
                     </section>
                   </div>
@@ -4693,7 +5171,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   <summary>Show recent activity records</summary>
                   <div className="result-list">
                     {recentProgress.map((progress) => {
-                      const match = matchResult(progress, visibleScholars);
+                      const match = matchResult(progress, reportScholars);
                       const updatedAt = formatDate(progress.updatedAt);
 
                       return (
@@ -4708,7 +5186,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       );
                     })}
                     {recentResults.map((result) => {
-                      const match = matchResult(result, visibleScholars);
+                      const match = matchResult(result, reportScholars);
                       const completedAt = formatDate(result.completedAt);
 
                       return (
@@ -4979,8 +5457,20 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       <span>
                         <strong>{scholar.firstName} {scholar.lastName}</strong>
                         <small>{teacherLabelForEmail(scholar.teacherEmail)} - {scholarResults.length} result{scholarResults.length === 1 ? "" : "s"}</small>
+                        {isTestScholar(scholar) ? (
+                          <small>Test student - {scholar.includeInReports ? "showing in data" : "hidden from data"}</small>
+                        ) : null}
                       </span>
                     </button>
+                    {isTestScholar(scholar) ? (
+                      <button
+                        className="teacher-text-button"
+                        onClick={() => void toggleTestScholarReportVisibility(scholar)}
+                        type="button"
+                      >
+                        {scholar.includeInReports ? "Hide Data" : "Show Data"}
+                      </button>
+                    ) : null}
                     <button className="teacher-text-button" onClick={() => printStudentOverviewReport(scholar)} type="button">
                       Print
                     </button>
