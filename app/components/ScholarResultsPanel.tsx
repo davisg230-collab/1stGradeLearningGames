@@ -16,10 +16,12 @@ type FirebaseUser = {
 type FirebaseAuth = {
   currentUser: FirebaseUser | null;
   onAuthStateChanged: (callback: (user: FirebaseUser | null) => void) => () => void;
+  signInWithPopup?: (provider: unknown) => Promise<{ user: FirebaseUser | null }>;
 };
 
 type FirestoreDocSnapshot = {
   data: () => Record<string, unknown> | undefined;
+  exists?: boolean;
   id: string;
 };
 
@@ -46,14 +48,17 @@ type FirestoreDb = {
 };
 
 type FirebaseCompat = {
-  apps: unknown[];
-  auth: () => FirebaseAuth;
-  firestore: (() => FirestoreDb) & {
+  app?: (name?: string) => unknown;
+  apps: Array<{ name?: string } | unknown>;
+  auth: ((app?: unknown) => FirebaseAuth) & {
+    GoogleAuthProvider?: new () => unknown;
+  };
+  firestore: ((app?: unknown) => FirestoreDb) & {
     FieldValue: {
       serverTimestamp: () => unknown;
     };
   };
-  initializeApp: (config: typeof firebaseConfig) => unknown;
+  initializeApp: (config: Record<string, string>, name?: string) => unknown;
 };
 
 declare global {
@@ -380,6 +385,15 @@ const QPS_SCREENER_GAME_ID = "qps-screener";
 const HUB_CLASS_URL = "https://first-grade-news-hub-mrdavis.web.app/";
 const HUB_CURRICULUM_RECOMMENDATION_URL =
   "https://us-central1-first-grade-news-hub.cloudfunctions.net/recommendCurriculumLessons";
+const HUB_FIREBASE_APP_NAME = "first-grade-hub-bridge";
+const HUB_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBVFcyBYlz3DmCkOervIswwjPf6wwFZlhU",
+  authDomain: "first-grade-news-hub.firebaseapp.com",
+  projectId: "first-grade-news-hub",
+  storageBucket: "first-grade-news-hub.firebasestorage.app",
+} as const;
+const HUB_TEACHER_WORKSPACE_COLLECTION = "teacherWorkspace";
+const HUB_TEACHER_WORKSPACE_DOC_ID = "current";
 const PREASSESSMENTS = {
   [MATH_PREASSESSMENT_GAME_ID]: {
     gameId: MATH_PREASSESSMENT_GAME_ID,
@@ -799,6 +813,45 @@ async function loadFirebase() {
   }
 
   return firebasePromise;
+}
+
+function firebaseAppByName(firebase: FirebaseCompat, name: string) {
+  return firebase.apps.find((app) => (
+    Boolean(app)
+    && typeof app === "object"
+    && "name" in app
+    && app.name === name
+  ));
+}
+
+async function loadHubFirebaseBridge() {
+  const { firebase } = await loadFirebase();
+  const hubApp =
+    firebaseAppByName(firebase, HUB_FIREBASE_APP_NAME)
+    ?? firebase.initializeApp(HUB_FIREBASE_CONFIG, HUB_FIREBASE_APP_NAME);
+  const auth = firebase.auth(hubApp);
+  let user = auth.currentUser;
+
+  if (!isAuthorizedTeacherEmail(user?.email)) {
+    const GoogleAuthProvider = firebase.auth.GoogleAuthProvider;
+
+    if (!GoogleAuthProvider || !auth.signInWithPopup) {
+      throw new Error("Hub sign-in is not available. Refresh and try again.");
+    }
+
+    const credential = await auth.signInWithPopup(new GoogleAuthProvider());
+    user = credential.user ?? auth.currentUser;
+  }
+
+  if (!isAuthorizedTeacherEmail(user?.email)) {
+    throw new Error("Sign in with an authorized teacher Google account to save plans to the Hub.");
+  }
+
+  return {
+    db: firebase.firestore(hubApp),
+    firebase,
+    user,
+  };
 }
 
 function normalizeNameKey(name: string) {
@@ -3862,6 +3915,191 @@ function smallGroupFamilyPractice(
   };
 }
 
+type HubTeacherWorkspaceFolder = {
+  createdAtLocal: string;
+  id: string;
+  title: string;
+};
+
+type HubTeacherWorkspaceResource = {
+  createdAtLocal: string;
+  folderId: string;
+  id: string;
+  notes: string;
+  title: string;
+  type: "note" | "link" | "file" | "data";
+  updatedAtLocal: string;
+  url: string;
+};
+
+type HubTeacherWorkspaceData = {
+  folders: HubTeacherWorkspaceFolder[];
+  resources: HubTeacherWorkspaceResource[];
+};
+
+function normalizeHubTeacherWorkspaceData(data: Record<string, unknown> | undefined): HubTeacherWorkspaceData {
+  const folders = Array.isArray(data?.folders) ? data.folders : [];
+  const resources = Array.isArray(data?.resources) ? data.resources : [];
+
+  return {
+    folders: folders
+      .map((folder) => {
+        const nextFolder = folder && typeof folder === "object" ? folder as Record<string, unknown> : {};
+        return {
+          createdAtLocal: asText(nextFolder.createdAtLocal),
+          id: asText(nextFolder.id),
+          title: asText(nextFolder.title).trim(),
+        };
+      })
+      .filter((folder) => folder.id && folder.title),
+    resources: resources
+      .map((resource) => {
+        const nextResource = resource && typeof resource === "object" ? resource as Record<string, unknown> : {};
+        const type = asText(nextResource.type);
+        return {
+          createdAtLocal: asText(nextResource.createdAtLocal),
+          folderId: asText(nextResource.folderId),
+          id: asText(nextResource.id),
+          notes: asText(nextResource.notes),
+          title: asText(nextResource.title).trim(),
+          type: type === "link" || type === "file" || type === "data" ? type : "note",
+          updatedAtLocal: asText(nextResource.updatedAtLocal),
+          url: asText(nextResource.url),
+        };
+      })
+      .filter((resource) => resource.id && (resource.title || resource.notes || resource.url)),
+  };
+}
+
+function hubWorkspaceFolderTitle(subject: "skills" | "listening" | "math") {
+  if (subject === "math") return "Small Group Math Plans";
+  if (subject === "listening") return "Small Group Listening Plans";
+  return "Small Group Skills Plans";
+}
+
+function ensureHubWorkspaceFolder(workspaceData: HubTeacherWorkspaceData, title: string) {
+  const existing = workspaceData.folders.find((folder) =>
+    folder.title.trim().toLowerCase() === title.trim().toLowerCase(),
+  );
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const folder = {
+    createdAtLocal: new Date().toISOString(),
+    id: `folder-${safeCurriculumFeedbackId(title)}-${Date.now().toString(36)}`,
+    title,
+  };
+
+  workspaceData.folders.push(folder);
+  return folder.id;
+}
+
+function smallGroupHubPlanResourceId(
+  candidate: CurriculumNeedCandidate,
+  recommendation: CurriculumRecommendation | undefined,
+  subject: "skills" | "listening" | "math",
+) {
+  return [
+    "small-group-plan",
+    subject,
+    safeCurriculumFeedbackId(candidate.key || candidate.need),
+    safeCurriculumFeedbackId(recommendation?.id || recommendation?.lessonTitle || "custom"),
+  ].join("-").slice(0, 180);
+}
+
+function smallGroupPlanSubjectLabel(subject: "skills" | "listening" | "math") {
+  if (subject === "math") return "Math";
+  if (subject === "listening") return "Listening & Learning";
+  return "CKLA Skills";
+}
+
+function buildSmallGroupHubPlanResource(
+  candidate: CurriculumNeedCandidate,
+  recommendations: CurriculumRecommendation[],
+  subject: "skills" | "listening" | "math",
+  lessonSource?: SmallGroupLessonSource,
+) {
+  const bestLesson = recommendations[0];
+  const sourceText = lessonSource?.text.trim() ?? "";
+  const sourceAnalysis = lessonSource?.analysis ?? (
+    isReadableLessonSourceText(sourceText, 8, 40)
+      ? buildSmallGroupLessonAnalysis(candidate, bestLesson, subject, sourceText)
+      : undefined
+  );
+  const objective = smallGroupPlanObjective(candidate, bestLesson, subject);
+  const materials = sourceAnalysis?.materials ?? smallGroupMaterials(candidate, bestLesson, subject, sourceText);
+  const planRows = sourceAnalysis
+    ? smallGroupTeacherPlanRowsFromAnalysis(sourceAnalysis)
+    : smallGroupTeacherPlanRows(candidate, bestLesson, subject, sourceText);
+  const dataCheckItems = sourceAnalysis?.dataCheckItems ?? smallGroupDataCheckItems(candidate, subject);
+  const practice = sourceAnalysis
+    ? {
+      focus: sourceAnalysis.target,
+      lookFor: sourceAnalysis.familyLookFor,
+      prompt: sourceAnalysis.familyPrompt,
+      steps: sourceAnalysis.familySteps,
+    }
+    : smallGroupFamilyPractice(candidate, bestLesson, subject);
+  const folderTitle = hubWorkspaceFolderTitle(subject);
+  const lessonLabel = bestLesson
+    ? `${curriculumRecommendationLessonLabel(bestLesson)}${bestLesson.lessonTitle ? ` - ${bestLesson.lessonTitle}` : ""}`
+    : "No connected lesson";
+  const title = `Small Group: ${candidate.need}${bestLesson?.lessonNumber ? ` - Lesson ${bestLesson.lessonNumber.replace(/^lesson\s*/i, "")}` : ""}`;
+  const notes = [
+    "SMALL-GROUP CURRICULUM PLAN",
+    "",
+    `Subject: ${smallGroupPlanSubjectLabel(subject)}`,
+    `Target need: ${candidate.need}`,
+    `Evidence: ${curriculumGroupReason(candidate)}`,
+    candidate.scholars.length ? `Scholars: ${candidate.scholars.join(", ")}` : "Scholars: No roster names were attached yet.",
+    `Connected lesson: ${lessonLabel}`,
+    bestLesson?.priorityStandard ? `Standard: ${bestLesson.priorityStandard}` : "",
+    bestLesson?.iCanStatement ? `I Can: ${bestLesson.iCanStatement}` : "",
+    bestLesson ? `Why this lesson: ${curriculumRecommendationReason(bestLesson, candidate)}` : "",
+    lessonSource?.fileName ? `Uploaded source: ${lessonSource.fileName}` : "",
+    sourceAnalysis?.summary ? `Source analysis: ${sourceAnalysis.summary}` : "",
+    "",
+    "TEACHING TARGET",
+    objective,
+    "",
+    "MATERIALS",
+    ...materials.map((material) => `- ${material}`),
+    "",
+    "TEACH IT",
+    ...planRows.map(([time, part, moves]) => `- ${time} | ${part}: ${moves}`),
+    "",
+    "QUICK DATA CHECK",
+    ...dataCheckItems.map((item) => `- ${item}`),
+    "",
+    "FAMILY HELP",
+    `Focus: ${practice.focus}`,
+    "Try this at home:",
+    ...practice.steps.map((step) => `- ${step}`),
+    `What to look for: ${practice.lookFor}`,
+    `Prompt: ${practice.prompt}`,
+    "",
+    `Saved from Learning Games on ${new Date().toLocaleDateString()}.`,
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+
+  return {
+    folderTitle,
+    resource: {
+      createdAtLocal: new Date().toISOString(),
+      folderId: "",
+      id: smallGroupHubPlanResourceId(candidate, bestLesson, subject),
+      notes,
+      title,
+      type: "data" as const,
+      updatedAtLocal: new Date().toISOString(),
+      url: bestLesson?.url || HUB_CLASS_URL,
+    },
+  };
+}
+
 function decodePdfLiteralString(value: string) {
   let output = "";
 
@@ -6537,6 +6775,91 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setTimeout(() => reportWindow.print(), 100);
   };
 
+  const saveSmallGroupPlanToHub = async (
+    candidate: CurriculumNeedCandidate,
+    recommendations: CurriculumRecommendation[],
+    lessonSource?: SmallGroupLessonSource,
+  ) => {
+    const bestLesson = recommendations[0];
+
+    if (!bestLesson) {
+      setStatus("Choose a recommended lesson before saving a small-group plan to the Hub.");
+      return;
+    }
+
+    const sourceText = lessonSource?.text.trim() ?? "";
+
+    if (isReadableLessonSourceText(sourceText, 8, 40)) {
+      const targetMatch = smallGroupSourceTargetMatch(
+        sourceText,
+        candidate,
+        bestLesson,
+        curriculumRecommendationSubject,
+      );
+
+      if (!targetMatch.matches) {
+        updateSmallGroupLessonSource(bestLesson.id, {
+          analysis: undefined,
+          analysisStatus: "mismatch",
+          mismatchReason: targetMatch.reason,
+          text: sourceText,
+        });
+
+        try {
+          await saveCurriculumRecommendationNotMatch(candidate, bestLesson, targetMatch.reason);
+          setStatus(`${bestLesson.lessonTitle} does not match ${candidate.need}. I saved that note and did not send it to the Hub plan folder.`);
+        } catch (nextError) {
+          setError(nextError instanceof Error ? nextError.message : "The not-a-match note could not be saved yet.");
+          setStatus(targetMatch.reason);
+        }
+
+        return;
+      }
+    }
+
+    try {
+      setStatus("Saving small-group plan to the Hub Teacher Workspace...");
+      const { db: hubDb, firebase: hubFirebase, user } = await loadHubFirebaseBridge();
+      const bundle = buildSmallGroupHubPlanResource(
+        candidate,
+        recommendations,
+        curriculumRecommendationSubject,
+        lessonSource,
+      );
+      const docRef = hubDb
+        .collection(HUB_TEACHER_WORKSPACE_COLLECTION)
+        .doc(HUB_TEACHER_WORKSPACE_DOC_ID);
+      const snapshot = await docRef.get();
+      const workspaceData = normalizeHubTeacherWorkspaceData(snapshot.exists ? snapshot.data() : {});
+      const folderId = ensureHubWorkspaceFolder(workspaceData, bundle.folderTitle);
+      const existingIndex = workspaceData.resources.findIndex((resource) => resource.id === bundle.resource.id);
+      const existing = existingIndex >= 0 ? workspaceData.resources[existingIndex] : null;
+      const resource = {
+        ...bundle.resource,
+        createdAtLocal: existing?.createdAtLocal || bundle.resource.createdAtLocal,
+        folderId,
+        updatedAtLocal: new Date().toISOString(),
+      };
+
+      if (existingIndex >= 0) {
+        workspaceData.resources[existingIndex] = resource;
+      } else {
+        workspaceData.resources.unshift(resource);
+      }
+
+      await docRef.set({
+        ...workspaceData,
+        updatedAt: hubFirebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: user.email,
+        version: 1,
+      }, { merge: true });
+
+      setStatus(`Saved "${resource.title}" to Hub Teacher Workspace > ${bundle.folderTitle}.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The plan could not be saved to the Hub yet.");
+    }
+  };
+
   const printCurriculumGroupPlan = (
     candidate: CurriculumNeedCandidate,
     recommendations: CurriculumRecommendation[],
@@ -7303,6 +7626,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                                     type="button"
                                   >
                                     Print Family Help
+                                  </button>
+                                  <button
+                                    className="teacher-text-button"
+                                    onClick={() => void saveSmallGroupPlanToHub(selectedSmallGroupNeed, [recommendation], lessonSource)}
+                                    type="button"
+                                  >
+                                    Save to Hub
                                   </button>
                                   <label className="curriculum-source-upload-button">
                                     Upload Source
