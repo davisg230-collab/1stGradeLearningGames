@@ -2658,7 +2658,9 @@ function questionResponseEvidence(
     : "";
   const skillsReportId = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
     ? ""
-    : reportIdForSkillsEvidence(
+    : record.gameId === LETTER_SEARCH_SAFARI_GAME_ID
+      ? "letter-names"
+      : reportIdForSkillsEvidence(
         normalizeSkillTarget(firstTextValue(
           response.target,
           response.letter,
@@ -2764,7 +2766,9 @@ function missedQuestionEvidence(
     : "";
   const skillsReportId = record.gameId === NUMBER_SEARCH_SAFARI_GAME_ID
     ? ""
-    : reportIdForSkillsEvidence(
+    : record.gameId === LETTER_SEARCH_SAFARI_GAME_ID
+      ? "letter-names"
+      : reportIdForSkillsEvidence(
         normalizeSkillTarget(firstTextValue(
           missed.correctAnswer,
           missed.word,
@@ -3456,23 +3460,79 @@ function smallGroupNeedTargetForStack(candidate: CurriculumNeedCandidate) {
 }
 
 function smallGroupUfliFocusForCandidate(candidate: CurriculumNeedCandidate) {
-  const recommendation = findUfliRecommendationsForNeedCandidate(candidate)[0];
   const target = smallGroupNeedTargetForStack(candidate);
+  const letterNeed = smallGroupSingleLetterNeed(candidate);
+  const chunkNeed = smallGroupNeedChunk(candidate);
+  const ufliPatterns = ufliPatternTermsForCandidate(candidate);
 
-  if (!recommendation) {
+  if (letterNeed) {
     return {
-      key: `needs-${normalizeCurriculumNeedKey(target)}`,
-      label: "UFLI small-group needs",
+      key: "alphabet",
+      label: "Alphabet",
       target,
-      unit: "",
+      unit: "Alphabet",
+    };
+  }
+
+  if (chunkNeed) {
+    return {
+      key: "digraphs-and-patterns",
+      label: "Digraphs and Patterns",
+      target,
+      unit: "Digraphs and Patterns",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /short [aeiou]|short vowels|nasalized a/.test(pattern))) {
+    return {
+      key: "short-vowels",
+      label: "Short Vowels",
+      target,
+      unit: "Short Vowels",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /vce|a_e|i_e|o_e|u_e|e_e|silent e/.test(pattern))) {
+    return {
+      key: "silent-e",
+      label: "Silent E",
+      target,
+      unit: "Silent E",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /vowel teams|ai|ee|oa|ie|oo|ew|au|oi|ou/.test(pattern))) {
+    return {
+      key: "vowel-teams",
+      label: "Vowel Teams",
+      target,
+      unit: "Vowel Teams",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /r-controlled|ar|or|er/.test(pattern))) {
+    return {
+      key: "r-controlled-vowels",
+      label: "R-Controlled Vowels",
+      target,
+      unit: "R-Controlled Vowels",
+    };
+  }
+
+  if (ufliPatterns.some((pattern) => /suffix|prefix|doubling|drop e|y to i|sion|tion|ture|ness|ment|able|ible/.test(pattern))) {
+    return {
+      key: "prefixes-and-suffixes",
+      label: "Prefixes and Suffixes",
+      target,
+      unit: "Prefixes and Suffixes",
     };
   }
 
   return {
-    key: normalizeCurriculumNeedKey(recommendation.unitOrModule),
-    label: recommendation.unitOrModule.replace(/\s+Unit$/i, ""),
+    key: `needs-${normalizeCurriculumNeedKey(target)}`,
+    label: "UFLI small-group needs",
     target,
-    unit: recommendation.unitOrModule,
+    unit: "",
   };
 }
 
@@ -5510,7 +5570,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
   const [selectedSkillsDataCellKey, setSelectedSkillsDataCellKey] = useState("");
   const [selectedSkillsDataScholarId, setSelectedSkillsDataScholarId] = useState("");
   const [selectedScholarId, setSelectedScholarId] = useState("");
-  const [smallGroupNeedsOpen, setSmallGroupNeedsOpen] = useState(false);
   const [selectedSmallGroupNeedKey, setSelectedSmallGroupNeedKey] = useState("");
   const [selectedManagedGameId, setSelectedManagedGameId] = useState(
     "unit1-zone1-sound-safari",
@@ -6494,12 +6553,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     const dismissedKeys = new Set(dismissedSmallGroupNeedKeys);
     return curriculumNeedCandidates.filter((candidate) => !dismissedKeys.has(candidate.key));
   }, [curriculumNeedCandidates, dismissedSmallGroupNeedKeys]);
-  const smallGroupStacksActive = skillsSmallGroupActive && (smallGroupNeedsOpen || Boolean(selectedSmallGroupNeedKey));
   const smallGroupNeedStacks = useMemo(() =>
-    smallGroupStacksActive
+    skillsSmallGroupActive
       ? buildSmallGroupNeedStacks(visibleCurriculumNeedCandidates)
       : [],
-  [smallGroupStacksActive, visibleCurriculumNeedCandidates]);
+  [skillsSmallGroupActive, visibleCurriculumNeedCandidates]);
   const curriculumRecommendationGroups = useMemo(() => {
     return visibleCurriculumNeedCandidates.map((candidate) => ({
       candidate,
@@ -6858,7 +6916,6 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     setCurriculumRecommendationNeeds([]);
     setCurriculumRecommendationError("");
     setCurriculumRecommendationStatus("idle");
-    setSmallGroupNeedsOpen(false);
 
     if (view === "math") {
       setSkillsDataReportId("math-starting-point");
@@ -8672,10 +8729,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
                 {skillsSmallGroupActive ? (
                 <>
-                <details
-                  className="dashboard-collapsible-section struggle-board"
-                  onToggle={(event) => setSmallGroupNeedsOpen(event.currentTarget.open)}
-                >
+                <details className="dashboard-collapsible-section struggle-board">
                   <summary>
                     <span>
                       <strong>Small-Group Needs</strong>
