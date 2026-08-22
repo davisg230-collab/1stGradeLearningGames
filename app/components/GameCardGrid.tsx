@@ -656,11 +656,11 @@ export function GameCardGrid({ games }: GameCardGridProps) {
                   <span>Grow</span>
                 </div>
                 <p>
-                  Try first. Think, choose, and do your best. Grown-ups can cheer you on,
+                  Think first. Try your best. Grown-ups can cheer you on,
                   but your answers should be your own.
                 </p>
                 <p className="independent-learning-note">
-                  Mistakes help your teacher know what to practice next.
+                  Mistakes help your teacher know what to practice next, and that is how you grow.
                 </p>
                 <div className="pin-actions">
                   <button type="button" onClick={() => setPendingLaunchProfile(null)}>
