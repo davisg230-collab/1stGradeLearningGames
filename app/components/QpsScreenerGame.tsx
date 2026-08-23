@@ -2023,14 +2023,6 @@ export function QpsScreenerGame() {
     window.setTimeout(() => wholeClassInitialsRef.current?.focus(), 40);
   };
 
-  const resetWholeClassItemForNextCall = () => {
-    updateCurrentScore(blankQpsItemScore());
-    setActiveErrorId("");
-    setIsWholeClassMissEntryOpen(false);
-    setWholeClassInitials("");
-    setWholeClassMissStatus("");
-  };
-
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     if (loadedProgressStatus === "completed") {
       setLoadedProgressStatus("draft");
@@ -2330,7 +2322,7 @@ export function QpsScreenerGame() {
     setWholeClassMissStatus("");
   };
 
-  const saveWholeClassMiss = async (options: { advanceAfterSave?: boolean } = {}) => {
+  const saveWholeClassMiss = async (options: { resetAfterSave?: boolean } = {}) => {
     if (!isWholeClassMode) {
       setWholeClassMissStatus("Choose Whole Class Mode first.");
       return;
@@ -2444,8 +2436,10 @@ export function QpsScreenerGame() {
       });
       setIsWholeClassMissEntryOpen(false);
       setWholeClassInitials("");
-      if (options.advanceAfterSave) {
-        goToNext();
+      if (options.resetAfterSave) {
+        updateCurrentScore(blankQpsItemScore());
+        setActiveErrorId("");
+        setWholeClassMissStatus("");
       }
     } catch (nextError) {
       setWholeClassMissStatus(nextError instanceof Error ? nextError.message : "This QPS miss could not save yet.");
@@ -3204,7 +3198,7 @@ export function QpsScreenerGame() {
                   className="qps-whole-class-tools"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void saveWholeClassMiss({ advanceAfterSave: true });
+                    void saveWholeClassMiss({ resetAfterSave: true });
                   }}
                   role="dialog"
                 >
@@ -3229,17 +3223,10 @@ export function QpsScreenerGame() {
                     <button
                       className="teacher-control-button"
                       disabled={isSavingWholeClassMiss}
-                      onClick={() => void saveWholeClassMiss()}
+                      onClick={() => void saveWholeClassMiss({ resetAfterSave: true })}
                       type="button"
                     >
-                      {isSavingWholeClassMiss ? "Saving..." : "Save Miss"}
-                    </button>
-                    <button
-                      className="teacher-control-button secondary"
-                      onClick={resetWholeClassItemForNextCall}
-                      type="button"
-                    >
-                      Reset Item
+                      {isSavingWholeClassMiss ? "Saving..." : "Save + Reset"}
                     </button>
                     <button
                       className="teacher-control-button secondary"
@@ -3253,7 +3240,7 @@ export function QpsScreenerGame() {
                       Close
                     </button>
                   </div>
-                  <p>{wholeClassMissStatus || "Enter the scholar's gray tracking initials. After saving, they leave this slide's call-on list."}</p>
+                  <p>{wholeClassMissStatus || "Enter initials, then press Enter to save this miss and clear the slide for the next scholar."}</p>
                 </form>
               </div>
             ) : null}
