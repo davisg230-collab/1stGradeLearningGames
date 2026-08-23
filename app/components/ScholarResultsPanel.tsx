@@ -8663,13 +8663,13 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           <section className="teacher-card results-overview-card">
             <div className="results-dashboard-head">
               <div>
-                <h3>{activeReportLabel} Reports</h3>
+                <h3>Class Snapshot</h3>
                 <p className="pin-helper">
                   {dashboardActive
-                    ? `${dashboardResults.length} result${dashboardResults.length === 1 ? "" : "s"}${dashboardProgress.length ? ` - ${dashboardProgress.length} unfinished` : ""}`
+                    ? `${activeReportLabel} activity from the selected window. Use this for quick checks; use the chart below for planning.`
                     : dashboardDateActive
-                      ? `Choose filters to build ${activeReportLabel} tiles.`
-                      : "Choose Today or This Week to start."}
+                      ? `Choose filters to review ${activeReportLabel} activity.`
+                      : "Choose Today or This Week to build the snapshot."}
                 </p>
               </div>
             </div>
@@ -8746,7 +8746,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             ) : null}
 
             <details className="dashboard-tools-panel">
-              <summary>Game, date, and lesson tools</summary>
+              <summary>Filter by game, date, or lesson</summary>
               <div className="result-filters">
                 <label>
                   Game
@@ -8846,23 +8846,23 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </article>
                   <article>
                     <strong>{dashboardWrongTotal}</strong>
-                    <span>wrong answers</span>
+                    <span>needs to review</span>
                   </article>
                   <article>
                     <strong>{dashboardRepeatFlags}</strong>
-                    <span>repeat flags</span>
+                    <span>rapid guessing flags</span>
                   </article>
                   <article>
                     <strong>{dashboardUnfinishedTotal}</strong>
-                    <span>unfinished</span>
+                    <span>unfinished sessions</span>
                   </article>
                 </div>
 
                 <details className="dashboard-collapsible-section">
                   <summary>
                     <span>
-                      <strong>Scholar Activity Cards</strong>
-                      <em>Open when you want to review individual work from these filters.</em>
+                      <strong>Scholar Activity</strong>
+                      <em>Open when you want individual game sessions from this snapshot.</em>
                     </span>
                     <span>{dashboardStudentSummaries.length} scholar{dashboardStudentSummaries.length === 1 ? "" : "s"}</span>
                   </summary>
@@ -8873,9 +8873,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                         onChange={(event) => setDashboardFocus(event.target.value as DashboardFocus)}
                         value={dashboardFocus}
                       >
-                        <option value="mostWrong">Most wrong answers</option>
-                        <option value="repeatMisses">Same question missed repeatedly</option>
-                        <option value="unfinished">Unfinished or skipped</option>
+                        <option value="mostWrong">Most needs to review</option>
+                        <option value="repeatMisses">Repeated missed attempts</option>
+                        <option value="unfinished">Unfinished sessions</option>
                         <option value="name">Name</option>
                       </select>
                     </label>
@@ -8896,7 +8896,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                       >
                         <span className={`match-pill ${summary.tone}`}>{summary.tone === "matched" ? "Student match" : summary.label}</span>
                         <strong>{summary.label}</strong>
-                        <span>{summary.wrongCount} wrong</span>
+                        <span>{summary.wrongCount} item{summary.wrongCount === 1 ? "" : "s"} to review</span>
                         {summary.repeatWrongCount >= 3 ? (
                           <em>Same question missed {summary.repeatWrongCount} times</em>
                         ) : summary.unfinishedCount ? (
@@ -8915,8 +8915,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 <details className="dashboard-collapsible-section struggle-board">
                   <summary>
                     <span>
-                      <strong>Small-Group Needs</strong>
-                      <em>Open to find UFLI lessons and make group plans.</em>
+                      <strong>Small-Group Planning</strong>
+                      <em>Open when you are ready to choose a reteach group and find UFLI support.</em>
                     </span>
                     <span>{visibleCurriculumNeedCandidates.length} need{visibleCurriculumNeedCandidates.length === 1 ? "" : "s"}</span>
                   </summary>
@@ -9015,8 +9015,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 <details className="dashboard-collapsible-section challenge-board">
                   <summary>
                     <span>
-                      <strong>Ready for Challenge</strong>
-                      <em>Scholars with strong current chart evidence and no active needs on this report.</em>
+                      <strong>Challenge Group</strong>
+                      <em>Scholars who look ready for extension from the current chart evidence.</em>
                     </span>
                     <span>{challengeReadyRows.length} scholar{challengeReadyRows.length === 1 ? "" : "s"}</span>
                   </summary>
@@ -9177,7 +9177,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 ) : null}
 
                 <details className="dashboard-detail-list">
-                  <summary>Show recent activity records</summary>
+                  <summary>Show raw activity records</summary>
                   <div className="result-list">
                     {recentProgress.map((progress) => {
                       const match = matchResult(progress, reportScholars);
@@ -9222,9 +9222,9 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           <section className="teacher-card skills-data-glance-card">
             <div className="skills-data-head">
               <div>
-                <h3>{activeReportLabel} Data at a Glance</h3>
+                <h3>{activeReportLabel} Skill Chart</h3>
                 <p className="pin-helper">
-                  Newest evidence wins. Game attempts, QPS, and teacher observations all stay in the cell history.
+                  Use this chart to see who has evidence of mastery, who needs review, and what proof created each cell.
                 </p>
               </div>
               <button className="teacher-control-button secondary" onClick={printSkillsDataReport} type="button">
@@ -9234,12 +9234,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
             {dataReportView === "skills" ? (
               <section className="qps-report-panel">
-                <div className="result-row-head">
+                <div className="qps-report-tool-row">
                   <div>
-                    <p className="eyebrow">QPS</p>
+                    <p className="eyebrow">Skills Assessment Tool</p>
                     <h4>Quick Phonics Screener</h4>
                     <p className="pin-helper">
-                      Teacher-run QPS sessions save as Skills evidence and stay in the history. This box only shows a small recent view.
+                      Run a QPS session, save a summary to the Hub, or open recent QPS history when you need it.
                     </p>
                   </div>
                   <div className="small-group-popup-actions">
@@ -9254,81 +9254,90 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     </button>
                   </div>
                 </div>
-                <div className="qps-report-controls">
-                  <label className="qps-compact-toggle">
-                    <input
-                      checked={qpsShowCurrentWeekOnly}
-                      onChange={(event) => setQpsShowCurrentWeekOnly(event.target.checked)}
-                      type="checkbox"
-                    />
-                    Show current week only
-                  </label>
-                  <label>
-                    Print from
-                    <input
-                      onChange={(event) => setQpsPrintStartDate(event.target.value)}
-                      type="date"
-                      value={qpsPrintStartDate}
-                    />
-                  </label>
-                  <label>
-                    Print to
-                    <input
-                      onChange={(event) => setQpsPrintEndDate(event.target.value)}
-                      type="date"
-                      value={qpsPrintEndDate}
-                    />
-                  </label>
-                  <button
-                    className="teacher-text-button"
-                    onClick={() => {
-                      const range = qpsCurrentWeekRange();
-                      setQpsPrintStartDate(range.start);
-                      setQpsPrintEndDate(range.end);
-                    }}
-                    type="button"
-                  >
-                    This Week
-                  </button>
-                  <button
-                    className="teacher-text-button"
-                    onClick={() => {
-                      setQpsPrintStartDate("");
-                      setQpsPrintEndDate("");
-                    }}
-                    type="button"
-                  >
-                    All Dates
-                  </button>
-                </div>
-                <p className="pin-helper">
-                  Showing {qpsPanelResults.length} of {qpsPanelTotalCount} {qpsShowCurrentWeekOnly ? "current-week" : "saved"} QPS record{qpsPanelTotalCount === 1 ? "" : "s"}.
-                </p>
-                <div className="qps-report-list">
-                  {qpsPanelResults.length ? qpsPanelResults.map((result) => {
-                    const match = matchResult(result, reportScholars);
-                    const completedAt = reportRecordDate(result);
-                    return (
-                      <article className="qps-report-row" key={`${reportRecordStatus(result)}-${result.id}`}>
-                        <strong>{match.label}</strong>
-                        <span>{completedAt ? completedAt.toLocaleDateString() : "Date pending"}</span>
-                        <span>{reportRecordStatus(result)}</span>
-                        <span>{result.score}/{result.totalQuestions}</span>
-                        <em>{result.missedCount} need{result.missedCount === 1 ? "" : "s"}</em>
-                      </article>
-                    );
-                  }) : (
-                    <p className="empty-results-message">
-                      {qpsReportRecords.length ? "No QPS records saved for this week." : "No QPS records saved yet."}
-                    </p>
-                  )}
-                </div>
+                <details className="qps-history-details">
+                  <summary>
+                    <span>
+                      <strong>Recent QPS History</strong>
+                      <em>Open only when you need saved screener records or print ranges.</em>
+                    </span>
+                    <span>{qpsPanelResults.length}/{qpsPanelTotalCount}</span>
+                  </summary>
+                  <div className="qps-report-controls">
+                    <label className="qps-compact-toggle">
+                      <input
+                        checked={qpsShowCurrentWeekOnly}
+                        onChange={(event) => setQpsShowCurrentWeekOnly(event.target.checked)}
+                        type="checkbox"
+                      />
+                      Show current week only
+                    </label>
+                    <label>
+                      Print from
+                      <input
+                        onChange={(event) => setQpsPrintStartDate(event.target.value)}
+                        type="date"
+                        value={qpsPrintStartDate}
+                      />
+                    </label>
+                    <label>
+                      Print to
+                      <input
+                        onChange={(event) => setQpsPrintEndDate(event.target.value)}
+                        type="date"
+                        value={qpsPrintEndDate}
+                      />
+                    </label>
+                    <button
+                      className="teacher-text-button"
+                      onClick={() => {
+                        const range = qpsCurrentWeekRange();
+                        setQpsPrintStartDate(range.start);
+                        setQpsPrintEndDate(range.end);
+                      }}
+                      type="button"
+                    >
+                      This Week
+                    </button>
+                    <button
+                      className="teacher-text-button"
+                      onClick={() => {
+                        setQpsPrintStartDate("");
+                        setQpsPrintEndDate("");
+                      }}
+                      type="button"
+                    >
+                      All Dates
+                    </button>
+                  </div>
+                  <p className="pin-helper">
+                    Showing {qpsPanelResults.length} of {qpsPanelTotalCount} {qpsShowCurrentWeekOnly ? "current-week" : "saved"} QPS record{qpsPanelTotalCount === 1 ? "" : "s"}.
+                  </p>
+                  <div className="qps-report-list">
+                    {qpsPanelResults.length ? qpsPanelResults.map((result) => {
+                      const match = matchResult(result, reportScholars);
+                      const completedAt = reportRecordDate(result);
+                      return (
+                        <article className="qps-report-row" key={`${reportRecordStatus(result)}-${result.id}`}>
+                          <strong>{match.label}</strong>
+                          <span>{completedAt ? completedAt.toLocaleDateString() : "Date pending"}</span>
+                          <span>{reportRecordStatus(result)}</span>
+                          <span>{result.score}/{result.totalQuestions}</span>
+                          <em>{result.missedCount} need{result.missedCount === 1 ? "" : "s"}</em>
+                        </article>
+                      );
+                    }) : (
+                      <p className="empty-results-message">
+                        {qpsReportRecords.length ? "No QPS records saved for this week." : "No QPS records saved yet."}
+                      </p>
+                    )}
+                  </div>
+                </details>
               </section>
             ) : null}
 
             <div className="skills-data-toolbar">
               <label>
-                Report
+                Skill area
                 <select
                   onChange={(event) => {
                     setSkillsDataReportId(event.target.value as SkillsDataReportId);
@@ -9344,7 +9353,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 </select>
               </label>
               <label>
-                Focus
+                Show
                 <select
                   onChange={(event) => {
                     setSkillsDataFocusMode(event.target.value as SkillsDataFocusMode);
@@ -9352,20 +9361,20 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   }}
                   value={skillsDataFocusMode}
                 >
-                  <option value="all">All</option>
-                  <option value="needs-review">Needs Work</option>
-                  <option value="mastered">Mastered</option>
-                  <option value="unassessed">Not Assessed</option>
-                  <option value="hide-mastered">Hide Mastered</option>
-                  <option value="student-100">100% Mastery</option>
-                  <option value="student-below-100">Still Learning / Below 100%</option>
-                  <option value="student-close-100">Close to 100%</option>
-                  <option value="targets-with-needs">Targets With Needs</option>
-                  <option value="targets-100">Targets at 100% Class Mastery</option>
+                  <option value="all">All evidence</option>
+                  <option value="needs-review">Needs review only</option>
+                  <option value="mastered">Mastered only</option>
+                  <option value="unassessed">No evidence yet</option>
+                  <option value="hide-mastered">Hide mastered cells</option>
+                  <option value="student-100">Scholars at 100%</option>
+                  <option value="student-below-100">Scholars still learning</option>
+                  <option value="student-close-100">Scholars close to 100%</option>
+                  <option value="targets-with-needs">Targets with needs</option>
+                  <option value="targets-100">Targets mastered classwide</option>
                 </select>
               </label>
               <label>
-                Sort
+                Sort scholars by
                 <select
                   onChange={(event) => setSkillsDataSortMode(event.target.value as SkillsDataSortMode)}
                   value={skillsDataSortMode}
@@ -9452,7 +9461,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
               <div className="skills-data-scholar-detail">
                 <div className="result-row-head">
                   <div>
-                    <p className="eyebrow">Scholar Evidence</p>
+                    <p className="eyebrow">Selected Scholar</p>
                     <h4>{selectedSkillsDataScholarRow.scholar.firstName} {selectedSkillsDataScholarRow.scholar.lastName}</h4>
                     <p className="pin-helper">
                       {selectedSkillsDataReport.label}: {selectedSkillsDataScholarRow.masteredCount} mastered, {selectedSkillsDataScholarRow.needsReviewCount} needs review, {selectedSkillsDataScholarRow.unassessedCount} not assessed.
@@ -9477,7 +9486,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 </div>
 
                 <details className="skills-data-focus-details">
-                  <summary>Open scholar targets and recent activity</summary>
+                  <summary>Open target cards and session history</summary>
                 <div className="skills-data-scholar-targets">
                   {selectedSkillsDataScholarRow.cells.map((cell) => (
                     <button
@@ -9501,7 +9510,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
 
                 <div className="skills-data-scholar-records">
                   <section>
-                    <h5>Recent Saved Results</h5>
+                    <h5>Saved Sessions</h5>
                     {selectedSkillsDataScholarResults.length ? (
                       selectedSkillsDataScholarResults.map((result) => {
                         const completedAt = formatDate(result.completedAt);
@@ -9521,7 +9530,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     )}
                   </section>
                   <section>
-                    <h5>Started But Not Finished</h5>
+                    <h5>In Progress</h5>
                     {selectedSkillsDataScholarProgress.length ? (
                       selectedSkillsDataScholarProgress.map((progress) => {
                         const updatedAt = formatDate(progress.updatedAt);
@@ -9544,14 +9553,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 </details>
               </div>
             ) : (
-              <p className="skills-data-chart-helper">Click a scholar name in the chart to open a larger printable evidence view.</p>
+              <p className="skills-data-chart-helper">Click a scholar name in the chart to open their printable skill evidence and recent sessions.</p>
             )}
 
             {selectedSkillsDataCell ? (
               <div className="skills-data-detail">
                 <div className="result-row-head">
                   <div>
-                    <p className="eyebrow">Cell Evidence</p>
+                    <p className="eyebrow">Selected Skill Cell</p>
                     <h4>
                       {selectedSkillsDataCell.row.scholar.firstName} {selectedSkillsDataCell.row.scholar.lastName} - {selectedSkillsDataCell.cell.target}
                     </h4>
@@ -9569,10 +9578,10 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                 </div>
 
                 <details className="skills-data-focus-details">
-                  <summary>Open observation tools and cell history</summary>
+                  <summary>Open teacher observation and evidence history</summary>
                 <div className="skills-data-edit-grid">
                   <label>
-                    Manual status
+                    Teacher observation status
                     <select
                       onChange={(event) => setSkillsDataEditStatus(event.target.value as SkillsDataStatus)}
                       value={skillsDataEditStatus}

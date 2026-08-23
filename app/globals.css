@@ -1934,7 +1934,7 @@ button.area-card {
   padding: 18px;
   border: 1px solid rgb(124 111 91 / 0.14);
   border-radius: 14px;
-  background: #fff7ea;
+  background: #fffdf8;
 }
 
 .roster-browser-card {
@@ -1944,6 +1944,7 @@ button.area-card {
 
 .results-overview-card {
   grid-column: 1 / -1;
+  background: #fffaf1;
 }
 
 .results-dashboard-head {
@@ -2019,10 +2020,11 @@ button.area-card {
 
 .dashboard-tools-panel summary {
   width: fit-content;
+  border: 1px solid rgb(51 92 126 / 0.16);
   border-radius: 999px;
   padding: 8px 12px;
   color: #2f4054;
-  background: #fffdf8;
+  background: #ffffff;
   font-size: 0.86rem;
   font-weight: 900;
   cursor: pointer;
@@ -2126,9 +2128,9 @@ button.area-card {
 .dashboard-summary-tiles article {
   display: grid;
   place-items: center;
-  min-height: 92px;
+  min-height: 76px;
   border: 1px solid rgb(124 111 91 / 0.12);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 12px;
   color: #2f4054;
   background: #ffffff;
@@ -2144,15 +2146,16 @@ button.area-card {
 .dashboard-summary-tiles span {
   font-size: 0.82rem;
   font-weight: 900;
+  line-height: 1.15;
 }
 
 .dashboard-collapsible-section {
   display: grid;
   gap: 12px;
   border: 1px solid rgb(124 111 91 / 0.14);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 12px;
-  background: #fffdf8;
+  background: #ffffff;
 }
 
 .dashboard-collapsible-section summary {
@@ -3023,7 +3026,8 @@ button.area-card {
 .skills-data-glance-card {
   display: grid;
   grid-column: 1 / -1;
-  gap: 14px;
+  gap: 16px;
+  background: #fffdf8;
 }
 
 .skills-data-head {
@@ -3031,6 +3035,8 @@ button.area-card {
   align-items: start;
   justify-content: space-between;
   gap: 14px;
+  border-bottom: 1px solid rgb(124 111 91 / 0.12);
+  padding-bottom: 12px;
 }
 
 .skills-data-head h3,
@@ -3043,6 +3049,10 @@ button.area-card {
   grid-template-columns: minmax(150px, 0.55fr) minmax(190px, 0.75fr) minmax(150px, 0.55fr) minmax(260px, 1.25fr);
   gap: 12px;
   align-items: end;
+  border: 1px solid rgb(51 92 126 / 0.14);
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fbff;
 }
 
 .skills-data-toolbar label,
@@ -3050,7 +3060,7 @@ button.area-card {
   display: grid;
   gap: 6px;
   color: #2f4054;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 900;
 }
 
@@ -3081,6 +3091,10 @@ button.area-card {
   background: #e8f1f7;
   font-size: 0.8rem;
   font-weight: 900;
+}
+
+.skills-data-summary-row span:first-child {
+  background: #fff0c8;
 }
 
 .skills-data-legend span::before {
@@ -3119,9 +3133,16 @@ button.area-card {
   display: grid;
   gap: 10px;
   border: 1px solid rgb(239 189 47 / 0.45);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 14px;
-  background: #fff8df;
+  background: #fffaf0;
+}
+
+.qps-report-tool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .qps-report-panel h4 {
@@ -3129,6 +3150,67 @@ button.area-card {
   color: var(--ink);
   font-size: 1.05rem;
   font-weight: 950;
+}
+
+.qps-history-details {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgb(124 111 91 / 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.qps-history-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: #2f4054;
+  cursor: pointer;
+  list-style: none;
+}
+
+.qps-history-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.qps-history-details summary span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.qps-history-details summary strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.qps-history-details summary em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.qps-history-details summary > span:last-child {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fff0c8;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.qps-history-details[open] summary {
+  border-bottom: 1px solid rgb(124 111 91 / 0.12);
+}
+
+.qps-history-details > .qps-report-controls,
+.qps-history-details > .pin-helper,
+.qps-history-details > .qps-report-list {
+  margin: 0 12px 12px;
 }
 
 .qps-report-controls {
@@ -3263,9 +3345,9 @@ button.area-card {
 .skills-data-scholar-detail {
   display: grid;
   gap: 14px;
-  border: 1px solid rgb(124 111 91 / 0.16);
+  border: 1px solid rgb(51 92 126 / 0.18);
   border-radius: 14px;
-  background: #fffdf8;
+  background: #f8fbff;
   padding: 14px;
 }
 
@@ -3449,10 +3531,10 @@ button.area-card {
 .skills-data-detail {
   display: grid;
   gap: 12px;
-  border: 1px solid rgb(124 111 91 / 0.16);
+  border: 1px solid rgb(51 92 126 / 0.18);
   border-radius: 12px;
   padding: 14px;
-  background: #fffdf8;
+  background: #f8fbff;
 }
 
 .skills-data-edit-grid {
@@ -3470,6 +3552,7 @@ button.area-card {
 .skills-data-evidence-list article {
   display: grid;
   gap: 3px;
+  border: 1px solid rgb(124 111 91 / 0.1);
   border-radius: 10px;
   padding: 10px 12px;
   background: #ffffff;
