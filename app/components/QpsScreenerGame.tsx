@@ -871,15 +871,15 @@ function qpsSelectedText(score: QpsItemScore) {
 
 function qpsPrintedStimulusHtml(item: QpsItem, score: QpsItemScore) {
   if (score.responseType === "no-response") {
-    return `<span class="print-no-response">${escapeHtml(primaryQpsDisplay(item.display))}<b>NR</b></span>`;
+    return `<span class="print-no-response"><b>NR</b><span class="print-expected">${escapeHtml(primaryQpsDisplay(item.display))}</span></span>`;
   }
 
   if (score.responseType === "whole-word") {
-    return `<span class="print-whole-word"><em>${escapeHtml(score.wholeWordResponse || "Whole word wrong")}</em>${escapeHtml(primaryQpsDisplay(item.display))}</span>`;
+    return `<span class="print-whole-word"><em>${escapeHtml(score.wholeWordResponse || "Whole word wrong")}</em><span class="print-expected">${escapeHtml(primaryQpsDisplay(item.display))}</span></span>`;
   }
 
   if (!score.errors.length) {
-    return escapeHtml(primaryQpsDisplay(item.display));
+    return `<span class="print-expected">${escapeHtml(primaryQpsDisplay(item.display))}</span>`;
   }
 
   const characters = qpsItemCharacters(item);
@@ -1498,6 +1498,7 @@ export function QpsScreenerGame() {
   const [liveSessionActive, setLiveSessionActive] = useState(false);
   const [liveSessionStatus, setLiveSessionStatus] = useState("");
   const [loadedProgressKey, setLoadedProgressKey] = useState("");
+  const [loadedProgressStatus, setLoadedProgressStatus] = useState<"none" | "draft" | "completed">("none");
   const [qpsCallOnRecords, setQpsCallOnRecords] = useState<QpsCallOnRecord[]>([]);
   const [qpsCallOnProgressRecords, setQpsCallOnProgressRecords] = useState<QpsCallOnRecord[]>([]);
   const [qpsSkillsOverrides, setQpsSkillsOverrides] = useState<QpsSkillsOverride[]>([]);
@@ -1512,6 +1513,8 @@ export function QpsScreenerGame() {
   const [wholeClassInitials, setWholeClassInitials] = useState("");
   const [wholeClassMissStatus, setWholeClassMissStatus] = useState("");
   const correctionInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const stimulusDragEndRef = useRef<number | null>(null);
+  const stimulusDragStartRef = useRef<number | null>(null);
   const wholeClassInitialsRef = useRef<HTMLInputElement | null>(null);
 
   const selectedForm = forms[formId] ?? QPS_FORMS[formId];
@@ -1568,6 +1571,7 @@ export function QpsScreenerGame() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const isTeacherLaunch = params.get("teacher") === "1";
     const firstName = asText(params.get("player")).trim();
     const firstNameKey = asText(params.get("key")).trim() || normalizeNameKey(firstName);
     const isWholeClassLaunch = params.get("wholeClass") === "1";
@@ -1576,7 +1580,7 @@ export function QpsScreenerGame() {
       setSelectedScholarId(QPS_WHOLE_CLASS_MODE);
     }
 
-    if (params.get("live") === "1" && firstName && firstNameKey && normalizeNameKey(firstName) === firstNameKey) {
+    if (!isTeacherLaunch && params.get("live") === "1" && firstName && firstNameKey && normalizeNameKey(firstName) === firstNameKey) {
       setScholarSlideProfile({ firstName, firstNameKey });
     }
 
@@ -1667,6 +1671,7 @@ export function QpsScreenerGame() {
     setActiveErrorId("");
     setAutosaveStatus("");
     setLoadedProgressKey("");
+    setLoadedProgressStatus("none");
     setStatus("");
   }, [qpsItems, selectedScholar]);
 
@@ -1675,6 +1680,7 @@ export function QpsScreenerGame() {
 
     if (!selectedScholar || !isAuthorizedTeacherEmail(teacherEmail)) {
       setLoadedProgressKey("");
+      setLoadedProgressStatus("none");
       return () => {
         cancelled = true;
       };
@@ -1682,6 +1688,7 @@ export function QpsScreenerGame() {
 
     const nextProgressSessionId = qpsProgressSessionId(formId, selectedScholar);
     setLoadedProgressKey("");
+    setLoadedProgressStatus("none");
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
     setStatus("");
@@ -1693,18 +1700,24 @@ export function QpsScreenerGame() {
 
         const data = asRecord(snapshot.data());
         const statusValue = asText(data?.status);
-        const isMatchingQpsDraft =
+        const isMatchingQpsProgress =
           snapshot.exists !== false
           && data
           && asText(data.gameId) === QPS_GAME_ID
-          && asText(data.scholarFirstNameKey) === selectedScholar.firstNameKey
-          && statusValue !== "completed";
+          && asText(data.scholarFirstNameKey) === selectedScholar.firstNameKey;
 
-        if (isMatchingQpsDraft) {
+        if (isMatchingQpsProgress) {
           const restoredIndex = boundedQpsIndex(asNumber(data.currentQuestionIndex) - 1, qpsItems.length);
           setScores(qpsScoresFromProgress(data, qpsItems));
           setCurrentIndex(restoredIndex);
-          setStatus(`Resumed ${selectedScholar.firstName}'s QPS at item ${restoredIndex + 1}.`);
+          setLoadedProgressStatus(statusValue === "completed" ? "completed" : "draft");
+          setStatus(
+            statusValue === "completed"
+              ? `Loaded saved QPS for ${selectedScholar.firstName}.`
+              : `Resumed ${selectedScholar.firstName}'s QPS at item ${restoredIndex + 1}.`,
+          );
+        } else {
+          setLoadedProgressStatus("none");
         }
 
         setLoadedProgressKey(nextProgressSessionId);
@@ -1712,6 +1725,7 @@ export function QpsScreenerGame() {
       .catch((nextError) => {
         if (cancelled) return;
         setLoadedProgressKey(nextProgressSessionId);
+        setLoadedProgressStatus("none");
         setError(nextError instanceof Error ? nextError.message : "QPS progress could not load.");
       });
 
@@ -1915,6 +1929,8 @@ export function QpsScreenerGame() {
       || !progressSessionId
       || loadedProgressKey !== progressSessionId
       || !isAuthorizedTeacherEmail(teacherEmail)
+      || loadedProgressStatus === "completed"
+      || !scoredItems.length
     ) {
       return;
     }
@@ -1930,6 +1946,7 @@ export function QpsScreenerGame() {
     currentItem,
     formId,
     loadedProgressKey,
+    loadedProgressStatus,
     missedCount,
     progressSessionId,
     qpsItems,
@@ -1966,6 +1983,10 @@ export function QpsScreenerGame() {
   }, [activeErrorId, currentIndex]);
 
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
+    if (loadedProgressStatus === "completed") {
+      setLoadedProgressStatus("draft");
+    }
+
     setScores((currentScores) => ({
       ...currentScores,
       [currentItem.id]: {
@@ -1981,12 +2002,19 @@ export function QpsScreenerGame() {
         ? { ...annotation, actualResponse }
         : annotation,
     );
+    const nextWholeWordResponse = currentScore.responseType === "whole-word"
+      ? actualResponse
+      : currentScore.wholeWordResponse;
+    const nextResponseType = currentScore.responseType === "whole-word" ? "whole-word" : "annotated-error";
 
     updateCurrentScore({
       errors,
-      responseType: "annotated-error",
-      said: qpsErrorSummary(errors),
+      responseType: nextResponseType,
+      said: nextResponseType === "whole-word"
+        ? nextWholeWordResponse.trim() || "Whole word wrong"
+        : qpsErrorSummary(errors),
       status: "missed",
+      wholeWordResponse: nextWholeWordResponse,
     });
   };
 
@@ -1999,6 +2027,47 @@ export function QpsScreenerGame() {
       status: errors.length ? "missed" : "unscored",
     });
     setActiveErrorId("");
+  };
+
+  const markStimulusRange = (startIndex: number, endIndex: number, responseType: QpsItemScore["responseType"] = "annotated-error") => {
+    if (!isExaminerSurfaceMode) {
+      return;
+    }
+
+    const characters = qpsItemCharacters(currentItem);
+    let start = Math.max(0, Math.min(startIndex, endIndex, characters.length - 1));
+    let end = Math.max(start, Math.min(Math.max(startIndex, endIndex), characters.length - 1));
+
+    while (start <= end && /\s/.test(characters[start] ?? "")) start += 1;
+    while (end >= start && /\s/.test(characters[end] ?? "")) end -= 1;
+
+    if (start > end) {
+      return;
+    }
+
+    const id = `${currentItem.id}-${start}-${end}-${Date.now()}`;
+    const nextAnnotation: QpsErrorAnnotation = {
+      actualResponse: responseType === "whole-word" ? currentScore.wholeWordResponse : "",
+      endIndex: end,
+      expectedSpan: qpsExpectedSpan(currentItem, start, end),
+      id,
+      startIndex: start,
+    };
+    const errors = currentScore.errors.filter((annotation) =>
+      annotation.endIndex < start || annotation.startIndex > end,
+    );
+    const nextErrors = [...errors, nextAnnotation];
+
+    updateCurrentScore({
+      errors: nextErrors,
+      responseType,
+      said: responseType === "whole-word"
+        ? currentScore.wholeWordResponse.trim() || "Whole word wrong"
+        : qpsErrorSummary(nextErrors),
+      status: "missed",
+      wholeWordResponse: responseType === "whole-word" ? currentScore.wholeWordResponse : "",
+    });
+    setActiveErrorId(id);
   };
 
   const markStimulusSpan = (index: number) => {
@@ -2064,6 +2133,41 @@ export function QpsScreenerGame() {
     setActiveErrorId(id);
   };
 
+  const beginStimulusDrag = (index: number) => {
+    if (!isExaminerSurfaceMode || /\s/.test(qpsItemCharacters(currentItem)[index] ?? "")) {
+      return;
+    }
+
+    stimulusDragStartRef.current = index;
+    stimulusDragEndRef.current = index;
+  };
+
+  const previewStimulusDrag = (index: number) => {
+    if (stimulusDragStartRef.current === null || /\s/.test(qpsItemCharacters(currentItem)[index] ?? "")) {
+      return;
+    }
+
+    stimulusDragEndRef.current = index;
+  };
+
+  const finishStimulusDrag = (index: number) => {
+    const startIndex = stimulusDragStartRef.current;
+    const endIndex = stimulusDragEndRef.current ?? index;
+    stimulusDragStartRef.current = null;
+    stimulusDragEndRef.current = null;
+
+    if (startIndex === null) {
+      return;
+    }
+
+    if (startIndex === endIndex) {
+      markStimulusSpan(index);
+      return;
+    }
+
+    markStimulusRange(startIndex, endIndex);
+  };
+
   const queueSectionAward = (section: string) => {
     if (!section) {
       return;
@@ -2116,18 +2220,20 @@ export function QpsScreenerGame() {
   };
 
   const markWholeWordWrong = () => {
-    updateCurrentScore({
-      errors: [],
-      responseType: "whole-word",
-      said: currentScore.wholeWordResponse.trim() || "Whole word wrong",
-      status: "missed",
-    });
-    setActiveErrorId("");
+    markStimulusRange(0, qpsItemCharacters(currentItem).length - 1, "whole-word");
   };
 
   const updateWholeWordResponse = (wholeWordResponse: string) => {
+    const errors = currentScore.errors.length
+      ? currentScore.errors.map((annotation, index) =>
+        index === currentScore.errors.length - 1
+          ? { ...annotation, actualResponse: wholeWordResponse }
+          : annotation,
+      )
+      : currentScore.errors;
+
     updateCurrentScore({
-      errors: [],
+      errors,
       responseType: "whole-word",
       said: wholeWordResponse.trim() || "Whole word wrong",
       status: "missed",
@@ -2371,12 +2477,8 @@ export function QpsScreenerGame() {
     const commentsForItems = (items: QpsItem[]) =>
       items
         .map((item) => {
-          const score = qpsScoreWithDefaults(scores[item.id]);
-          if (score.status !== "missed" && !score.note.trim()) return "";
-          const response = score.status === "missed" ? qpsSelectedText(score) : "";
-          const note = score.note.trim();
-          const detail = [response, note].filter(Boolean).join("; ");
-          return `${primaryQpsDisplay(item.display)}: ${detail}`;
+          const note = qpsScoreWithDefaults(scores[item.id]).note.trim();
+          return note ? `${primaryQpsDisplay(item.display)}: ${note}` : "";
         })
         .filter(Boolean)
         .join(" | ");
@@ -2408,10 +2510,11 @@ export function QpsScreenerGame() {
       const sentenceItems = sectionItems.filter((item) => item.type === "sentence");
       const comments = commentsForItems(sectionItems);
       const sectionClass = sentenceItems.length ? "has-task-b" : "single-task";
+      const wordGridClass = setNumber >= 10 ? "is-words is-long-words" : "is-words";
 
       if (setNumber <= 2) {
         return `
-          <section class="sheet-set ${sectionClass}">
+          <section class="sheet-set set-${setNumber} ${sectionClass}">
             <div class="set-number">${setNumber}</div>
             <div class="set-content">
               <div class="set-title"><strong>Skill Set ${setNumber}:</strong> ${escapeHtml(qpsDisplaySectionName(section).replace(/^Set \d+ - /, ""))}</div>
@@ -2426,7 +2529,7 @@ export function QpsScreenerGame() {
       }
 
       return `
-        <section class="sheet-set ${sectionClass}">
+        <section class="sheet-set set-${setNumber} ${sectionClass}">
           <div class="set-number">${setNumber}</div>
           <div class="set-content">
             <div class="set-title">
@@ -2435,7 +2538,7 @@ export function QpsScreenerGame() {
             </div>
             <div class="task-row">
               ${sentenceItems.length ? `<div class="task-label">Task A</div>` : ""}
-              <div class="task-items">${renderItems(wordItems, "is-words")}</div>
+              <div class="task-items">${renderItems(wordItems, wordGridClass)}</div>
               ${renderScoreBox(wordItems)}
             </div>
             ${sentenceItems.length ? `
@@ -2484,54 +2587,57 @@ export function QpsScreenerGame() {
         <meta charset="utf-8">
         <title>QPS Screener</title>
         <style>
-          @page{margin:7mm}
+          @page{size:letter portrait;margin:.28in}
           html,body{margin:0;padding:0}
           body{font-family:"Times New Roman",Times,serif;color:#111;background:#fff}
-          .sheet-page{min-height:calc(100vh - 14mm);page-break-after:always}
-          .sheet-page:last-child{page-break-after:auto}
-          .sheet-header{display:grid;grid-template-columns:205px 1fr 330px;gap:14px;align-items:start;margin:0 0 8px}
-          .sheet-header.continued{grid-template-columns:1fr 360px}
+          .sheet-page{box-sizing:border-box;width:100%;height:10.35in;overflow:hidden;break-after:page;page-break-after:always}
+          .sheet-page:last-child{break-after:auto;page-break-after:auto}
+          .sheet-header{display:grid;grid-template-columns:185px 1fr 300px;gap:10px;align-items:start;margin:0 0 5px}
+          .sheet-header.continued{grid-template-columns:1fr 330px}
           .sheet-header.continued .brand-block{display:none}
-          .brand-block{display:grid;grid-template-columns:58px 1fr;gap:8px;align-items:center}
-          .brand-mark{display:grid;place-items:center;width:52px;height:52px;border:1px solid #111;border-radius:50%;font:bold 12px Arial,sans-serif;text-transform:uppercase}
-          .brand-block h1{margin:0;font:700 26px/0.95 Arial,Helvetica,sans-serif}
-          .form-title{padding-top:12px;font-family:Arial,Helvetica,sans-serif}
-          .form-title strong{display:block;font-size:21px}
-          .form-title span{display:block;font-size:29px;letter-spacing:.03em}
-          .sheet-header.continued .form-title span{display:inline;font-size:18px;font-style:italic;margin-left:4px}
-          .student-fields{font:17px Arial,Helvetica,sans-serif}
-          .student-fields p{display:grid;grid-template-columns:70px 1fr;gap:6px;align-items:end;margin:0 0 9px}
+          .brand-block{display:grid;grid-template-columns:50px 1fr;gap:7px;align-items:center}
+          .brand-mark{display:grid;place-items:center;width:46px;height:46px;border:1px solid #111;border-radius:50%;font:bold 11px Arial,sans-serif;text-transform:uppercase}
+          .brand-block h1{margin:0;font:700 22px/0.95 Arial,Helvetica,sans-serif}
+          .form-title{padding-top:8px;font-family:Arial,Helvetica,sans-serif}
+          .form-title strong{display:block;font-size:18px}
+          .form-title span{display:block;font-size:25px;letter-spacing:.03em}
+          .sheet-header.continued .form-title span{display:inline;font-size:16px;font-style:italic;margin-left:4px}
+          .student-fields{font:15px Arial,Helvetica,sans-serif}
+          .student-fields p{display:grid;grid-template-columns:62px 1fr;gap:5px;align-items:end;margin:0 0 6px}
           .student-fields p:last-child{grid-template-columns:54px 1fr 48px 60px}
-          .student-fields span{min-height:18px;border-bottom:1px solid #111}
-          .sheet-set{display:grid;grid-template-columns:52px 1fr;border:1.6px solid #111;border-bottom:0;break-inside:avoid}
+          .student-fields span{min-height:16px;border-bottom:1px solid #111}
+          .sheet-set{display:grid;grid-template-columns:44px 1fr;border:1.4px solid #111;border-bottom:0;break-inside:avoid}
           .sheet-set:last-child{border-bottom:1.6px solid #111}
-          .set-number{display:grid;place-items:center;border-right:1.2px solid #111;font:42px Arial,Helvetica,sans-serif}
+          .set-number{display:grid;place-items:center;border-right:1.2px solid #111;font:36px Arial,Helvetica,sans-serif}
           .set-content{min-width:0}
-          .set-title{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #111;background:#f2f2f2;padding:2px 8px;font:bold 16px Arial,Helvetica,sans-serif}
+          .set-title{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #111;background:#f2f2f2;padding:2px 7px;font:bold 14px Arial,Helvetica,sans-serif}
           .set-title em{font:11px Arial,Helvetica,sans-serif;color:#444}
-          .task-row{display:grid;grid-template-columns:56px 1fr 74px;border-bottom:1px solid #111;min-height:42px}
-          .task-row.no-task-label{grid-template-columns:1fr 74px}
+          .task-row{display:grid;grid-template-columns:48px 1fr 66px;border-bottom:1px solid #111;min-height:34px}
+          .task-row.no-task-label{grid-template-columns:1fr 66px}
           .task-label{display:grid;place-items:center;border-right:1px solid #111;font:bold 13px Arial,Helvetica,sans-serif}
-          .task-items{padding:7px 12px}
+          .task-items{padding:4px 8px}
           .item-grid{display:grid;gap:8px 22px;align-items:end}
-          .item-grid.is-letters{grid-template-columns:repeat(13,minmax(22px,1fr));gap:11px 18px}
-          .item-grid.is-words{grid-template-columns:repeat(5,minmax(70px,1fr));gap:8px 24px}
-          .item-grid.is-sentences{grid-template-columns:repeat(2,minmax(210px,1fr));gap:9px 28px}
-          .print-item{display:inline-block;text-align:center;min-height:20px;font-size:17px;line-height:1.35;text-decoration:underline;text-underline-offset:3px}
+          .item-grid.is-letters{grid-template-columns:repeat(13,minmax(20px,1fr));gap:7px 14px}
+          .item-grid.is-words{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px 12px}
+          .item-grid.is-long-words{gap:5px 6px}
+          .item-grid.is-sentences{grid-template-columns:repeat(2,minmax(190px,1fr));gap:7px 18px}
+          .print-item{display:block;text-align:center;min-height:18px;font-size:16px;line-height:1.2;text-decoration:none}
+          .item-grid.is-long-words .print-item{font-size:12px;line-height:1.1;white-space:normal;overflow-wrap:anywhere}
           .is-missed{color:#9a2f1b}
           .is-unscored{color:#777}
-          .score-box{display:grid;grid-template-rows:20px 1fr;align-items:end;border-left:1px solid #111;text-align:right;padding:0 5px 6px;font:18px Arial,Helvetica,sans-serif}
-          .score-box span{align-self:start;text-align:center;border-bottom:1px solid #111;font:13px "Times New Roman",Times,serif}
+          .score-box{display:grid;grid-template-rows:18px 1fr;align-items:end;border-left:1px solid #111;text-align:right;padding:0 4px 4px;font:16px Arial,Helvetica,sans-serif}
+          .score-box span{align-self:start;text-align:center;border-bottom:1px solid #111;font:12px "Times New Roman",Times,serif}
           .score-box small{font-size:9px;line-height:1.1;text-align:right;color:#222}
           .score-box strong{font-weight:400}
-          .comments-line{min-height:25px;padding:3px 8px;font-size:16px;line-height:1.2}
+          .comments-line{min-height:17px;padding:2px 7px;font-size:13px;line-height:1.15}
           .comments-line strong{font-weight:400}
-          .print-marked-span{display:inline-grid;grid-template-rows:auto auto;place-items:center;margin:0 1px;color:#912f1a;text-decoration:none}
-          .print-marked-span em{font:700 12px Arial,Helvetica,sans-serif;line-height:1}
-          .print-marked-span b{border-top:2px solid #912f1a;font-weight:400;line-height:1.05;text-decoration:line-through;text-decoration-thickness:1.4px}
-          .print-whole-word,.print-no-response{display:inline-grid;grid-template-rows:auto auto;gap:0;text-decoration:none}
-          .print-whole-word em,.print-no-response b{color:#912f1a;font:700 12px Arial,Helvetica,sans-serif}
-          .sheet-footer{display:flex;justify-content:space-between;margin:10px 26px 0;font:14px Arial,Helvetica,sans-serif}
+          .print-expected{display:inline-block;border-bottom:1px solid #111;padding:0 1px;line-height:1.05}
+          .print-marked-span{display:inline-grid;grid-template-rows:auto auto;place-items:center;margin:0 1px;color:#912f1a;text-decoration:none;vertical-align:bottom}
+          .print-marked-span em{font:700 11px Arial,Helvetica,sans-serif;line-height:1;text-decoration:none;color:#912f1a}
+          .print-marked-span b{border-bottom:1px solid #111;font-weight:400;line-height:1.05;text-decoration:line-through;text-decoration-thickness:1.4px;text-decoration-color:#912f1a}
+          .print-whole-word,.print-no-response{display:inline-grid;grid-template-rows:auto auto;gap:0;place-items:center;text-decoration:none}
+          .print-whole-word em,.print-no-response b{color:#912f1a;font:700 11px Arial,Helvetica,sans-serif;text-decoration:none}
+          .sheet-footer{display:flex;justify-content:space-between;margin:6px 22px 0;font:12px Arial,Helvetica,sans-serif}
         </style>
       </head>
       <body>
@@ -2611,11 +2717,13 @@ export function QpsScreenerGame() {
         scholarFirstNameKey: selectedScholar.firstNameKey,
         scholarId: selectedScholar.id,
         score: correctCount,
+        sessionId: progressSessionId,
         teacherEmail: selectedScholar.teacherEmail,
         totalQuestions: scoredItems.length,
       });
 
       await saveQpsProgress("completed");
+      setLoadedProgressStatus("completed");
       setStatus(`QPS saved for ${selectedScholar.firstName}.`);
       void loadTeacherData();
     } catch (nextError) {
@@ -2646,7 +2754,7 @@ export function QpsScreenerGame() {
   const currentStimulusCharacters = qpsItemCharacters(currentItem);
 
   return (
-    <section className="qps-screener-page">
+    <section className={`qps-screener-page${isExaminerSurfaceMode ? " is-examiner-surface" : ""}`}>
       <div className="qps-toolbar">
         <div>
           <p className="section-kicker">Teacher-only screener</p>
@@ -2822,17 +2930,37 @@ export function QpsScreenerGame() {
                             />
                             <button
                               aria-label="Remove this mark"
-                              onClick={() => removeAnnotation(annotation.id)}
-                              type="button"
-                            >
-                              x
-                            </button>
+                          onClick={() => removeAnnotation(annotation.id)}
+                          type="button"
+                        >
+                          x
+                        </button>
                           </span>
                         ) : null}
                         <button
                           aria-label={isSpace ? "Space" : `Mark ${character}`}
                           disabled={isSpace}
-                          onClick={() => markStimulusSpan(index)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              markStimulusSpan(index);
+                            }
+                          }}
+                          onPointerCancel={() => {
+                            stimulusDragStartRef.current = null;
+                            stimulusDragEndRef.current = null;
+                          }}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            beginStimulusDrag(index);
+                          }}
+                          onPointerEnter={() => {
+                            previewStimulusDrag(index);
+                          }}
+                          onPointerUp={(event) => {
+                            event.preventDefault();
+                            finishStimulusDrag(index);
+                          }}
                           type="button"
                         >
                           {isSpace ? "\u00a0" : primaryQpsDisplay(character)}
@@ -2916,6 +3044,15 @@ export function QpsScreenerGame() {
               </label>
             ) : null}
 
+            <div className="qps-nav-row">
+              <button className="teacher-control-button secondary" disabled={currentIndex === 0} onClick={goToPrevious} type="button">
+                Previous
+              </button>
+              <button className="teacher-control-button" disabled={currentIndex >= qpsItems.length - 1} onClick={goToNext} type="button">
+                Next
+              </button>
+            </div>
+
             {isWholeClassMode ? (
               <div className="qps-whole-class-tools">
                 <label>
@@ -2942,6 +3079,40 @@ export function QpsScreenerGame() {
               </div>
             ) : null}
 
+            <div className={`qps-notes-grid${isExaminerSurfaceMode ? " is-individual" : ""}`}>
+              {!isExaminerSurfaceMode ? (
+                <label>
+                  What scholar said
+                  <input
+                    onChange={(event) => updateCurrentScore({ said: event.target.value, status: event.target.value.trim() ? "missed" : currentScore.status })}
+                    placeholder="Example: /b/ for /d/"
+                    value={currentScore.said}
+                  />
+                </label>
+              ) : null}
+              <label>
+                Note
+                <input
+                  onChange={(event) => updateCurrentScore({ note: event.target.value })}
+                  placeholder="Optional teacher note"
+                  value={currentScore.note}
+                />
+              </label>
+            </div>
+
+          </main>
+
+          <aside className={`qps-item-list${isExaminerSurfaceMode && !isItemDrawerOpen ? " is-collapsed" : ""}`}>
+            {isExaminerSurfaceMode ? (
+              <button
+                className="qps-item-drawer-toggle"
+                onClick={() => setIsItemDrawerOpen((isOpen) => !isOpen)}
+                type="button"
+              >
+                <strong>Items / Progress</strong>
+                <span>{currentSectionScoredCount}/{currentSectionItems.length} scored in this set</span>
+              </button>
+            ) : null}
             {isWholeClassMode ? (
               <section className="qps-call-on-panel">
                 <div className="qps-call-on-head">
@@ -2973,49 +3144,6 @@ export function QpsScreenerGame() {
                   <p className="pin-helper">Everyone currently shows mastered for this chart target.</p>
                 )}
               </section>
-            ) : null}
-
-            <div className={`qps-notes-grid${isExaminerSurfaceMode ? " is-individual" : ""}`}>
-              {!isExaminerSurfaceMode ? (
-                <label>
-                  What scholar said
-                  <input
-                    onChange={(event) => updateCurrentScore({ said: event.target.value, status: event.target.value.trim() ? "missed" : currentScore.status })}
-                    placeholder="Example: /b/ for /d/"
-                    value={currentScore.said}
-                  />
-                </label>
-              ) : null}
-              <label>
-                Note
-                <input
-                  onChange={(event) => updateCurrentScore({ note: event.target.value })}
-                  placeholder="Optional teacher note"
-                  value={currentScore.note}
-                />
-              </label>
-            </div>
-
-            <div className="qps-nav-row">
-              <button className="teacher-control-button secondary" disabled={currentIndex === 0} onClick={goToPrevious} type="button">
-                Previous
-              </button>
-              <button className="teacher-control-button" disabled={currentIndex >= qpsItems.length - 1} onClick={goToNext} type="button">
-                Next
-              </button>
-            </div>
-          </main>
-
-          <aside className={`qps-item-list${isExaminerSurfaceMode && !isItemDrawerOpen ? " is-collapsed" : ""}`}>
-            {isExaminerSurfaceMode ? (
-              <button
-                className="qps-item-drawer-toggle"
-                onClick={() => setIsItemDrawerOpen((isOpen) => !isOpen)}
-                type="button"
-              >
-                <strong>Items / Progress</strong>
-                <span>{currentSectionScoredCount}/{currentSectionItems.length} scored in this set</span>
-              </button>
             ) : null}
             {(!isExaminerSurfaceMode || isItemDrawerOpen) ? qpsItems.map((item, index) => {
               const score = qpsScoreWithDefaults(scores[item.id]);

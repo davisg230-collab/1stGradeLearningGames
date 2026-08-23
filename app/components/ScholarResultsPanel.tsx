@@ -130,6 +130,7 @@ type ResultSubmission = {
   teacherEmail: string;
   totalQuestions: number;
   responseTimesMs?: number[];
+  sessionId?: string;
   word?: string;
 };
 
@@ -161,6 +162,7 @@ type ProgressSubmission = {
   teacherEmail: string;
   totalQuestions: number;
   responseTimesMs?: number[];
+  completedAt?: unknown;
   updatedAt: unknown;
 };
 
@@ -1673,11 +1675,12 @@ function qpsCurrentWeekRange() {
 }
 
 function reportRecordDate(record: QpsReportRecord) {
-  return formatDate("completedAt" in record ? record.completedAt : record.updatedAt);
+  return formatDate(record.completedAt ?? ("updatedAt" in record ? record.updatedAt : null));
 }
 
 function reportRecordStatus(record: QpsReportRecord) {
-  return "completedAt" in record ? "Saved" : "In progress";
+  if ("attempts" in record) return "Saved";
+  return record.status === "completed" ? "Saved score sheet" : "In progress";
 }
 
 function resultIsWithinDateInputs(result: QpsReportRecord, startInput: string, endInput: string) {
@@ -1970,6 +1973,7 @@ function mapResult(doc: FirestoreDocSnapshot): ResultSubmission {
     teacherEmail: asText(data.teacherEmail),
     totalQuestions: asNumber(data.totalQuestions),
     responseTimesMs: asArray(data.responseTimesMs).map(asNumber),
+    sessionId: asText(data.sessionId),
     word: asText(data.word),
   };
 }
@@ -2005,6 +2009,7 @@ function mapProgress(doc: FirestoreDocSnapshot): ProgressSubmission {
     teacherEmail: asText(data.teacherEmail),
     totalQuestions: asNumber(data.totalQuestions),
     responseTimesMs: asArray(data.responseTimesMs).map(asNumber),
+    completedAt: data.completedAt,
     updatedAt: data.updatedAt,
   };
 }
@@ -4797,11 +4802,14 @@ function buildSmallGroupLessonAnalysis(
       familyLookFor: `Your child can find ${letterNeed}, name it or say the sound, and write it without guessing.`,
       familyPrompt: `Find ${letterNeed}, say it, write it, and read it in a word.`,
       familySteps: [
-        `Write ${letterNeed} with ${confusableLetters} and ask your child to point to ${letterNeed}.`,
-        `Have your child say the letter name or sound, then write ${letterNeed}.`,
+        `Warm up: Say, "Today we are looking for ${letterNeed}. Say the letter name or the sound you practiced in class." Have your child repeat it once.`,
+        `Find it: Write ${letterNeed} with ${confusableLetters}. Ask your child to point to ${letterNeed} and tell how they knew.`,
+        `Write it: Have your child sky-write ${letterNeed}, then write ${letterNeed} three times on paper.`,
         practiceExamples.length
-          ? `Read or say these quick practice words together: ${practiceExamples.slice(0, 4).join(", ")}.`
+          ? `Read it in words: Practice these quick words together: ${practiceExamples.slice(0, 5).join(", ")}. Tap the sounds, blend the word, then find ${letterNeed}.`
           : `Find ${letterNeed} in one short word and say the word together.`,
+        `Quick check: Mix ${letterNeed} with a few other letters again. Ask: "Show me ${letterNeed}. What is its sound? Can you write it?"`,
+        `Challenge: Find ${letterNeed} on a book page, cereal box, sign, or label. Read the word together if you can.`,
       ],
       guidedPractice: `Use ${lessonLabel} with ${exampleWords}. Scholars find ${letterNeed}, say the letter name or sound, trace or write it, and read it in a short word.`,
       independentPractice: `Give scholars a short page/whiteboard with ${letterNeed}, ${confusableLetters}, and 2 practice words. They circle ${letterNeed}, write ${letterNeed}, and read one word containing ${letterNeed}.`,
@@ -4993,9 +5001,12 @@ function smallGroupFamilyPractice(
       focus: target,
       lookFor: `Your child can find ${letter}, name or say it, and write it without guessing.`,
       steps: [
-        `Write ${letter} on a card or paper. Say: "This is ${letter}."`,
-        `Mix ${letter} with 3 or 4 other letters. Ask your child to point to ${letter}.`,
-        `Have your child write ${letter} three times and read it back.`,
+        `Warm up: Write ${letter} on a card or paper. Say: "This is ${letter}. Say the letter name or the sound you practiced in class."`,
+        `Find it: Mix ${letter} with 3 or 4 other letters. Ask your child to point to ${letter} and tell how they knew.`,
+        `Write it: Have your child sky-write ${letter}, then write ${letter} three times on paper.`,
+        `Read it: Put ${letter} in a few short words or names when possible. Read the word together and point to ${letter}.`,
+        `Quick check: Ask your child to find ${letter}, say its sound, write it, and read one word with ${letter}.`,
+        `Challenge: Find ${letter} on a book page, cereal box, sign, or label. Read the word together if you can.`,
       ],
       prompt: `Point to ${letter}, say it, write it, then find it in a book or around the house.`,
     };
@@ -6544,13 +6555,18 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     }
 
     const savedRecords = qpsResults;
-    const activeProgressRecords = progressRecords.filter((progress) =>
+    const savedSessionIds = new Set(
+      savedRecords
+        .map((record) => record.sessionId)
+        .filter(Boolean),
+    );
+    const visibleProgressRecords = progressRecords.filter((progress) =>
       progress.gameId === QPS_SCREENER_GAME_ID
-      && progress.status !== "completed"
+      && (!savedSessionIds.has(progress.sessionId) || progress.status !== "completed")
       && matchResult(progress, reportScholars).scholar,
     );
 
-    return [...savedRecords, ...activeProgressRecords].sort((a, b) =>
+    return [...savedRecords, ...visibleProgressRecords].sort((a, b) =>
       (reportRecordDate(b)?.getTime() ?? 0) - (reportRecordDate(a)?.getTime() ?? 0),
     );
   }, [dataReportView, progressRecords, qpsResults, reportScholars]);
@@ -8407,15 +8423,16 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           body{font-family:Arial,Helvetica,sans-serif;margin:28px;color:#223044;background:#fff}
           .page{max-width:760px;margin:0 auto}
           h1{margin:0 0 6px;font-size:28px;color:#26384d}
-          h2{margin:22px 0 8px;font-size:18px;color:#26384d}
+          h2{margin:18px 0 8px;font-size:18px;color:#26384d}
           p,li{font-size:15px;line-height:1.55}
           .subtitle{margin:0 0 18px;color:#65758b;font-weight:700}
           .focus{border:1px solid #d8e2ec;border-radius:12px;background:#f8fbff;padding:14px;margin:16px 0}
           .steps{border:1px solid #f1d6bf;border-radius:12px;background:#fff8f0;padding:14px;margin:16px 0}
           .prompt{border-left:5px solid #f9735b;background:#fff3ef;padding:12px 14px;font-weight:700}
+          .helper-box{border:1px solid #d8e2ec;border-radius:12px;background:#fbfdff;padding:12px 14px;margin:14px 0}
           ul{margin:8px 0 0;padding-left:22px}
           .quiet{color:#65758b;font-size:13px}
-          @media print{body{margin:12mm}.focus,.steps,.prompt{break-inside:avoid}}
+          @media print{body{margin:10mm}h2{margin-top:14px}.focus,.steps,.prompt,.helper-box{break-inside:avoid}}
         </style>
       </head>
       <body>
@@ -8430,7 +8447,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
           </section>
 
           <section class="steps">
-            <h2>Try This At Home</h2>
+            <h2>5-Minute Home Routine</h2>
             <ul>
               ${practice.steps.map((step) => `<li>${escapeReportHtml(step)}</li>`).join("")}
             </ul>
@@ -8442,7 +8459,12 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
             <p class="prompt">${escapeReportHtml(practice.prompt)}</p>
           </section>
 
-          <p class="quiet">Keep practice short and encouraging. If your child gets stuck, model one example, then let them try again.</p>
+          <section class="helper-box">
+            <h2>If Your Child Gets Stuck</h2>
+            <p>Pause and model one example. Then cover it, mix it with one easier item, and let your child try again. Keep the practice calm and short.</p>
+          </section>
+
+          <p class="quiet">Grown-ups can coach, encourage, and model, but the goal is for your child to do the thinking and responding.</p>
         </main>
       </body>
       </html>
@@ -9215,7 +9237,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     </p>
                   </div>
                   <div className="small-group-popup-actions">
-                    <a className="teacher-control-button secondary" href="/games/skills/qps-screener">
+                    <a className="teacher-control-button secondary" href="/games/skills/qps-screener?teacher=1">
                       Open QPS
                     </a>
                     <button className="teacher-control-button secondary" onClick={() => void saveQpsSummaryToHub()} type="button">
@@ -9448,6 +9470,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
 
+                <details className="skills-data-focus-details">
+                  <summary>Open scholar targets and recent activity</summary>
                 <div className="skills-data-scholar-targets">
                   {selectedSkillsDataScholarRow.cells.map((cell) => (
                     <button
@@ -9511,6 +9535,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     )}
                   </section>
                 </div>
+                </details>
               </div>
             ) : (
               <p className="skills-data-chart-helper">Click a scholar name in the chart to open a larger printable evidence view.</p>
@@ -9537,6 +9562,8 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                   </button>
                 </div>
 
+                <details className="skills-data-focus-details">
+                  <summary>Open observation tools and cell history</summary>
                 <div className="skills-data-edit-grid">
                   <label>
                     Manual status
@@ -9584,6 +9611,7 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     <p className="empty-results-message">No game or teacher evidence recorded for this target yet.</p>
                   )}
                 </div>
+                </details>
               </div>
             ) : null}
           </section>
