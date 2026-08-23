@@ -2509,6 +2509,7 @@ export function QpsScreenerGame() {
       const sentenceItems = sectionItems.filter((item) => item.type === "sentence");
       const comments = commentsForItems(sectionItems);
       const sectionClass = sentenceItems.length ? "has-task-b" : "single-task";
+      const firstTaskRowClass = sentenceItems.length ? "task-row" : "task-row no-task-label";
       const wordGridClass = setNumber >= 10 ? "is-words is-long-words" : "is-words";
 
       if (setNumber <= 2) {
@@ -2535,7 +2536,7 @@ export function QpsScreenerGame() {
               <strong>Skill Set ${setNumber}:</strong> ${escapeHtml(qpsDisplaySectionName(section).replace(/^Set \d+ - /, ""))}
               <em>${total.correct}/${sectionItems.length} scored correct</em>
             </div>
-            <div class="task-row">
+            <div class="${firstTaskRowClass}">
               ${sentenceItems.length ? `<div class="task-label">Task A</div>` : ""}
               <div class="task-items">${renderItems(wordItems, wordGridClass)}</div>
               ${renderScoreBox(wordItems)}
@@ -2618,10 +2619,10 @@ export function QpsScreenerGame() {
           .item-grid{display:grid;gap:8px 22px;align-items:end}
           .item-grid.is-letters{grid-template-columns:repeat(13,minmax(20px,1fr));gap:7px 14px}
           .item-grid.is-words{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px 12px}
-          .item-grid.is-long-words{gap:5px 6px}
+          .item-grid.is-long-words{grid-template-columns:repeat(5,minmax(88px,1fr));gap:5px 10px}
           .item-grid.is-sentences{grid-template-columns:repeat(2,minmax(190px,1fr));gap:7px 18px}
           .print-item{display:block;text-align:center;min-height:18px;font-size:16px;line-height:1.2;text-decoration:none}
-          .item-grid.is-long-words .print-item{font-size:12px;line-height:1.1;white-space:normal;overflow-wrap:anywhere}
+          .item-grid.is-long-words .print-item{font-size:12px;line-height:1.1;white-space:nowrap;overflow-wrap:normal}
           .is-missed{color:#9a2f1b}
           .is-unscored{color:#777}
           .score-box{display:grid;grid-template-rows:18px 1fr;align-items:end;border-left:1px solid #111;text-align:right;padding:0 4px 4px;font:16px Arial,Helvetica,sans-serif}
