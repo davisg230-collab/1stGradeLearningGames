@@ -1399,6 +1399,8 @@ service cloud.firestore {
       return sessionId.matches('^[a-z]{1,30}$')
         && request.resource.data.keys().hasOnly([
           'active',
+          'awardKey',
+          'awardSection',
           'createdAt',
           'currentIndex',
           'formId',
@@ -1432,30 +1434,29 @@ service cloud.firestore {
         && isValidName(request.resource.data.scholarFirstName)
         && request.resource.data.scholarFirstNameKey == sessionId
         && isValidNameKey(request.resource.data.scholarFirstNameKey)
+        && (
+          !request.resource.data.keys().hasAny(['awardKey'])
+          || (
+            request.resource.data.awardKey is string
+            && request.resource.data.awardKey.size() <= 80
+          )
+        )
+        && (
+          !request.resource.data.keys().hasAny(['awardSection'])
+          || (
+            request.resource.data.awardSection is string
+            && request.resource.data.awardSection.size() <= 80
+          )
+        )
         && request.resource.data.scholarId is string
         && request.resource.data.scholarId.size() > 0
         && request.resource.data.scholarId.size() <= 150
-        && (
-          isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
-          || (
-            sessionId == 'wcm'
-            && request.resource.data.teacherEmail == 'unassigned'
-            && request.resource.data.scholarId == 'whole-class-mode'
-          )
-        )
+        && isAuthorizedRosterTeacherEmail(request.resource.data.teacherEmail)
         && request.resource.data.updatedAt is timestamp
         && (
           !request.resource.data.keys().hasAny(['createdAt'])
           || request.resource.data.createdAt is timestamp
         );
-    }
-
-    function isValidPublicWholeClassQpsLiveSession(sessionId) {
-      return sessionId == 'wcm'
-        && request.resource.data.scholarFirstNameKey == 'wcm'
-        && request.resource.data.scholarId == 'whole-class-mode'
-        && request.resource.data.teacherEmail == 'unassigned'
-        && isValidQpsLiveSession(sessionId);
     }
 
     function isValidScholarQpsLiveMove(sessionId) {
@@ -1570,12 +1571,11 @@ service cloud.firestore {
       allow create: if (
           isTeacherEditor()
           && isValidQpsLiveSession(sessionId)
-        ) || isValidPublicWholeClassQpsLiveSession(sessionId);
+        );
       allow update: if (
           isTeacherEditor()
           && isValidQpsLiveSession(sessionId)
-        ) || isValidPublicWholeClassQpsLiveSession(sessionId)
-        || isValidScholarQpsLiveMove(sessionId);
+        ) || isValidScholarQpsLiveMove(sessionId);
       allow delete: if isTeacherEditor();
     }
 

@@ -1490,7 +1490,6 @@ export function QpsScreenerGame() {
   const [error, setError] = useState("");
   const [formId, setFormId] = useState<QpsFormId>("A");
   const [hasCheckedScholarMode, setHasCheckedScholarMode] = useState(false);
-  const [hasPinTeacherAccess, setHasPinTeacherAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiveSessionSaving, setIsLiveSessionSaving] = useState(false);
   const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -1522,7 +1521,8 @@ export function QpsScreenerGame() {
   const selectedScholar = scholars.find((scholar) => scholar.id === selectedScholarId) ?? null;
   const isWholeClassMode = selectedScholarId === QPS_WHOLE_CLASS_MODE;
   const isIndividualExaminerMode = Boolean(selectedScholar) && !isWholeClassMode;
-  const canUseTeacherBoard = hasPinTeacherAccess || isAuthorizedTeacherEmail(teacherEmail);
+  const isExaminerSurfaceMode = isIndividualExaminerMode || isWholeClassMode;
+  const canUseTeacherBoard = isAuthorizedTeacherEmail(teacherEmail);
   const signedInRosterTeacherEmail = rosterTeacherEmailForEmail(teacherEmail);
   const callOnRosterScholars = useMemo(
     () => signedInRosterTeacherEmail
@@ -1573,7 +1573,6 @@ export function QpsScreenerGame() {
     const isWholeClassLaunch = params.get("wholeClass") === "1";
 
     if (isWholeClassLaunch && hasTeacherCklaAccess()) {
-      setHasPinTeacherAccess(true);
       setSelectedScholarId(QPS_WHOLE_CLASS_MODE);
     }
 
@@ -1795,7 +1794,7 @@ export function QpsScreenerGame() {
       const { auth, db, firebase } = await loadFirebase();
       const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
 
-      if (!isWholeClassMode && !isAuthorizedTeacherEmail(signedInEmail)) {
+      if (!isAuthorizedTeacherEmail(signedInEmail)) {
         throw new Error("Sign in with an authorized teacher account before starting live QPS.");
       }
 
@@ -2003,7 +2002,7 @@ export function QpsScreenerGame() {
   };
 
   const markStimulusSpan = (index: number) => {
-    if (!isIndividualExaminerMode || /\s/.test(qpsItemCharacters(currentItem)[index] ?? "")) {
+    if (!isExaminerSurfaceMode || /\s/.test(qpsItemCharacters(currentItem)[index] ?? "")) {
       return;
     }
 
@@ -2179,7 +2178,8 @@ export function QpsScreenerGame() {
     try {
       const { db, firebase } = await loadFirebase();
       const serverTime = firebase.firestore.FieldValue.serverTimestamp();
-      const selected = currentScore.said.trim() || "Needs review";
+      const normalizedScore = qpsScoreWithDefaults(currentScore);
+      const selected = qpsSelectedText(normalizedScore);
       const note = currentScore.note.trim();
       const teacherForMiss =
         rosterTeacherEmailForEmail(teacherEmail)
@@ -2204,6 +2204,11 @@ export function QpsScreenerGame() {
           gameTitle: QPS_GAME_TITLE,
           incorrectSelection: selected,
           note,
+          errors: normalizedScore.errors,
+          noResponse: normalizedScore.responseType === "no-response",
+          responseType: normalizedScore.responseType,
+          sectionLabel: qpsDisplaySectionName(currentItem.section),
+          wholeWordResponse: normalizedScore.wholeWordResponse,
           levelId: currentItem.section,
           levelName: currentItem.section,
           questionIndex: currentIndex + 1,
@@ -2217,6 +2222,11 @@ export function QpsScreenerGame() {
           gameTitle: QPS_GAME_TITLE,
           incorrectSelections: [selected],
           note,
+          errors: normalizedScore.errors,
+          noResponse: normalizedScore.responseType === "no-response",
+          responseType: normalizedScore.responseType,
+          sectionLabel: qpsDisplaySectionName(currentItem.section),
+          wholeWordResponse: normalizedScore.wholeWordResponse,
           levelId: currentItem.section,
           levelName: currentItem.section,
           questionIndex: currentIndex + 1,
@@ -2299,7 +2309,7 @@ export function QpsScreenerGame() {
   };
 
   useEffect(() => {
-    if (!isIndividualExaminerMode) {
+    if (!isExaminerSurfaceMode) {
       return;
     }
 
@@ -2337,7 +2347,7 @@ export function QpsScreenerGame() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, currentScore, isIndividualExaminerMode, qpsItems]);
+  }, [currentIndex, currentScore, isExaminerSurfaceMode, qpsItems]);
 
   const printQps = () => {
     const reportWindow = window.open("", "_blank");
@@ -2554,7 +2564,7 @@ export function QpsScreenerGame() {
     return <QpsScholarLiveSlides profile={scholarSlideProfile} />;
   }
 
-  const signedInButUnauthorized = teacherEmail && !isAuthorizedTeacherEmail(teacherEmail) && !hasPinTeacherAccess;
+  const signedInButUnauthorized = teacherEmail && !isAuthorizedTeacherEmail(teacherEmail);
   const needsTeacherSignIn = !isAuthorizedTeacherEmail(teacherEmail);
   const currentSetLabel = qpsDisplaySectionName(currentItem.section).toUpperCase();
   const currentProgressLabel =
@@ -2595,14 +2605,14 @@ export function QpsScreenerGame() {
           Teacher Sign In for Roster
         </button>
       ) : null}
-      {hasPinTeacherAccess && needsTeacherSignIn ? (
-        <p className="pin-helper">PIN mode is on. Whole Class Mode works now; sign in only if you need the scholar roster or individual QPS saves.</p>
+      {selectedScholarId === QPS_WHOLE_CLASS_MODE && needsTeacherSignIn ? (
+        <p className="pin-helper">QPS Whole Class Mode is ready, but QPS teacher tools require Google sign-in first.</p>
       ) : null}
       {error ? <p className="pin-error">{error}</p> : null}
       {status ? <p className="card-edit-message">{status}</p> : null}
 
       {canUseTeacherBoard ? (
-        <div className={`qps-layout${isIndividualExaminerMode ? " is-individual-examiner" : " is-whole-class-examiner"}`}>
+        <div className={`qps-layout${isExaminerSurfaceMode ? " is-individual-examiner" : " is-whole-class-examiner"}`}>
           <aside className="qps-score-panel">
             <label>
               QPS Form
@@ -2653,8 +2663,9 @@ export function QpsScreenerGame() {
               <span>correct</span>
               <em>{missedCount} needs review</em>
               {isIndividualExaminerMode ? <small>{autosaveStatus || "Autosave ready"}</small> : null}
+              {isWholeClassMode ? <small>Use initials + Save Miss for class evidence</small> : null}
             </div>
-            {isIndividualExaminerMode ? (
+            {isExaminerSurfaceMode ? (
               <label className="qps-current-set-control">
                 Current set
                 <select
@@ -2697,12 +2708,12 @@ export function QpsScreenerGame() {
           </aside>
 
           <main className="qps-reader-panel">
-            <div className={`qps-reader-card${isIndividualExaminerMode ? " is-examiner-surface" : ""}`}>
+            <div className={`qps-reader-card${isExaminerSurfaceMode ? " is-examiner-surface" : ""}`}>
               <div className="qps-progress-line">
                 <p>{currentProgressLabel}</p>
                 <span>{currentOverallLabel}</span>
               </div>
-              {isIndividualExaminerMode ? (
+              {isExaminerSurfaceMode ? (
                 <div
                   aria-label="Tap the part the scholar missed"
                   className={`qps-interactive-stimulus qps-reader-display ${qpsStimulusSizeClass(currentItem)}`}
@@ -2768,9 +2779,9 @@ export function QpsScreenerGame() {
                 onClick={markCorrect}
                 type="button"
               >
-                {isIndividualExaminerMode ? "✓ Correct" : "Correct"}
+                {isExaminerSurfaceMode ? "✓ Correct" : "Correct"}
               </button>
-              {isIndividualExaminerMode ? (
+              {isExaminerSurfaceMode ? (
                 <>
                   <button
                     className={currentScore.responseType === "no-response" ? "is-missed" : ""}
@@ -2809,7 +2820,7 @@ export function QpsScreenerGame() {
               )}
             </div>
 
-            {isIndividualExaminerMode && currentScore.responseType === "whole-word" ? (
+            {isExaminerSurfaceMode && currentScore.responseType === "whole-word" ? (
               <label className="qps-whole-word-response">
                 What scholar said for the whole item
                 <input
@@ -2879,8 +2890,8 @@ export function QpsScreenerGame() {
               </section>
             ) : null}
 
-            <div className={`qps-notes-grid${isIndividualExaminerMode ? " is-individual" : ""}`}>
-              {!isIndividualExaminerMode ? (
+            <div className={`qps-notes-grid${isExaminerSurfaceMode ? " is-individual" : ""}`}>
+              {!isExaminerSurfaceMode ? (
                 <label>
                   What scholar said
                   <input
@@ -2910,8 +2921,8 @@ export function QpsScreenerGame() {
             </div>
           </main>
 
-          <aside className={`qps-item-list${isIndividualExaminerMode && !isItemDrawerOpen ? " is-collapsed" : ""}`}>
-            {isIndividualExaminerMode ? (
+          <aside className={`qps-item-list${isExaminerSurfaceMode && !isItemDrawerOpen ? " is-collapsed" : ""}`}>
+            {isExaminerSurfaceMode ? (
               <button
                 className="qps-item-drawer-toggle"
                 onClick={() => setIsItemDrawerOpen((isOpen) => !isOpen)}
@@ -2921,7 +2932,7 @@ export function QpsScreenerGame() {
                 <span>{currentSectionScoredCount}/{currentSectionItems.length} scored in this set</span>
               </button>
             ) : null}
-            {(!isIndividualExaminerMode || isItemDrawerOpen) ? qpsItems.map((item, index) => {
+            {(!isExaminerSurfaceMode || isItemDrawerOpen) ? qpsItems.map((item, index) => {
               const score = qpsScoreWithDefaults(scores[item.id]);
               return (
                 <button
