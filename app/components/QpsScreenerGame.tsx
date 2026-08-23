@@ -7,7 +7,6 @@ import {
   rosterTeacherEmailForEmail,
   teacherLabelForEmail,
 } from "../firebase-config";
-import { hasTeacherCklaAccess } from "./scholar-profile";
 
 type FirebaseUser = {
   email: string | null;
@@ -1576,7 +1575,7 @@ export function QpsScreenerGame() {
     const firstNameKey = asText(params.get("key")).trim() || normalizeNameKey(firstName);
     const isWholeClassLaunch = params.get("wholeClass") === "1";
 
-    if (isWholeClassLaunch && hasTeacherCklaAccess()) {
+    if (isWholeClassLaunch || isTeacherLaunch) {
       setSelectedScholarId(QPS_WHOLE_CLASS_MODE);
     }
 

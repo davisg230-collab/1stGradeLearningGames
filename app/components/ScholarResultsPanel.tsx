@@ -8,6 +8,7 @@ import {
   rosterTeacherEmailForEmail,
   teacherLabelForEmail,
 } from "../firebase-config";
+import { writeCklaTeacherAccess } from "./scholar-profile";
 
 type FirebaseUser = {
   email: string | null;
@@ -7432,6 +7433,11 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
     resultIsWithinDateInputs(result, qpsPrintStartDate, qpsPrintEndDate),
   );
 
+  const openQpsTeacherScreener = () => {
+    writeCklaTeacherAccess();
+    window.location.href = "/games/skills/qps-screener?teacher=1&wholeClass=1";
+  };
+
   const buildQpsHubSummaryResource = (
     qpsRecordsForSave: QpsReportRecord[],
     rangeLabel: string,
@@ -9237,14 +9243,14 @@ export function ScholarResultsPanel({ onClose }: { onClose: () => void }) {
                     </p>
                   </div>
                   <div className="small-group-popup-actions">
-                    <a className="teacher-control-button secondary" href="/games/skills/qps-screener?teacher=1">
+                    <button className="teacher-control-button secondary" onClick={openQpsTeacherScreener} type="button">
                       Open QPS
-                    </a>
+                    </button>
                     <button className="teacher-control-button secondary" onClick={() => void saveQpsSummaryToHub()} type="button">
-                      Save to Hub
+                      Save Summary
                     </button>
                     <button className="teacher-control-button secondary" onClick={printQpsSummaryReport} type="button">
-                      Print QPS
+                      Print Summary
                     </button>
                   </div>
                 </div>
