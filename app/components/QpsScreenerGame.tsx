@@ -1511,7 +1511,9 @@ export function QpsScreenerGame() {
   const [status, setStatus] = useState("");
   const [teacherEmail, setTeacherEmail] = useState("");
   const [wholeClassInitials, setWholeClassInitials] = useState("");
+  const [isWholeClassMissEntryOpen, setIsWholeClassMissEntryOpen] = useState(false);
   const [wholeClassMissStatus, setWholeClassMissStatus] = useState("");
+  const [wholeClassTrackedByItemId, setWholeClassTrackedByItemId] = useState<Record<string, string[]>>({});
   const correctionInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const stimulusDragEndRef = useRef<number | null>(null);
   const stimulusDragStartRef = useRef<number | null>(null);
@@ -1568,6 +1570,14 @@ export function QpsScreenerGame() {
     ),
     [callOnRosterScholars, currentChartTarget, qpsCallOnProgressRecords, qpsCallOnRecords, qpsSkillsOverrides],
   );
+  const visibleQpsCallOnScholars = useMemo(() => {
+    const trackedInitials = new Set((wholeClassTrackedByItemId[currentItem.id] ?? []).map(cleanTrackingInitials));
+    if (!trackedInitials.size) {
+      return qpsCallOnScholars;
+    }
+
+    return qpsCallOnScholars.filter((scholar) => !trackedInitials.has(cleanTrackingInitials(scholar.trackingInitials)));
+  }, [currentItem.id, qpsCallOnScholars, wholeClassTrackedByItemId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1997,6 +2007,30 @@ export function QpsScreenerGame() {
     window.setTimeout(focusNow, 30);
   };
 
+  const openWholeClassMissEntry = (focusInitials = false) => {
+    if (!isWholeClassMode) {
+      return;
+    }
+
+    setIsWholeClassMissEntryOpen(true);
+    setWholeClassMissStatus("");
+
+    if (!focusInitials) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => wholeClassInitialsRef.current?.focus());
+    window.setTimeout(() => wholeClassInitialsRef.current?.focus(), 40);
+  };
+
+  const resetWholeClassItemForNextCall = () => {
+    updateCurrentScore(blankQpsItemScore());
+    setActiveErrorId("");
+    setIsWholeClassMissEntryOpen(false);
+    setWholeClassInitials("");
+    setWholeClassMissStatus("");
+  };
+
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     if (loadedProgressStatus === "completed") {
       setLoadedProgressStatus("draft");
@@ -2086,6 +2120,7 @@ export function QpsScreenerGame() {
       setActiveErrorId(id);
     });
     focusCorrectionInput(id);
+    openWholeClassMissEntry(false);
   };
 
   const markStimulusSpan = (index: number) => {
@@ -2125,6 +2160,7 @@ export function QpsScreenerGame() {
         setActiveErrorId(activeAnnotation.id);
       });
       focusCorrectionInput(activeAnnotation.id);
+      openWholeClassMissEntry(false);
       return;
     }
 
@@ -2132,6 +2168,7 @@ export function QpsScreenerGame() {
     if (existingAnnotation) {
       setActiveErrorId(existingAnnotation.id);
       focusCorrectionInput(existingAnnotation.id);
+      openWholeClassMissEntry(false);
       return;
     }
 
@@ -2156,6 +2193,7 @@ export function QpsScreenerGame() {
       setActiveErrorId(id);
     });
     focusCorrectionInput(id);
+    openWholeClassMissEntry(false);
   };
 
   const beginStimulusDrag = (index: number) => {
@@ -2229,7 +2267,7 @@ export function QpsScreenerGame() {
     setWholeClassMissStatus("");
 
     if (isWholeClassMode) {
-      window.setTimeout(() => wholeClassInitialsRef.current?.focus(), 50);
+      openWholeClassMissEntry(true);
     }
   };
 
@@ -2242,6 +2280,7 @@ export function QpsScreenerGame() {
       wholeWordResponse: "",
     });
     setActiveErrorId("");
+    openWholeClassMissEntry(true);
   };
 
   const markWholeWordWrong = () => {
@@ -2286,9 +2325,12 @@ export function QpsScreenerGame() {
   const resetCurrentItem = () => {
     updateCurrentScore(blankQpsItemScore());
     setActiveErrorId("");
+    setIsWholeClassMissEntryOpen(false);
+    setWholeClassInitials("");
+    setWholeClassMissStatus("");
   };
 
-  const saveWholeClassMiss = async () => {
+  const saveWholeClassMiss = async (options: { advanceAfterSave?: boolean } = {}) => {
     if (!isWholeClassMode) {
       setWholeClassMissStatus("Choose Whole Class Mode first.");
       return;
@@ -2392,7 +2434,19 @@ export function QpsScreenerGame() {
       ]);
 
       setWholeClassMissStatus(`Saved ${currentItem.display} for ${initials}.`);
+      setWholeClassTrackedByItemId((currentTracked) => {
+        const trackedForItem = new Set((currentTracked[currentItem.id] ?? []).map(cleanTrackingInitials));
+        trackedForItem.add(initials);
+        return {
+          ...currentTracked,
+          [currentItem.id]: [...trackedForItem],
+        };
+      });
+      setIsWholeClassMissEntryOpen(false);
       setWholeClassInitials("");
+      if (options.advanceAfterSave) {
+        goToNext();
+      }
     } catch (nextError) {
       setWholeClassMissStatus(nextError instanceof Error ? nextError.message : "This QPS miss could not save yet.");
     } finally {
@@ -2405,7 +2459,9 @@ export function QpsScreenerGame() {
     setActiveErrorId("");
     setAutosaveStatus("");
     setIsItemDrawerOpen(false);
+    setIsWholeClassMissEntryOpen(false);
     setQpsSectionAward(null);
+    setWholeClassInitials("");
     setWholeClassMissStatus("");
 
     if (nextScholarId === QPS_WHOLE_CLASS_MODE) {
@@ -2420,12 +2476,16 @@ export function QpsScreenerGame() {
     }
     setActiveErrorId("");
     setCurrentIndex(nextIndex);
+    setIsWholeClassMissEntryOpen(false);
+    setWholeClassInitials("");
     setWholeClassMissStatus("");
   };
 
   const goToPrevious = () => {
     setActiveErrorId("");
     setCurrentIndex((index) => Math.max(0, index - 1));
+    setIsWholeClassMissEntryOpen(false);
+    setWholeClassInitials("");
     setWholeClassMissStatus("");
   };
 
@@ -2440,8 +2500,11 @@ export function QpsScreenerGame() {
     setQpsSectionAward(null);
     setActiveErrorId("");
     setAutosaveStatus("");
+    setIsWholeClassMissEntryOpen(false);
     setStatus("");
+    setWholeClassInitials("");
     setWholeClassMissStatus("");
+    setWholeClassTrackedByItemId({});
   };
 
   useEffect(() => {
@@ -2784,8 +2847,8 @@ export function QpsScreenerGame() {
     }
 
     const isCompact = variant === "compact";
-    const visibleCallOnScholars = isCompact ? qpsCallOnScholars.slice(0, 6) : qpsCallOnScholars;
-    const hiddenCallOnCount = qpsCallOnScholars.length - visibleCallOnScholars.length;
+    const visibleCallOnScholars = isCompact ? visibleQpsCallOnScholars.slice(0, 6) : visibleQpsCallOnScholars;
+    const hiddenCallOnCount = visibleQpsCallOnScholars.length - visibleCallOnScholars.length;
 
     return (
       <section className={`qps-call-on-panel${isCompact ? " is-compact-call-on" : ""}`}>
@@ -2798,7 +2861,7 @@ export function QpsScreenerGame() {
                 : "Letter and digraph chart targets"}
             </span>
           </div>
-          {currentChartTarget ? <em>{qpsCallOnScholars.length}</em> : null}
+          {currentChartTarget ? <em>{visibleQpsCallOnScholars.length}</em> : null}
         </div>
         {!isAuthorizedTeacherEmail(teacherEmail) ? (
           <p className="pin-helper">Sign in with a teacher account to use chart-based call-on suggestions.</p>
@@ -2866,7 +2929,7 @@ export function QpsScreenerGame() {
       {status ? <p className="card-edit-message">{status}</p> : null}
 
       {canUseTeacherBoard ? (
-        <div className={`qps-layout${isExaminerSurfaceMode ? " is-individual-examiner" : " is-whole-class-examiner"}`}>
+        <div className={`qps-layout${isWholeClassMode ? " is-whole-class-examiner" : isIndividualExaminerMode ? " is-individual-examiner" : ""}`}>
           <aside className="qps-score-panel">
             <label>
               QPS Form
@@ -3133,29 +3196,65 @@ export function QpsScreenerGame() {
               </button>
             </div>
 
-            {isWholeClassMode ? (
-              <div className="qps-whole-class-tools">
-                <label>
-                  Whole Class miss initials
-                  <input
-                    ref={wholeClassInitialsRef}
-                    autoComplete="off"
-                    inputMode="text"
-                    maxLength={3}
-                    onChange={(event) => setWholeClassInitials(cleanTrackingInitials(event.target.value))}
-                    placeholder="JRB"
-                    value={wholeClassInitials}
-                  />
-                </label>
-                <button
-                  className="teacher-control-button"
-                  disabled={isSavingWholeClassMiss}
-                  onClick={() => void saveWholeClassMiss()}
-                  type="button"
+            {isWholeClassMode && isWholeClassMissEntryOpen ? (
+              <div className="qps-whole-class-entry-backdrop" role="presentation">
+                <form
+                  aria-label="Save whole class QPS miss"
+                  aria-modal="true"
+                  className="qps-whole-class-tools"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveWholeClassMiss({ advanceAfterSave: true });
+                  }}
+                  role="dialog"
                 >
-                  {isSavingWholeClassMiss ? "Saving..." : "Save Miss"}
-                </button>
-                <p>{wholeClassMissStatus || "Use the scholar's gray tracking initials when this item needs review."}</p>
+                  <div>
+                    <strong>Save Miss</strong>
+                    <span>{primaryQpsDisplay(currentItem.display)} - {qpsSelectedText(currentScore)}</span>
+                  </div>
+                  <label>
+                    Scholar initials
+                    <input
+                      ref={wholeClassInitialsRef}
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      inputMode="text"
+                      maxLength={3}
+                      onChange={(event) => setWholeClassInitials(cleanTrackingInitials(event.target.value))}
+                      placeholder="JRB"
+                      value={wholeClassInitials}
+                    />
+                  </label>
+                  <div className="qps-whole-class-popup-actions">
+                    <button
+                      className="teacher-control-button"
+                      disabled={isSavingWholeClassMiss}
+                      onClick={() => void saveWholeClassMiss()}
+                      type="button"
+                    >
+                      {isSavingWholeClassMiss ? "Saving..." : "Save Miss"}
+                    </button>
+                    <button
+                      className="teacher-control-button secondary"
+                      onClick={resetWholeClassItemForNextCall}
+                      type="button"
+                    >
+                      Reset Item
+                    </button>
+                    <button
+                      className="teacher-control-button secondary"
+                      onClick={() => {
+                        setIsWholeClassMissEntryOpen(false);
+                        setWholeClassInitials("");
+                        setWholeClassMissStatus("");
+                      }}
+                      type="button"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <p>{wholeClassMissStatus || "Enter the scholar's gray tracking initials. After saving, they leave this slide's call-on list."}</p>
+                </form>
               </div>
             ) : null}
 

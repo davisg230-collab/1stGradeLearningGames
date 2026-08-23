@@ -1129,17 +1129,56 @@ body:has(.qps-screener-page.is-examiner-surface) .teacher-edit-dock,
 
 .qps-whole-class-tools {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto;
-  gap: 10px;
-  align-items: end;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: stretch;
   border: 2px solid #f0d7a4;
   border-radius: 14px;
   padding: 12px;
   background: #fff8e6;
 }
 
-.qps-layout.is-whole-class-examiner .qps-whole-class-tools {
-  padding: 10px;
+.qps-whole-class-entry-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(34 48 68 / 0.24);
+}
+
+.qps-whole-class-entry-backdrop .qps-whole-class-tools {
+  width: min(100%, 430px);
+  padding: 16px;
+  box-shadow: 0 18px 42px rgb(47 64 84 / 0.22);
+}
+
+.qps-whole-class-tools > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.qps-whole-class-tools > div:first-child strong {
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.qps-whole-class-tools > div:first-child span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.qps-whole-class-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qps-whole-class-popup-actions .teacher-control-button {
+  flex: 1 1 118px;
 }
 
 .qps-whole-word-response {
@@ -1185,7 +1224,6 @@ body:has(.qps-screener-page.is-examiner-surface) .teacher-edit-dock,
 }
 
 .qps-whole-class-tools p {
-  grid-column: 1 / -1;
   margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
@@ -1794,6 +1832,25 @@ body:has(.qps-screener-page.is-examiner-surface) .teacher-edit-dock,
 }
 
 @media (max-width: 620px) {
+  .qps-whole-class-entry-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .qps-whole-class-entry-backdrop .qps-whole-class-tools {
+    width: 100%;
+    padding: 14px;
+  }
+
+  .qps-whole-class-tools input {
+    min-height: 46px;
+    font-size: 1.05rem;
+  }
+
+  .qps-whole-class-popup-actions .teacher-control-button {
+    min-height: 44px;
+  }
+
   .qps-score-panel {
     grid-template-columns: 1fr;
   }
