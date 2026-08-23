@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   firebaseConfig,
   isAuthorizedTeacherEmail,
@@ -1974,12 +1975,27 @@ export function QpsScreenerGame() {
     }
 
     const handle = window.setTimeout(() => {
-      correctionInputRefs.current[activeErrorId]?.focus();
-      correctionInputRefs.current[activeErrorId]?.select();
+      const input = correctionInputRefs.current[activeErrorId];
+      input?.focus({ preventScroll: true });
+      input?.select();
     }, 40);
 
     return () => window.clearTimeout(handle);
   }, [activeErrorId, currentIndex]);
+
+  const focusCorrectionInput = (annotationId: string) => {
+    const focusNow = () => {
+      const input = correctionInputRefs.current[annotationId];
+      if (!input) return false;
+      input.focus({ preventScroll: true });
+      input.select();
+      return true;
+    };
+
+    if (focusNow()) return;
+    window.requestAnimationFrame(focusNow);
+    window.setTimeout(focusNow, 30);
+  };
 
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     if (loadedProgressStatus === "completed") {
@@ -2057,16 +2073,19 @@ export function QpsScreenerGame() {
     );
     const nextErrors = [...errors, nextAnnotation];
 
-    updateCurrentScore({
-      errors: nextErrors,
-      responseType,
-      said: responseType === "whole-word"
-        ? currentScore.wholeWordResponse.trim() || "Whole word wrong"
-        : qpsErrorSummary(nextErrors),
-      status: "missed",
-      wholeWordResponse: responseType === "whole-word" ? currentScore.wholeWordResponse : "",
+    flushSync(() => {
+      updateCurrentScore({
+        errors: nextErrors,
+        responseType,
+        said: responseType === "whole-word"
+          ? currentScore.wholeWordResponse.trim() || "Whole word wrong"
+          : qpsErrorSummary(nextErrors),
+        status: "missed",
+        wholeWordResponse: responseType === "whole-word" ? currentScore.wholeWordResponse : "",
+      });
+      setActiveErrorId(id);
     });
-    setActiveErrorId(id);
+    focusCorrectionInput(id);
   };
 
   const markStimulusSpan = (index: number) => {
@@ -2096,19 +2115,23 @@ export function QpsScreenerGame() {
           : annotation,
       );
 
-      updateCurrentScore({
-        errors,
-        responseType: "annotated-error",
-        said: qpsErrorSummary(errors),
-        status: "missed",
+      flushSync(() => {
+        updateCurrentScore({
+          errors,
+          responseType: "annotated-error",
+          said: qpsErrorSummary(errors),
+          status: "missed",
+        });
+        setActiveErrorId(activeAnnotation.id);
       });
-      setActiveErrorId(activeAnnotation.id);
+      focusCorrectionInput(activeAnnotation.id);
       return;
     }
 
     const existingAnnotation = qpsAnnotationAtIndex(currentScore.errors, index);
     if (existingAnnotation) {
       setActiveErrorId(existingAnnotation.id);
+      focusCorrectionInput(existingAnnotation.id);
       return;
     }
 
@@ -2122,14 +2145,17 @@ export function QpsScreenerGame() {
     };
     const errors = [...currentScore.errors, nextAnnotation];
 
-    updateCurrentScore({
-      errors,
-      responseType: "annotated-error",
-      said: qpsErrorSummary(errors),
-      status: "missed",
-      wholeWordResponse: "",
+    flushSync(() => {
+      updateCurrentScore({
+        errors,
+        responseType: "annotated-error",
+        said: qpsErrorSummary(errors),
+        status: "missed",
+        wholeWordResponse: "",
+      });
+      setActiveErrorId(id);
     });
-    setActiveErrorId(id);
+    focusCorrectionInput(id);
   };
 
   const beginStimulusDrag = (index: number) => {
@@ -2914,6 +2940,9 @@ export function QpsScreenerGame() {
                           <span className="qps-inline-correction">
                             <input
                               aria-label={`What scholar said for ${annotation.expectedSpan}`}
+                              autoComplete="off"
+                              autoFocus={annotation.id === activeErrorId}
+                              inputMode="text"
                               ref={(node) => {
                                 correctionInputRefs.current[annotation.id] = node;
                               }}
