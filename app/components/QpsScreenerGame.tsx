@@ -96,10 +96,28 @@ type QpsForm = {
   version: string;
 };
 
+type QpsErrorAnnotation = {
+  actualResponse: string;
+  endIndex: number;
+  expectedSpan: string;
+  id: string;
+  startIndex: number;
+};
+
+type QpsResponseType =
+  | "none"
+  | "correct"
+  | "annotated-error"
+  | "no-response"
+  | "whole-word";
+
 type QpsItemScore = {
+  errors: QpsErrorAnnotation[];
   note: string;
   said: string;
+  responseType: QpsResponseType;
   status: "unscored" | "correct" | "missed";
+  wholeWordResponse: string;
 };
 
 type QpsLiveSession = {
@@ -194,6 +212,21 @@ const QPS_WHOLE_CLASS_MODE = "whole-class";
 const QPS_DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ck", "ng", "qu"];
 const QPS_CHART_DIGRAPH_TARGETS = ["sh", "ch", "th", "wh", "ph", "ng", "ck"];
 const QPS_CHART_LETTER_TARGETS = "abcdefghijklmnopqrstuvwxyz".split("");
+const QPS_VISIBLE_SET_NAMES: Record<string, string> = {
+  "Set 1 - Letter Names": "Set 1 - Letter Names",
+  "Set 2 - Letter Sounds": "Set 2 - Letter Sounds",
+  "Set 3 - Short Vowels": "Set 3 - VC & CVC Words",
+  "Set 4 - Digraphs": "Set 4 - Consonant Digraphs",
+  "Set 5 - Blends": "Set 5 - CVCC & CCVC Words",
+  "Set 6 - Silent E": "Set 6 - Silent E",
+  "Set 7 - R-Controlled Vowels": "Set 7 - R-Controlled Vowels",
+  "Set 8 - Advanced Consonants": "Set 8 - Advanced Consonants",
+  "Set 9 - Vowel Teams": "Set 9 - Advanced Vowel Sounds",
+  "Set 10 - Multisyllabic Words": "Set 10 - Prefixes & Suffixes",
+  "Set 11 - Multisyllabic Words": "Set 11 - Two-Syllable Words",
+  "Set 12 - Multisyllabic Words": "Set 12 - Three-Syllable Words",
+  "Set 13 - Multisyllabic Words": "Set 13 - Four-Syllable Words",
+};
 const QPS_FORM_RAW = {
   A: {
     letterNames: "m t a s i r d f o g l h u c n b j k y e w p v q x z",
@@ -267,6 +300,18 @@ function sentencesFrom(value: string) {
   return value.split("|").map((sentence) => sentence.trim()).filter(Boolean);
 }
 
+export function qpsDisplaySectionName(section: string) {
+  return QPS_VISIBLE_SET_NAMES[section] ?? section;
+}
+
+function qpsSetNumber(section: string) {
+  return Math.max(1, Math.trunc(Number(section.match(/Set\s+(\d+)/i)?.[1] ?? 1)));
+}
+
+function qpsIsLetterSoundsSection(section: string) {
+  return qpsSetNumber(section) === 2 || section.includes("Letter Sounds");
+}
+
 function qpsTargetFor(display: string, section: string) {
   const clean = display.toLowerCase().replace(/[^a-z]/g, "");
 
@@ -299,7 +344,7 @@ function qpsItem(
       : isLetterName
         ? `Name the letter ${display}.`
         : isLetterSound
-          ? `Say the sound for ${display}.`
+          ? `Teacher says the sound for ${display}. Scholar names the letter.`
           : `Read ${display}.`,
     section,
     skill,
@@ -548,13 +593,50 @@ function qpsItemScoreDefaults(items: QpsItem[]): Record<string, QpsItemScore> {
   return Object.fromEntries(
     items.map((item) => [
       item.id,
-      {
-        note: "",
-        said: "",
-        status: "unscored" as const,
-      },
+      blankQpsItemScore(),
     ]),
   );
+}
+
+function blankQpsItemScore(status: QpsItemScore["status"] = "unscored"): QpsItemScore {
+  return {
+    errors: [],
+    note: "",
+    responseType: status === "correct" ? "correct" : "none",
+    said: "",
+    status,
+    wholeWordResponse: "",
+  };
+}
+
+function normalizeQpsResponseType(value: unknown, status: QpsItemScore["status"]): QpsResponseType {
+  if (
+    value === "correct"
+    || value === "annotated-error"
+    || value === "no-response"
+    || value === "whole-word"
+    || value === "none"
+  ) {
+    return value;
+  }
+
+  if (status === "correct") {
+    return "correct";
+  }
+
+  return status === "missed" ? "annotated-error" : "none";
+}
+
+function qpsScoreWithDefaults(score: Partial<QpsItemScore> | undefined): QpsItemScore {
+  const status = score?.status === "correct" || score?.status === "missed" ? score.status : "unscored";
+  return {
+    errors: Array.isArray(score?.errors) ? score.errors : [],
+    note: score?.note ?? "",
+    responseType: normalizeQpsResponseType(score?.responseType, status),
+    said: score?.said ?? "",
+    status,
+    wholeWordResponse: score?.wholeWordResponse ?? "",
+  };
 }
 
 function mapScholar(doc: FirestoreDocSnapshot): QpsScholar | null {
@@ -735,6 +817,108 @@ function primaryQpsDisplay(value: string) {
   return value.replace(/a/g, "ɑ").replace(/g/g, "ɡ");
 }
 
+function qpsItemCharacters(item: QpsItem) {
+  return Array.from(item.display);
+}
+
+function qpsExpectedSpan(item: QpsItem, startIndex: number, endIndex: number) {
+  const characters = qpsItemCharacters(item);
+  const start = Math.max(0, Math.min(startIndex, endIndex, characters.length - 1));
+  const end = Math.max(start, Math.min(Math.max(startIndex, endIndex), characters.length - 1));
+  return characters.slice(start, end + 1).join("");
+}
+
+function normalizeQpsAnnotation(value: unknown, item: QpsItem): QpsErrorAnnotation | null {
+  const raw = asRecord(value);
+  if (!raw) return null;
+
+  const characters = qpsItemCharacters(item);
+  const startIndex = Math.max(0, Math.min(characters.length - 1, Math.trunc(asNumber(raw.startIndex))));
+  const endIndex = Math.max(startIndex, Math.min(characters.length - 1, Math.trunc(asNumber(raw.endIndex))));
+  const expectedSpan = asText(raw.expectedSpan).trim() || qpsExpectedSpan(item, startIndex, endIndex);
+
+  if (!expectedSpan) {
+    return null;
+  }
+
+  return {
+    actualResponse: asText(raw.actualResponse).trim(),
+    endIndex,
+    expectedSpan,
+    id: asText(raw.id).trim() || `${startIndex}-${endIndex}-${slug(expectedSpan)}`,
+    startIndex,
+  };
+}
+
+function qpsAnnotationsFromValue(value: unknown, item: QpsItem) {
+  return asArray(value)
+    .map((annotation) => normalizeQpsAnnotation(annotation, item))
+    .filter((annotation): annotation is QpsErrorAnnotation => Boolean(annotation));
+}
+
+function qpsErrorSummary(errors: QpsErrorAnnotation[]) {
+  return errors
+    .map((error) => `${error.expectedSpan}->${error.actualResponse || "?"}`)
+    .join("; ");
+}
+
+function qpsSelectedText(score: QpsItemScore) {
+  if (score.status === "correct") return "Correct";
+  if (score.responseType === "no-response") return "No response";
+  if (score.responseType === "whole-word") return score.wholeWordResponse.trim() || "Whole word wrong";
+  return score.said.trim() || qpsErrorSummary(score.errors) || "Needs review";
+}
+
+function qpsPrintedStimulusHtml(item: QpsItem, score: QpsItemScore) {
+  if (score.responseType === "no-response") {
+    return `<span class="print-no-response">${escapeHtml(primaryQpsDisplay(item.display))}<b>NR</b></span>`;
+  }
+
+  if (score.responseType === "whole-word") {
+    return `<span class="print-whole-word"><em>${escapeHtml(score.wholeWordResponse || "Whole word wrong")}</em>${escapeHtml(primaryQpsDisplay(item.display))}</span>`;
+  }
+
+  if (!score.errors.length) {
+    return escapeHtml(primaryQpsDisplay(item.display));
+  }
+
+  const characters = qpsItemCharacters(item);
+  const starts = new Map(score.errors.map((annotation) => [annotation.startIndex, annotation]));
+  const covered = new Set<number>();
+  score.errors.forEach((annotation) => {
+    for (let index = annotation.startIndex; index <= annotation.endIndex; index += 1) {
+      covered.add(index);
+    }
+  });
+
+  return characters.map((character, index) => {
+    const annotation = starts.get(index);
+    if (annotation) {
+      const spanCharacters = characters.slice(annotation.startIndex, annotation.endIndex + 1).join("");
+      return `<span class="print-marked-span"><em>${escapeHtml(annotation.actualResponse || "?")}</em><b>${escapeHtml(primaryQpsDisplay(spanCharacters))}</b></span>`;
+    }
+
+    if (covered.has(index)) {
+      return "";
+    }
+
+    return escapeHtml(primaryQpsDisplay(character));
+  }).join("");
+}
+
+function qpsStimulusSizeClass(item: QpsItem) {
+  const length = qpsItemCharacters(item).length;
+  if (item.type === "sentence") return "is-sentence";
+  if (length >= 13) return "is-long-word";
+  if (length >= 9) return "is-medium-word";
+  if (item.type === "word") return "is-word";
+  return `is-${item.type}`;
+}
+
+function qpsAnnotationAtIndex(errors: QpsErrorAnnotation[], index: number) {
+  return errors.find((error) => index >= error.startIndex && index <= error.endIndex) ?? null;
+}
+
 function safeQpsProgressText(value: string, fallback = "QPS item") {
   const cleaned = value.trim().replace(/\s+/g, " ");
   return (cleaned || fallback).slice(0, 120);
@@ -746,7 +930,8 @@ function qpsProgressSessionId(formId: QpsFormId, scholar: QpsScholar) {
 
 function qpsQuestionResponse(item: QpsItem, itemIndex: number, score: QpsItemScore) {
   const correct = score.status === "correct";
-  const selected = correct ? "Correct" : score.said.trim() || "Needs review";
+  const selected = qpsSelectedText(score);
+  const errors = score.errors.map((error) => ({ ...error }));
 
   return {
     attempts: [{
@@ -757,31 +942,44 @@ function qpsQuestionResponse(item: QpsItem, itemIndex: number, score: QpsItemSco
     category: item.skill,
     correct,
     correctAnswer: item.display,
+    errors,
     firstAttemptCorrect: correct,
     itemId: item.id,
     itemType: item.type,
+    noResponse: score.responseType === "no-response",
     note: score.note.trim(),
     prompt: item.prompt,
     questionIndex: itemIndex + 1,
+    responseType: score.responseType,
     section: item.section,
+    sectionLabel: qpsDisplaySectionName(item.section),
     selected,
     skill: item.skill,
     target: item.target,
+    wholeWordResponse: score.wholeWordResponse.trim(),
     word: item.display,
   };
 }
 
 function qpsMissedQuestion(item: QpsItem, itemIndex: number, score: QpsItemScore) {
+  const selected = qpsSelectedText(score);
+  const errors = score.errors.map((error) => ({ ...error }));
+
   return {
     category: item.skill,
     correctAnswer: item.display,
+    errors,
     gameId: QPS_GAME_ID,
     gameTitle: QPS_GAME_TITLE,
-    incorrectSelections: [score.said.trim() || "Needs review"],
+    incorrectSelections: [selected],
     itemId: item.id,
     levelName: item.section,
+    noResponse: score.responseType === "no-response",
     note: score.note.trim(),
     questionIndex: itemIndex + 1,
+    responseType: score.responseType,
+    sectionLabel: qpsDisplaySectionName(item.section),
+    wholeWordResponse: score.wholeWordResponse.trim(),
     word: item.display,
   };
 }
@@ -804,10 +1002,16 @@ function qpsScoresFromProgress(data: Record<string, unknown>, items: QpsItem[]) 
 
     const selected = asText(raw.selected).trim();
     const correct = raw.correct === true || raw.firstAttemptCorrect === true || selected === "Correct";
+    const responseType = normalizeQpsResponseType(raw.responseType, correct ? "correct" : "missed");
+    const errors = qpsAnnotationsFromValue(raw.errors, item);
+    const wholeWordResponse = asText(raw.wholeWordResponse).trim();
     nextScores[item.id] = {
+      errors,
       note: asText(raw.note).trim(),
+      responseType,
       said: correct ? "" : selected,
       status: correct ? "correct" : "missed",
+      wholeWordResponse,
     };
   });
 
@@ -1115,6 +1319,7 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
   const currentIndex = boundedQpsIndex(liveSession?.currentIndex ?? 0, qpsItems.length);
   const currentItem = qpsItems[currentIndex] ?? qpsItems[0];
   const isConnected = liveSession?.active === true && liveSession.scholarFirstNameKey === profile.firstNameKey;
+  const scholarShouldListenOnly = qpsIsLetterSoundsSection(currentItem?.section ?? "");
   const qpsSections = useMemo(() => qpsSectionsForItems(qpsItems), [qpsItems]);
   const currentSectionIndex = Math.max(0, qpsSections.indexOf(currentItem?.section ?? ""));
   const awardSectionIndex = liveSession?.awardSection ? qpsSections.indexOf(liveSession.awardSection) : -1;
@@ -1212,7 +1417,7 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
           <>
             <div className="qps-scholar-status">
               <span>Connected with your teacher</span>
-              <strong>{selectedForm.label} - Item {currentIndex + 1} of {qpsItems.length}</strong>
+              <strong>{selectedForm.label} - {qpsDisplaySectionName(currentItem.section)}</strong>
             </div>
             <div className="qps-scholar-progress" aria-label="QPS section progress">
               {qpsSections.map((section, index) => (
@@ -1234,12 +1439,22 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
                 </div>
               </div>
             ) : null}
-            <div className="qps-scholar-card">
-              <p>{currentItem.section}</p>
-              <strong className={`qps-reader-display is-${currentItem.type}`}>
-                {primaryQpsDisplay(currentItem.display)}
-              </strong>
-              <span>Read or say this for your teacher.</span>
+            <div className={`qps-scholar-card${scholarShouldListenOnly ? " is-listening-only" : ""}`}>
+              {scholarShouldListenOnly ? (
+                <>
+                  <p>{qpsDisplaySectionName(currentItem.section)}</p>
+                  <strong className="qps-listening-icon">Listen</strong>
+                  <span>Listen to your teacher.</span>
+                </>
+              ) : (
+                <>
+                  <p>{qpsDisplaySectionName(currentItem.section)}</p>
+                  <strong className={`qps-reader-display ${qpsStimulusSizeClass(currentItem)}`}>
+                    {primaryQpsDisplay(currentItem.display)}
+                  </strong>
+                  <span>Read or say this for your teacher.</span>
+                </>
+              )}
             </div>
             <div className="qps-scholar-nav">
               <button
@@ -1269,6 +1484,8 @@ function QpsScholarLiveSlides({ profile }: { profile: QpsScholarSlideProfile }) 
 }
 
 export function QpsScreenerGame() {
+  const [activeErrorId, setActiveErrorId] = useState("");
+  const [autosaveStatus, setAutosaveStatus] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState("");
   const [formId, setFormId] = useState<QpsFormId>("A");
@@ -1276,6 +1493,7 @@ export function QpsScreenerGame() {
   const [hasPinTeacherAccess, setHasPinTeacherAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiveSessionSaving, setIsLiveSessionSaving] = useState(false);
+  const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingWholeClassMiss, setIsSavingWholeClassMiss] = useState(false);
   const [liveSessionActive, setLiveSessionActive] = useState(false);
@@ -1294,14 +1512,16 @@ export function QpsScreenerGame() {
   const [teacherEmail, setTeacherEmail] = useState("");
   const [wholeClassInitials, setWholeClassInitials] = useState("");
   const [wholeClassMissStatus, setWholeClassMissStatus] = useState("");
+  const correctionInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const wholeClassInitialsRef = useRef<HTMLInputElement | null>(null);
 
   const selectedForm = forms[formId] ?? QPS_FORMS[formId];
   const qpsItems = selectedForm.items;
   const currentItem = qpsItems[currentIndex] ?? qpsItems[0];
-  const currentScore = scores[currentItem.id] ?? { note: "", said: "", status: "unscored" as const };
+  const currentScore = qpsScoreWithDefaults(scores[currentItem.id]);
   const selectedScholar = scholars.find((scholar) => scholar.id === selectedScholarId) ?? null;
   const isWholeClassMode = selectedScholarId === QPS_WHOLE_CLASS_MODE;
+  const isIndividualExaminerMode = Boolean(selectedScholar) && !isWholeClassMode;
   const canUseTeacherBoard = hasPinTeacherAccess || isAuthorizedTeacherEmail(teacherEmail);
   const signedInRosterTeacherEmail = rosterTeacherEmailForEmail(teacherEmail);
   const callOnRosterScholars = useMemo(
@@ -1330,6 +1550,10 @@ export function QpsScreenerGame() {
   const correctCount = scoredItems.filter((item) => scores[item.id]?.status === "correct").length;
   const missedCount = scoredItems.filter((item) => scores[item.id]?.status === "missed").length;
   const percent = scoredItems.length ? Math.round((correctCount / scoredItems.length) * 100) : 0;
+  const qpsSections = useMemo(() => qpsSectionsForItems(qpsItems), [qpsItems]);
+  const currentSectionItems = qpsItems.filter((item) => item.section === currentItem.section);
+  const currentSectionItemIndex = Math.max(0, currentSectionItems.findIndex((item) => item.id === currentItem.id));
+  const currentSectionScoredCount = currentSectionItems.filter((item) => scores[item.id]?.status !== "unscored").length;
   const currentChartTarget = qpsChartTargetForItem(currentItem);
   const qpsCallOnScholars = useMemo(
     () => qpsCallOnScholarsForTarget(
@@ -1441,6 +1665,8 @@ export function QpsScreenerGame() {
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
     setQpsSectionAward(null);
+    setActiveErrorId("");
+    setAutosaveStatus("");
     setLoadedProgressKey("");
     setStatus("");
   }, [qpsItems, selectedScholar]);
@@ -1614,6 +1840,10 @@ export function QpsScreenerGame() {
     }
 
     try {
+      if (progressStatus !== "completed") {
+        setAutosaveStatus("Saving...");
+      }
+
       const { auth, db, firebase } = await loadFirebase();
       const signedInEmail = auth.currentUser?.email?.trim().toLowerCase() ?? "";
 
@@ -1639,7 +1869,7 @@ export function QpsScreenerGame() {
         currentWord: currentDisplay,
         gameId: QPS_GAME_ID,
         gameTitle: QPS_GAME_TITLE,
-        incorrectSelections: progressMissedItems.map((item) => scores[item.id]?.said.trim() || item.display),
+        incorrectSelections: progressMissedItems.map((item) => qpsSelectedText(qpsScoreWithDefaults(scores[item.id]))),
         learningLocation: "school",
         levelId: "qps-full-screener",
         levelIndex: 0,
@@ -1647,13 +1877,13 @@ export function QpsScreenerGame() {
         missedCount: progressMissedItems.length,
         missedQuestions: progressMissedItems.map((item) => {
           const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
-          return qpsMissedQuestion(item, itemIndex >= 0 ? itemIndex : 0, scores[item.id] ?? { note: "", said: "", status: "missed" });
+          return qpsMissedQuestion(item, itemIndex >= 0 ? itemIndex : 0, qpsScoreWithDefaults(scores[item.id]));
         }),
         mode: "session-progress",
         percentComplete: Math.round((reachedCount / qpsItems.length) * 100),
         questionResponses: scoredItems.map((item) => {
           const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
-          return qpsQuestionResponse(item, itemIndex >= 0 ? itemIndex : 0, scores[item.id] ?? { note: "", said: "", status: "unscored" });
+          return qpsQuestionResponse(item, itemIndex >= 0 ? itemIndex : 0, qpsScoreWithDefaults(scores[item.id]));
         }),
         questionsCompleted: reachedCount,
         responseTimesMs: [],
@@ -1668,7 +1898,14 @@ export function QpsScreenerGame() {
         totalQuestions: qpsItems.length,
         updatedAt: serverTime,
       }, { merge: true });
+
+      if (progressStatus !== "completed") {
+        setAutosaveStatus("Saved");
+      }
     } catch {
+      if (progressStatus !== "completed") {
+        setAutosaveStatus("Autosave paused");
+      }
       // Draft progress should never block live scoring or final QPS saving.
     }
   };
@@ -1716,6 +1953,19 @@ export function QpsScreenerGame() {
     return () => window.clearTimeout(handle);
   }, [currentIndex, formId, liveSessionActive, qpsSectionAward, selectedLiveTarget, scholarSlideProfile]);
 
+  useEffect(() => {
+    if (!activeErrorId) {
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      correctionInputRefs.current[activeErrorId]?.focus();
+      correctionInputRefs.current[activeErrorId]?.select();
+    }, 40);
+
+    return () => window.clearTimeout(handle);
+  }, [activeErrorId, currentIndex]);
+
   const updateCurrentScore = (update: Partial<QpsItemScore>) => {
     setScores((currentScores) => ({
       ...currentScores,
@@ -1724,6 +1974,95 @@ export function QpsScreenerGame() {
         ...update,
       },
     }));
+  };
+
+  const updateAnnotationResponse = (annotationId: string, actualResponse: string) => {
+    const errors = currentScore.errors.map((annotation) =>
+      annotation.id === annotationId
+        ? { ...annotation, actualResponse }
+        : annotation,
+    );
+
+    updateCurrentScore({
+      errors,
+      responseType: "annotated-error",
+      said: qpsErrorSummary(errors),
+      status: "missed",
+    });
+  };
+
+  const removeAnnotation = (annotationId: string) => {
+    const errors = currentScore.errors.filter((annotation) => annotation.id !== annotationId);
+    updateCurrentScore({
+      errors,
+      responseType: errors.length ? "annotated-error" : "none",
+      said: qpsErrorSummary(errors),
+      status: errors.length ? "missed" : "unscored",
+    });
+    setActiveErrorId("");
+  };
+
+  const markStimulusSpan = (index: number) => {
+    if (!isIndividualExaminerMode || /\s/.test(qpsItemCharacters(currentItem)[index] ?? "")) {
+      return;
+    }
+
+    const activeAnnotation = currentScore.errors.find((annotation) => annotation.id === activeErrorId);
+    const canExtendActive =
+      activeAnnotation
+      && (
+        index >= activeAnnotation.startIndex - 1
+        && index <= activeAnnotation.endIndex + 1
+      );
+
+    if (canExtendActive) {
+      const startIndex = Math.min(activeAnnotation.startIndex, index);
+      const endIndex = Math.max(activeAnnotation.endIndex, index);
+      const errors = currentScore.errors.map((annotation) =>
+        annotation.id === activeAnnotation.id
+          ? {
+            ...annotation,
+            endIndex,
+            expectedSpan: qpsExpectedSpan(currentItem, startIndex, endIndex),
+            startIndex,
+          }
+          : annotation,
+      );
+
+      updateCurrentScore({
+        errors,
+        responseType: "annotated-error",
+        said: qpsErrorSummary(errors),
+        status: "missed",
+      });
+      setActiveErrorId(activeAnnotation.id);
+      return;
+    }
+
+    const existingAnnotation = qpsAnnotationAtIndex(currentScore.errors, index);
+    if (existingAnnotation) {
+      setActiveErrorId(existingAnnotation.id);
+      return;
+    }
+
+    const id = `${currentItem.id}-${index}-${Date.now()}`;
+    const nextAnnotation: QpsErrorAnnotation = {
+      actualResponse: "",
+      endIndex: index,
+      expectedSpan: qpsExpectedSpan(currentItem, index, index),
+      id,
+      startIndex: index,
+    };
+    const errors = [...currentScore.errors, nextAnnotation];
+
+    updateCurrentScore({
+      errors,
+      responseType: "annotated-error",
+      said: qpsErrorSummary(errors),
+      status: "missed",
+      wholeWordResponse: "",
+    });
+    setActiveErrorId(id);
   };
 
   const queueSectionAward = (section: string) => {
@@ -1742,7 +2081,14 @@ export function QpsScreenerGame() {
       queueSectionAward(currentItem.section);
     }
 
-    updateCurrentScore({ said: "", status: "correct" });
+    updateCurrentScore({
+      errors: [],
+      responseType: "correct",
+      said: "",
+      status: "correct",
+      wholeWordResponse: "",
+    });
+    setActiveErrorId("");
     setWholeClassMissStatus("");
 
     if (currentIndex < qpsItems.length - 1) {
@@ -1751,12 +2097,65 @@ export function QpsScreenerGame() {
   };
 
   const markNeedsReview = () => {
-    updateCurrentScore({ status: "missed" });
+    updateCurrentScore({ responseType: "annotated-error", status: "missed" });
     setWholeClassMissStatus("");
 
     if (isWholeClassMode) {
       window.setTimeout(() => wholeClassInitialsRef.current?.focus(), 50);
     }
+  };
+
+  const markNoResponse = () => {
+    updateCurrentScore({
+      errors: [],
+      responseType: "no-response",
+      said: "No response",
+      status: "missed",
+      wholeWordResponse: "",
+    });
+    setActiveErrorId("");
+  };
+
+  const markWholeWordWrong = () => {
+    updateCurrentScore({
+      errors: [],
+      responseType: "whole-word",
+      said: currentScore.wholeWordResponse.trim() || "Whole word wrong",
+      status: "missed",
+    });
+    setActiveErrorId("");
+  };
+
+  const updateWholeWordResponse = (wholeWordResponse: string) => {
+    updateCurrentScore({
+      errors: [],
+      responseType: "whole-word",
+      said: wholeWordResponse.trim() || "Whole word wrong",
+      status: "missed",
+      wholeWordResponse,
+    });
+  };
+
+  const undoCurrentItem = () => {
+    if (currentScore.errors.length) {
+      const errors = currentScore.errors.slice(0, -1);
+      updateCurrentScore({
+        errors,
+        responseType: errors.length ? "annotated-error" : "none",
+        said: qpsErrorSummary(errors),
+        status: errors.length ? "missed" : "unscored",
+      });
+      setActiveErrorId(errors[errors.length - 1]?.id ?? "");
+      return;
+    }
+
+    updateCurrentScore(blankQpsItemScore());
+    setActiveErrorId("");
+  };
+
+  const resetCurrentItem = () => {
+    updateCurrentScore(blankQpsItemScore());
+    setActiveErrorId("");
   };
 
   const saveWholeClassMiss = async () => {
@@ -1862,6 +2261,9 @@ export function QpsScreenerGame() {
 
   const handleScholarSelection = (nextScholarId: string) => {
     setSelectedScholarId(nextScholarId);
+    setActiveErrorId("");
+    setAutosaveStatus("");
+    setIsItemDrawerOpen(false);
     setQpsSectionAward(null);
     setWholeClassMissStatus("");
 
@@ -1875,11 +2277,13 @@ export function QpsScreenerGame() {
     if (nextIndex !== currentIndex && qpsItems[currentIndex]?.section !== qpsItems[nextIndex]?.section) {
       queueSectionAward(qpsItems[currentIndex].section);
     }
+    setActiveErrorId("");
     setCurrentIndex(nextIndex);
     setWholeClassMissStatus("");
   };
 
   const goToPrevious = () => {
+    setActiveErrorId("");
     setCurrentIndex((index) => Math.max(0, index - 1));
     setWholeClassMissStatus("");
   };
@@ -1888,47 +2292,104 @@ export function QpsScreenerGame() {
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
     setQpsSectionAward(null);
+    setActiveErrorId("");
+    setAutosaveStatus("");
     setStatus("");
     setWholeClassMissStatus("");
   };
 
+  useEffect(() => {
+    if (!isIndividualExaminerMode) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target
+        && (
+          target.tagName === "INPUT"
+          || target.tagName === "TEXTAREA"
+          || target.tagName === "SELECT"
+          || target.isContentEditable
+        )
+      ) {
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        markCorrect();
+      } else if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        markNoResponse();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goToPrevious();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goToNext();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        undoCurrentItem();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, currentScore, isIndividualExaminerMode, qpsItems]);
+
   const printQps = () => {
     const reportWindow = window.open("", "_blank");
     const scholarName = selectedScholar ? `${selectedScholar.firstName} ${selectedScholar.lastName}` : "No scholar selected";
-    const sectionSummaryRows = Object.entries(sectionTotals(scores, qpsItems)).map(([section, total]) => {
-      const sectionPercent = total.total ? Math.round((total.correct / total.total) * 100) : 0;
+    const totals = sectionTotals(scores, qpsItems);
+    const sectionSummaryRows = qpsSections.map((section) => {
+      const total = totals[section] ?? { correct: 0, missed: 0, skipped: 0, total: 0 };
+      const sectionItems = qpsItems.filter((item) => item.section === section);
       return `
         <tr>
-          <th>${escapeHtml(section)}</th>
-          <td>${total.correct}/${total.total}</td>
+          <th>${escapeHtml(qpsDisplaySectionName(section))}</th>
+          <td>${total.correct}/${sectionItems.length}</td>
           <td>${total.missed}</td>
-          <td>${sectionPercent}%</td>
+          <td>${sectionItems.length - total.total}</td>
         </tr>
       `;
     }).join("");
-    const needsRows = qpsItems.filter((item) => scores[item.id]?.status === "missed").map((item, index) => {
-      const score = scores[item.id] ?? { note: "", said: "", status: "missed" as const };
+    const sectionCardsHtml = qpsSections.map((section) => {
+      const sectionItems = qpsItems.filter((item) => item.section === section);
+      const total = totals[section] ?? { correct: 0, missed: 0, skipped: 0, total: 0 };
+      const rows = sectionItems.map((item) => {
+        const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
+        const score = qpsScoreWithDefaults(scores[item.id]);
+        const status = score.status === "correct"
+          ? "Correct"
+          : score.status === "missed"
+            ? qpsSelectedText(score)
+            : "Not scored";
+
+        return `
+          <tr class="${score.status}">
+            <td class="item-number">${itemIndex + 1}</td>
+            <td class="printed-stimulus">${qpsPrintedStimulusHtml(item, score)}</td>
+            <td>${escapeHtml(status)}</td>
+            <td>${escapeHtml(score.note)}</td>
+          </tr>
+        `;
+      }).join("");
+
       return `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${escapeHtml(item.section)}</td>
-          <td>${escapeHtml(primaryQpsDisplay(item.display))}</td>
-          <td>${escapeHtml(score.said.trim() || "Needs review")}</td>
-          <td>${escapeHtml(score.note)}</td>
-        </tr>
-      `;
-    }).join("");
-    const rows = qpsItems.map((item, index) => {
-      const score = scores[item.id] ?? { note: "", said: "", status: "unscored" as const };
-      return `
-        <tr class="${score.status}">
-          <td>${index + 1}</td>
-          <td>${escapeHtml(item.section)}</td>
-          <td>${escapeHtml(primaryQpsDisplay(item.display))}</td>
-          <td>${escapeHtml(statusLabel(score.status))}</td>
-          <td>${escapeHtml(score.said)}</td>
-          <td>${escapeHtml(score.note)}</td>
-        </tr>
+        <section class="skill-set">
+          <header>
+            <h2>${escapeHtml(qpsDisplaySectionName(section))}</h2>
+            <span>Score: ${total.correct}/${sectionItems.length}</span>
+          </header>
+          <table>
+            <thead>
+              <tr><th>#</th><th>Item / Examiner Marking</th><th>Result</th><th>Comments</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </section>
       `;
     }).join("");
 
@@ -1948,14 +2409,16 @@ export function QpsScreenerGame() {
           html,body{margin:0;padding:0}
           body{font-family:Arial,Helvetica,sans-serif;color:#223044}
           .report{padding:0}
-          .report-header{border-bottom:2px solid #223044;margin:0 0 12px;padding:0 0 10px}
+          .report-header{border-bottom:2px solid #223044;margin:0 0 10px;padding:0 0 10px}
           h1{margin:0 0 4px;font-size:24px}
-          h2{font-size:15px;margin:16px 0 6px;color:#223044}
+          h2{font-size:15px;margin:0;color:#223044}
           p{margin:0;color:#56677d;font-size:12px}
           .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
           .summary-card{border:1px solid #cdd8e5;border-radius:8px;padding:8px}
           .summary-card span{display:block;color:#56677d;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
           .summary-card strong{display:block;font-size:18px;margin-top:3px}
+          .student-line{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:8px;margin-top:8px}
+          .student-line div{border:1px solid #cdd8e5;border-radius:6px;padding:6px;font-size:11px}
           table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:auto}
           thead{display:table-header-group}
           th,td{border:1px solid #cdd8e5;padding:5px;text-align:left;vertical-align:top}
@@ -1963,45 +2426,43 @@ export function QpsScreenerGame() {
           tr.correct td{background:#f0fbf3}
           tr.missed td{background:#fff0ec}
           tr.unscored td{color:#64748b}
-          .empty-note{border:1px solid #cdd8e5;border-radius:8px;padding:9px;color:#56677d}
+          .skill-set{margin-top:10px;break-inside:avoid;page-break-inside:avoid}
+          .skill-set header{align-items:center;display:flex;justify-content:space-between;border:1px solid #223044;border-bottom:0;border-radius:8px 8px 0 0;padding:7px 8px;background:#f7fafc}
+          .skill-set header span{font-weight:700}
+          .item-number{width:28px}
+          .printed-stimulus{font-family:Arial,Helvetica,sans-serif;font-size:18px;letter-spacing:.04em;line-height:1.9}
+          .print-marked-span{display:inline-grid;grid-template-rows:auto auto;place-items:center;margin:0 1px;color:#912f1a}
+          .print-marked-span em{font-size:11px;font-style:normal;font-weight:700;line-height:1}
+          .print-marked-span b{border-top:2px solid #912f1a;font-weight:700;line-height:1.1}
+          .print-whole-word,.print-no-response{display:inline-grid;gap:1px}
+          .print-whole-word em,.print-no-response b{color:#912f1a;font-size:11px;font-style:normal;font-weight:700}
           tr,.summary-card{break-inside:avoid;page-break-inside:avoid}
         </style>
       </head>
       <body>
         <main class="report">
         <header class="report-header">
-          <h1>QPS Screener Results</h1>
-          <p>${escapeHtml(selectedForm.label)} - ${escapeHtml(scholarName)} - ${new Date().toLocaleDateString()}</p>
+          <h1>Quick Phonics Screener</h1>
+          <p>Digitally completed examiner scoring sheet</p>
+          <div class="student-line">
+            <div><strong>Student:</strong> ${escapeHtml(scholarName)}</div>
+            <div><strong>Form:</strong> ${escapeHtml(selectedForm.label)}</div>
+            <div><strong>Date:</strong> ${escapeHtml(new Date().toLocaleDateString())}</div>
+          </div>
         </header>
         <section class="summary-grid" aria-label="QPS summary">
-          <div class="summary-card"><span>Score</span><strong>${correctCount}/${scoredItems.length || 0}</strong></div>
+          <div class="summary-card"><span>Score</span><strong>${correctCount}/${qpsItems.length}</strong></div>
           <div class="summary-card"><span>Percent</span><strong>${percent}%</strong></div>
           <div class="summary-card"><span>Needs Review</span><strong>${missedCount}</strong></div>
           <div class="summary-card"><span>Items Scored</span><strong>${scoredItems.length}/${qpsItems.length}</strong></div>
         </section>
-        <h2>Section Breakdown</h2>
         <table>
           <thead>
-            <tr><th>Section</th><th>Score</th><th>Needs Review</th><th>Percent</th></tr>
+            <tr><th>Skill Set</th><th>Score</th><th>Needs Review</th><th>Not Scored</th></tr>
           </thead>
           <tbody>${sectionSummaryRows || `<tr><td colspan="4">No QPS items have been scored yet.</td></tr>`}</tbody>
         </table>
-        <h2>Needs Review Items</h2>
-        ${needsRows ? `
-        <table>
-          <thead>
-            <tr><th>#</th><th>Section</th><th>Item</th><th>What scholar said</th><th>Notes</th></tr>
-          </thead>
-          <tbody>${needsRows}</tbody>
-        </table>
-        ` : `<p class="empty-note">No missed QPS items recorded.</p>`}
-        <h2>Full Score Sheet</h2>
-        <table>
-          <thead>
-            <tr><th>#</th><th>Section</th><th>Item</th><th>Status</th><th>What scholar said</th><th>Notes</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+        ${sectionCardsHtml}
         </main>
       </body>
       </html>
@@ -2032,12 +2493,12 @@ export function QpsScreenerGame() {
       const serverTime = firebase.firestore.FieldValue.serverTimestamp();
       const missedItems = scoredItems.filter((item) => scores[item.id]?.status === "missed");
       const questionResponses = scoredItems.map((item, index) => {
-        const score = scores[item.id] ?? { note: "", said: "", status: "unscored" as const };
+        const score = qpsScoreWithDefaults(scores[item.id]);
         const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
         return qpsQuestionResponse(item, itemIndex >= 0 ? itemIndex : index, score);
       });
       const missedQuestions = missedItems.map((item) => {
-        const score = scores[item.id] ?? { note: "", said: "", status: "missed" as const };
+        const score = qpsScoreWithDefaults(scores[item.id]);
         const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
         return qpsMissedQuestion(item, itemIndex >= 0 ? itemIndex : 0, score);
       });
@@ -2051,7 +2512,7 @@ export function QpsScreenerGame() {
         createdAt: serverTime,
         gameId: QPS_GAME_ID,
         gameTitle: QPS_GAME_TITLE,
-        incorrectSelections: missedItems.map((item) => scores[item.id]?.said.trim() || item.display),
+        incorrectSelections: missedItems.map((item) => qpsSelectedText(qpsScoreWithDefaults(scores[item.id]))),
         learningLocation: "school",
         levelId: "qps-full-screener",
         levelIndex: 0,
@@ -2095,6 +2556,11 @@ export function QpsScreenerGame() {
 
   const signedInButUnauthorized = teacherEmail && !isAuthorizedTeacherEmail(teacherEmail) && !hasPinTeacherAccess;
   const needsTeacherSignIn = !isAuthorizedTeacherEmail(teacherEmail);
+  const currentSetLabel = qpsDisplaySectionName(currentItem.section).toUpperCase();
+  const currentProgressLabel =
+    `${selectedForm.label.toUpperCase()} · ${currentSetLabel} · ITEM ${currentSectionItemIndex + 1} OF ${currentSectionItems.length || 1}`;
+  const currentOverallLabel = `Overall: ${currentIndex + 1} of ${qpsItems.length}`;
+  const currentStimulusCharacters = qpsItemCharacters(currentItem);
 
   return (
     <section className="qps-screener-page">
@@ -2136,11 +2602,13 @@ export function QpsScreenerGame() {
       {status ? <p className="card-edit-message">{status}</p> : null}
 
       {canUseTeacherBoard ? (
-        <div className="qps-layout">
+        <div className={`qps-layout${isIndividualExaminerMode ? " is-individual-examiner" : " is-whole-class-examiner"}`}>
           <aside className="qps-score-panel">
             <label>
               QPS Form
               <select onChange={(event) => {
+                setActiveErrorId("");
+                setAutosaveStatus("");
                 setQpsSectionAward(null);
                 setFormId(event.target.value as QpsFormId);
               }} value={formId}>
@@ -2184,36 +2652,113 @@ export function QpsScreenerGame() {
               <strong>{correctCount}/{scoredItems.length || 0}</strong>
               <span>correct</span>
               <em>{missedCount} needs review</em>
+              {isIndividualExaminerMode ? <small>{autosaveStatus || "Autosave ready"}</small> : null}
             </div>
-            <div className="qps-section-jump">
-              {[...new Set(qpsItems.map((item) => item.section))].map((section) => {
-                const firstIndex = qpsItems.findIndex((item) => item.section === section);
-                return (
-                  <button
-                    className={currentItem.section === section ? "is-active" : ""}
-                    key={section}
-                    onClick={() => setCurrentIndex(firstIndex)}
-                    type="button"
-                  >
-                    {section}
-                  </button>
-                );
-              })}
-            </div>
+            {isIndividualExaminerMode ? (
+              <label className="qps-current-set-control">
+                Current set
+                <select
+                  onChange={(event) => {
+                    const firstIndex = qpsItems.findIndex((item) => item.section === event.target.value);
+                    if (firstIndex >= 0) {
+                      setActiveErrorId("");
+                      setCurrentIndex(firstIndex);
+                    }
+                  }}
+                  value={currentItem.section}
+                >
+                  {qpsSections.map((section) => (
+                    <option key={section} value={section}>
+                      {qpsDisplaySectionName(section)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="qps-section-jump">
+                {qpsSections.map((section) => {
+                  const firstIndex = qpsItems.findIndex((item) => item.section === section);
+                  return (
+                    <button
+                      className={currentItem.section === section ? "is-active" : ""}
+                      key={section}
+                      onClick={() => setCurrentIndex(firstIndex)}
+                      type="button"
+                    >
+                      {qpsDisplaySectionName(section)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <button className="teacher-text-button" onClick={resetScores} type="button">
               Start Over
             </button>
           </aside>
 
           <main className="qps-reader-panel">
-            <div className="qps-reader-card">
-              <p>{selectedForm.label} - {currentItem.section} - Item {currentIndex + 1} of {qpsItems.length}</p>
-              <strong className={`qps-reader-display is-${currentItem.type}`}>
-                {primaryQpsDisplay(currentItem.display)}
-              </strong>
+            <div className={`qps-reader-card${isIndividualExaminerMode ? " is-examiner-surface" : ""}`}>
+              <div className="qps-progress-line">
+                <p>{currentProgressLabel}</p>
+                <span>{currentOverallLabel}</span>
+              </div>
+              {isIndividualExaminerMode ? (
+                <div
+                  aria-label="Tap the part the scholar missed"
+                  className={`qps-interactive-stimulus qps-reader-display ${qpsStimulusSizeClass(currentItem)}`}
+                >
+                  {currentStimulusCharacters.map((character, index) => {
+                    const annotation = qpsAnnotationAtIndex(currentScore.errors, index);
+                    const isAnnotationStart = annotation?.startIndex === index;
+                    const isSelected = annotation?.id === activeErrorId;
+                    const isSpace = /\s/.test(character);
+
+                    return (
+                      <span
+                        className={`qps-stimulus-token${annotation ? " is-marked" : ""}${isSelected ? " is-selected" : ""}${isSpace ? " is-space" : ""}`}
+                        key={`${currentItem.id}-${index}-${character}`}
+                      >
+                        {isAnnotationStart ? (
+                          <span className="qps-inline-correction">
+                            <input
+                              aria-label={`What scholar said for ${annotation.expectedSpan}`}
+                              ref={(node) => {
+                                correctionInputRefs.current[annotation.id] = node;
+                              }}
+                              onChange={(event) => updateAnnotationResponse(annotation.id, event.target.value)}
+                              onFocus={() => setActiveErrorId(annotation.id)}
+                              placeholder="said"
+                              value={annotation.actualResponse}
+                            />
+                            <button
+                              aria-label="Remove this mark"
+                              onClick={() => removeAnnotation(annotation.id)}
+                              type="button"
+                            >
+                              x
+                            </button>
+                          </span>
+                        ) : null}
+                        <button
+                          aria-label={isSpace ? "Space" : `Mark ${character}`}
+                          disabled={isSpace}
+                          onClick={() => markStimulusSpan(index)}
+                          type="button"
+                        >
+                          {isSpace ? "\u00a0" : primaryQpsDisplay(character)}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <strong className={`qps-reader-display ${qpsStimulusSizeClass(currentItem)}`}>
+                  {primaryQpsDisplay(currentItem.display)}
+                </strong>
+              )}
               <span>{currentItem.prompt}</span>
-              {currentScore.status === "missed" && currentScore.said ? (
-                <em className="qps-correction-note">Said: {currentScore.said}</em>
+              {currentScore.status === "missed" ? (
+                <em className="qps-correction-note">{qpsSelectedText(currentScore)}</em>
               ) : null}
             </div>
 
@@ -2223,19 +2768,57 @@ export function QpsScreenerGame() {
                 onClick={markCorrect}
                 type="button"
               >
-                Correct
+                {isIndividualExaminerMode ? "✓ Correct" : "Correct"}
               </button>
-              <button
-                className={currentScore.status === "missed" ? "is-missed" : ""}
-                onClick={markNeedsReview}
-                type="button"
-              >
-                Needs Review
-              </button>
-              <button onClick={() => updateCurrentScore({ note: "", said: "", status: "unscored" })} type="button">
-                Clear
-              </button>
+              {isIndividualExaminerMode ? (
+                <>
+                  <button
+                    className={currentScore.responseType === "no-response" ? "is-missed" : ""}
+                    onClick={markNoResponse}
+                    type="button"
+                  >
+                    No Response
+                  </button>
+                  <button
+                    className={currentScore.responseType === "whole-word" ? "is-missed" : ""}
+                    onClick={markWholeWordWrong}
+                    type="button"
+                  >
+                    Whole Word Wrong
+                  </button>
+                  <button onClick={undoCurrentItem} type="button">
+                    Undo
+                  </button>
+                  <button onClick={resetCurrentItem} type="button">
+                    Reset
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className={currentScore.status === "missed" ? "is-missed" : ""}
+                    onClick={markNeedsReview}
+                    type="button"
+                  >
+                    Needs Review
+                  </button>
+                  <button onClick={() => updateCurrentScore(blankQpsItemScore())} type="button">
+                    Clear
+                  </button>
+                </>
+              )}
             </div>
+
+            {isIndividualExaminerMode && currentScore.responseType === "whole-word" ? (
+              <label className="qps-whole-word-response">
+                What scholar said for the whole item
+                <input
+                  onChange={(event) => updateWholeWordResponse(event.target.value)}
+                  placeholder="Type the whole response"
+                  value={currentScore.wholeWordResponse}
+                />
+              </label>
+            ) : null}
 
             {isWholeClassMode ? (
               <div className="qps-whole-class-tools">
@@ -2296,15 +2879,17 @@ export function QpsScreenerGame() {
               </section>
             ) : null}
 
-            <div className="qps-notes-grid">
-              <label>
-                What scholar said
-                <input
-                  onChange={(event) => updateCurrentScore({ said: event.target.value, status: event.target.value.trim() ? "missed" : currentScore.status })}
-                  placeholder="Example: /b/ for /d/"
-                  value={currentScore.said}
-                />
-              </label>
+            <div className={`qps-notes-grid${isIndividualExaminerMode ? " is-individual" : ""}`}>
+              {!isIndividualExaminerMode ? (
+                <label>
+                  What scholar said
+                  <input
+                    onChange={(event) => updateCurrentScore({ said: event.target.value, status: event.target.value.trim() ? "missed" : currentScore.status })}
+                    placeholder="Example: /b/ for /d/"
+                    value={currentScore.said}
+                  />
+                </label>
+              ) : null}
               <label>
                 Note
                 <input
@@ -2325,21 +2910,34 @@ export function QpsScreenerGame() {
             </div>
           </main>
 
-          <aside className="qps-item-list">
-            {qpsItems.map((item, index) => {
-              const score = scores[item.id] ?? { note: "", said: "", status: "unscored" as const };
+          <aside className={`qps-item-list${isIndividualExaminerMode && !isItemDrawerOpen ? " is-collapsed" : ""}`}>
+            {isIndividualExaminerMode ? (
+              <button
+                className="qps-item-drawer-toggle"
+                onClick={() => setIsItemDrawerOpen((isOpen) => !isOpen)}
+                type="button"
+              >
+                <strong>Items / Progress</strong>
+                <span>{currentSectionScoredCount}/{currentSectionItems.length} scored in this set</span>
+              </button>
+            ) : null}
+            {(!isIndividualExaminerMode || isItemDrawerOpen) ? qpsItems.map((item, index) => {
+              const score = qpsScoreWithDefaults(scores[item.id]);
               return (
                 <button
                   className={`qps-item-chip ${score.status} ${index === currentIndex ? "is-active" : ""}`}
                   key={item.id}
-                  onClick={() => setCurrentIndex(index)}
+                  onClick={() => {
+                    setActiveErrorId("");
+                    setCurrentIndex(index);
+                  }}
                   type="button"
                 >
                   <strong>{primaryQpsDisplay(item.display)}</strong>
                   <span>{statusLabel(score.status)}</span>
                 </button>
               );
-            })}
+            }) : null}
           </aside>
         </div>
       ) : null}

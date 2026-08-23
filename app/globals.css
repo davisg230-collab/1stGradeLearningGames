@@ -755,6 +755,10 @@ button.area-card {
   align-items: start;
 }
 
+.qps-layout.is-individual-examiner {
+  grid-template-columns: minmax(210px, 0.55fr) minmax(0, 2fr) minmax(180px, 0.45fr);
+}
+
 .qps-score-panel,
 .qps-reader-panel,
 .qps-item-list {
@@ -804,7 +808,8 @@ button.area-card {
 }
 
 .qps-score-summary span,
-.qps-score-summary em {
+.qps-score-summary em,
+.qps-score-summary small {
   color: var(--muted);
   font-style: normal;
   font-weight: 900;
@@ -830,6 +835,11 @@ button.area-card {
 .qps-item-list {
   display: grid;
   gap: 8px;
+}
+
+.qps-current-set-control {
+  display: grid;
+  gap: 6px;
 }
 
 .qps-section-jump button,
@@ -868,6 +878,20 @@ button.area-card {
   text-align: center;
 }
 
+.qps-reader-card.is-examiner-surface {
+  min-height: min(58vh, 560px);
+  padding: clamp(16px, 4vw, 36px);
+}
+
+.qps-progress-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
 .qps-reader-card p,
 .qps-reader-card span {
   margin: 0;
@@ -875,21 +899,122 @@ button.area-card {
   font-weight: 900;
 }
 
+.qps-progress-line span {
+  color: #335c7e;
+  font-size: 0.86rem;
+}
+
 .qps-reader-display {
   color: var(--ink);
   font-size: clamp(5rem, 18vw, 13rem);
   font-weight: 950;
   line-height: 1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .qps-reader-display.is-word {
   font-size: clamp(4rem, 13vw, 9rem);
 }
 
+.qps-reader-display.is-medium-word {
+  font-size: clamp(3rem, 9vw, 7rem);
+}
+
+.qps-reader-display.is-long-word {
+  font-size: clamp(2.3rem, 7vw, 5.3rem);
+}
+
 .qps-reader-display.is-sentence {
   max-width: 100%;
   font-size: clamp(2.4rem, 7vw, 5.3rem);
   line-height: 1.15;
+}
+
+.qps-interactive-stimulus {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.02em;
+  width: 100%;
+  padding-top: 42px;
+}
+
+.qps-stimulus-token {
+  position: relative;
+  display: inline-grid;
+  place-items: end center;
+  min-width: 0.75em;
+  min-height: 1.25em;
+  color: var(--ink);
+}
+
+.qps-stimulus-token > button {
+  min-width: 0.86em;
+  min-height: 1.08em;
+  border: 0;
+  border-radius: 0.12em;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.qps-stimulus-token > button:focus-visible {
+  outline: 3px solid #335c7e;
+  outline-offset: 4px;
+}
+
+.qps-stimulus-token.is-marked > button {
+  color: #912f1a;
+  text-decoration: line-through;
+  text-decoration-thickness: 0.08em;
+}
+
+.qps-stimulus-token.is-selected > button {
+  background: #fff0ec;
+  box-shadow: 0 0 0 0.08em #f3b7a9;
+}
+
+.qps-stimulus-token.is-space {
+  min-width: 0.42em;
+}
+
+.qps-inline-correction {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.2em);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transform: translateX(-50%);
+}
+
+.qps-inline-correction input {
+  width: clamp(54px, 12vw, 86px);
+  border: 2px solid #f3b7a9;
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: #912f1a;
+  background: #fff8f5;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 950;
+  text-align: center;
+}
+
+.qps-inline-correction button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #912f1a;
+  background: #ffe2da;
+  font-weight: 950;
 }
 
 .qps-correction-note {
@@ -936,6 +1061,28 @@ button.area-card {
   border-radius: 14px;
   padding: 12px;
   background: #fff8e6;
+}
+
+.qps-whole-word-response {
+  display: grid;
+  gap: 6px;
+  border: 2px solid #f0d7a4;
+  border-radius: 14px;
+  padding: 12px;
+  color: #2f4054;
+  background: #fff8e6;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.qps-whole-word-response input {
+  width: 100%;
+  border: 2px solid #eadcc8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
 }
 
 .qps-whole-class-tools label {
@@ -1065,14 +1212,47 @@ button.area-card {
   gap: 10px;
 }
 
+.qps-notes-grid.is-individual {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .qps-item-list {
   max-height: 620px;
   overflow: auto;
 }
 
+.qps-item-list.is-collapsed {
+  max-height: none;
+  overflow: visible;
+}
+
+.qps-item-drawer-toggle {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  border: 2px solid #d9e9f7;
+  border-radius: 12px;
+  padding: 10px;
+  color: #2f4054;
+  background: #f4f9ff;
+  font: inherit;
+  text-align: left;
+}
+
+.qps-item-drawer-toggle strong {
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.qps-item-drawer-toggle span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
 .qps-item-chip {
   display: grid;
-  grid-template-columns: minmax(42px, 0.45fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   text-align: left;
@@ -1089,8 +1269,16 @@ button.area-card {
 }
 
 .qps-item-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1.05rem;
   font-weight: 950;
+}
+
+.qps-item-chip span {
+  white-space: nowrap;
 }
 
 .qps-scholar-page {
@@ -1235,6 +1423,27 @@ button.area-card {
   text-align: center;
 }
 
+.qps-scholar-card.is-listening-only {
+  gap: 16px;
+  background:
+    radial-gradient(circle at top, rgb(255 207 82 / 0.28), transparent 42%),
+    #fffdf8;
+}
+
+.qps-listening-icon {
+  display: grid;
+  width: min(60vw, 360px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 6px solid #335c7e;
+  border-radius: 50%;
+  color: #223044;
+  background: #eef6ff;
+  font-size: clamp(2.6rem, 8vw, 5rem);
+  font-weight: 950;
+  box-shadow: 0 18px 36px rgb(47 64 84 / 0.12);
+}
+
 .qps-scholar-card p,
 .qps-scholar-card span {
   margin: 0;
@@ -1270,6 +1479,81 @@ button.area-card {
   color: #6f7480 !important;
   font-size: 0.82rem !important;
   font-weight: 700 !important;
+}
+
+@media (max-width: 1180px) {
+  .qps-layout,
+  .qps-layout.is-individual-examiner {
+    grid-template-columns: minmax(190px, 0.58fr) minmax(0, 1.75fr);
+  }
+
+  .qps-layout.is-individual-examiner .qps-item-list {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .qps-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .qps-layout,
+  .qps-layout.is-individual-examiner {
+    grid-template-columns: 1fr;
+  }
+
+  .qps-score-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .qps-live-controls,
+  .qps-score-summary,
+  .qps-current-set-control,
+  .qps-section-jump,
+  .qps-score-panel > .teacher-text-button {
+    grid-column: 1 / -1;
+  }
+
+  .qps-reader-card.is-examiner-surface {
+    min-height: min(55vh, 520px);
+  }
+
+  .qps-progress-line {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  .qps-score-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .qps-score-buttons button,
+  .qps-nav-row button,
+  .qps-toolbar-actions a,
+  .qps-toolbar-actions button {
+    min-height: 44px;
+  }
+
+  .qps-interactive-stimulus {
+    padding-top: 54px;
+  }
+
+  .qps-reader-display {
+    font-size: clamp(4.2rem, 24vw, 8rem);
+  }
+
+  .qps-reader-display.is-word,
+  .qps-reader-display.is-medium-word {
+    font-size: clamp(3rem, 18vw, 6rem);
+  }
+
+  .qps-reader-display.is-long-word,
+  .qps-reader-display.is-sentence {
+    font-size: clamp(1.9rem, 11vw, 3.6rem);
+  }
 }
 
 .field-help {

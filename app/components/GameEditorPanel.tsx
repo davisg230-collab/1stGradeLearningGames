@@ -7,7 +7,7 @@ import {
   teacherLabelForEmail,
 } from "../firebase-config";
 import { listeningLearningGames, mathGames, skillsGames } from "../game-data";
-import { QPS_FORMS } from "./QpsScreenerGame";
+import { QPS_FORMS, qpsDisplaySectionName } from "./QpsScreenerGame";
 import type { CardEdit } from "./TeacherEditProvider";
 
 type FirebaseUser = {
@@ -1291,16 +1291,17 @@ function qpsEditableGame(): EditableGame {
     QPS_FORMS[formId].items.forEach((item) => {
       const levelKey = `${formId}:${item.section}`;
       let levelIndex = levelIndexes.get(levelKey);
+      const displaySection = qpsDisplaySectionName(item.section);
 
       if (levelIndex === undefined) {
         levelIndex = levels.length;
         levelIndexes.set(levelKey, levelIndex);
         levels.push({
-          detail: `Form ${formId} ${item.section}`,
+          detail: `Form ${formId} ${displaySection}`,
           icon: "QPS",
-          learningTarget: item.section,
+          learningTarget: displaySection,
           lessonRange: `Form ${formId}`,
-          name: `Form ${formId} - ${item.section}`,
+          name: `Form ${formId} - ${displaySection}`,
           practiceLabel: "QPS",
         });
       }
