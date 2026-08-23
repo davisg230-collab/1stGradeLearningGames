@@ -180,11 +180,14 @@ type QpsSkillsOverride = {
 
 type QpsCallOnEvidence = {
   dateMs: number;
+  expected?: string;
+  response?: string;
   status: Exclude<QpsCallOnStatus, "unassessed">;
   source: string;
 };
 
 type QpsCallOnScholar = QpsScholar & {
+  evidenceText: string;
   reason: string;
   status: QpsCallOnStatus;
 };
@@ -1091,6 +1094,8 @@ function qpsTargetEvidenceFromResponse(
 
   return {
     dateMs,
+    expected: qpsFirstText(raw.correctAnswer, raw.word, raw.answer, raw.display, chartTarget.target),
+    response: correct ? "" : selected,
     source: record.gameTitle || QPS_GAME_TITLE,
     status: correct ? "mastered" : "needs-review",
   };
@@ -1127,11 +1132,46 @@ function qpsTargetEvidenceFromMiss(
     return null;
   }
 
+  const selected = qpsFirstText(
+    raw.wholeWordResponse,
+    raw.incorrectSelection,
+    asArray(raw.incorrectSelections)[0],
+  );
+
   return {
-    dateMs: evidenceDateMs(record.updatedAt) || evidenceDateMs(record.completedAt) || 0,
+    dateMs:
+      evidenceDateMs(raw.timestamp)
+      || evidenceDateMs(record.updatedAt)
+      || evidenceDateMs(record.completedAt)
+      || 0,
+    expected: qpsFirstText(raw.correctAnswer, raw.word, record.correctAnswer, record.word, chartTarget.target),
+    response: selected,
     source: record.gameTitle || QPS_GAME_TITLE,
     status: "needs-review",
   };
+}
+
+function qpsCallOnEvidenceText(evidence: QpsCallOnEvidence | undefined, target: string) {
+  if (!evidence) {
+    return "No evidence yet";
+  }
+
+  if (evidence.status === "mastered") {
+    return `Mastered from ${evidence.source}`;
+  }
+
+  const expected = primaryQpsDisplay((evidence.expected || target).trim());
+  const response = primaryQpsDisplay((evidence.response || "").trim());
+
+  if (!response || /^needs review$/i.test(response)) {
+    return `Needs review from ${evidence.source}`;
+  }
+
+  if (response.includes("->")) {
+    return `Last miss: ${response}`;
+  }
+
+  return `Last miss: ${expected} -> ${response}`;
 }
 
 function qpsCallOnScholarsForTarget(
@@ -1205,6 +1245,7 @@ function qpsCallOnScholarsForTarget(
 
       return {
         ...scholar,
+        evidenceText: qpsCallOnEvidenceText(latest, chartTarget.target),
         reason: latest
           ? `${latest.status === "mastered" ? "Mastered" : "Needs review"} from ${latest.source}`
           : "No chart evidence yet",
@@ -2868,7 +2909,7 @@ export function QpsScreenerGame() {
                 <span className={scholar.status === "needs-review" ? "needs-review" : "unassessed"} key={scholar.id}>
                   <strong>{scholar.firstName}</strong>
                   <em>{scholar.trackingInitials}</em>
-                  <small>{scholar.status === "needs-review" ? "Needs review" : "No evidence"}</small>
+                  <small>{scholar.evidenceText}</small>
                 </span>
               ))}
             </div>

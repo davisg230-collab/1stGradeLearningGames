@@ -1325,6 +1325,7 @@ body:has(.qps-screener-page.is-examiner-surface) .teacher-edit-dock,
 
 .qps-call-on-list small {
   color: var(--muted);
+  line-height: 1.25;
 }
 
 .qps-call-on-panel.is-compact-call-on {
