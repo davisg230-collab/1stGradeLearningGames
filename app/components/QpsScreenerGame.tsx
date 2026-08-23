@@ -2778,6 +2778,53 @@ export function QpsScreenerGame() {
     `${selectedForm.label.toUpperCase()} · ${currentSetLabel} · ITEM ${currentSectionItemIndex + 1} OF ${currentSectionItems.length || 1}`;
   const currentOverallLabel = `Overall: ${currentIndex + 1} of ${qpsItems.length}`;
   const currentStimulusCharacters = qpsItemCharacters(currentItem);
+  const renderQpsCallOnPanel = (variant: "full" | "compact" = "full") => {
+    if (!isWholeClassMode) {
+      return null;
+    }
+
+    const isCompact = variant === "compact";
+    const visibleCallOnScholars = isCompact ? qpsCallOnScholars.slice(0, 6) : qpsCallOnScholars;
+    const hiddenCallOnCount = qpsCallOnScholars.length - visibleCallOnScholars.length;
+
+    return (
+      <section className={`qps-call-on-panel${isCompact ? " is-compact-call-on" : ""}`}>
+        <div className="qps-call-on-head">
+          <div>
+            <strong>{isCompact ? "Call On" : "Suggested Call-On List"}</strong>
+            <span>
+              {currentChartTarget
+                ? `${qpsChartReportLabel(currentChartTarget.reportId)} chart: ${primaryQpsDisplay(currentChartTarget.target)}`
+                : "Letter and digraph chart targets"}
+            </span>
+          </div>
+          {currentChartTarget ? <em>{qpsCallOnScholars.length}</em> : null}
+        </div>
+        {!isAuthorizedTeacherEmail(teacherEmail) ? (
+          <p className="pin-helper">Sign in with a teacher account to use chart-based call-on suggestions.</p>
+        ) : !currentChartTarget ? (
+          <p className="pin-helper">This slide is not tied to the current Letter Names, Letter Sounds, or Digraphs chart yet.</p>
+        ) : visibleCallOnScholars.length ? (
+          <>
+            <div className="qps-call-on-list">
+              {visibleCallOnScholars.map((scholar) => (
+                <span className={scholar.status === "needs-review" ? "needs-review" : "unassessed"} key={scholar.id}>
+                  <strong>{scholar.firstName}</strong>
+                  <em>{scholar.trackingInitials}</em>
+                  <small>{scholar.status === "needs-review" ? "Needs review" : "No evidence"}</small>
+                </span>
+              ))}
+            </div>
+            {isCompact && hiddenCallOnCount > 0 ? (
+              <p className="pin-helper">+{hiddenCallOnCount} more in Items / Progress.</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="pin-helper">Everyone currently shows mastered for this chart target.</p>
+        )}
+      </section>
+    );
+  };
 
   return (
     <section className={`qps-screener-page${isExaminerSurfaceMode ? " is-examiner-surface" : ""}`}>
@@ -3056,6 +3103,10 @@ export function QpsScreenerGame() {
               )}
             </div>
 
+            <div className="qps-mobile-call-on">
+              {renderQpsCallOnPanel("compact")}
+            </div>
+
             {isExaminerSurfaceMode && currentScore.responseType === "whole-word" ? (
               <label className="qps-whole-word-response">
                 What scholar said for the whole item
@@ -3142,38 +3193,7 @@ export function QpsScreenerGame() {
                 <span>{currentSectionScoredCount}/{currentSectionItems.length} scored in this set</span>
               </button>
             ) : null}
-            {isWholeClassMode ? (
-              <section className="qps-call-on-panel">
-                <div className="qps-call-on-head">
-                  <div>
-                    <strong>Suggested Call-On List</strong>
-                    <span>
-                      {currentChartTarget
-                        ? `${qpsChartReportLabel(currentChartTarget.reportId)} chart: ${primaryQpsDisplay(currentChartTarget.target)}`
-                        : "Letter and digraph chart targets"}
-                    </span>
-                  </div>
-                  {currentChartTarget ? <em>{qpsCallOnScholars.length}</em> : null}
-                </div>
-                {!isAuthorizedTeacherEmail(teacherEmail) ? (
-                  <p className="pin-helper">Sign in with a teacher account to use chart-based call-on suggestions.</p>
-                ) : !currentChartTarget ? (
-                  <p className="pin-helper">This slide is not tied to the current Letter Names, Letter Sounds, or Digraphs chart yet.</p>
-                ) : qpsCallOnScholars.length ? (
-                  <div className="qps-call-on-list">
-                    {qpsCallOnScholars.map((scholar) => (
-                      <span className={scholar.status === "needs-review" ? "needs-review" : "unassessed"} key={scholar.id}>
-                        <strong>{scholar.firstName}</strong>
-                        <em>{scholar.trackingInitials}</em>
-                        <small>{scholar.status === "needs-review" ? "Needs review" : "No evidence"}</small>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="pin-helper">Everyone currently shows mastered for this chart target.</p>
-                )}
-              </section>
-            ) : null}
+            {renderQpsCallOnPanel("full")}
             {(!isExaminerSurfaceMode || isItemDrawerOpen) ? qpsItems.map((item, index) => {
               const score = qpsScoreWithDefaults(scores[item.id]);
               return (
