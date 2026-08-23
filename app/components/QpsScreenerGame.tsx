@@ -2298,6 +2298,11 @@ export function QpsScreenerGame() {
     setWholeClassMissStatus("");
   };
 
+  const finishExaminerEntry = () => {
+    setActiveErrorId("");
+    goToNext();
+  };
+
   const resetScores = () => {
     setScores(qpsItemScoreDefaults(qpsItems));
     setCurrentIndex(0);
@@ -2353,55 +2358,119 @@ export function QpsScreenerGame() {
     const reportWindow = window.open("", "_blank");
     const scholarName = selectedScholar ? `${selectedScholar.firstName} ${selectedScholar.lastName}` : "No scholar selected";
     const totals = sectionTotals(scores, qpsItems);
-    const sectionSummaryRows = qpsSections.map((section) => {
-      const total = totals[section] ?? { correct: 0, missed: 0, skipped: 0, total: 0 };
+    const today = new Date().toLocaleDateString();
+    const teacherName = selectedScholar
+      ? teacherLabelForEmail(selectedScholar.teacherEmail)
+      : teacherEmail
+        ? teacherLabelForEmail(teacherEmail)
+        : "";
+    const scoreForItems = (items: QpsItem[]) => {
+      const correct = items.filter((item) => qpsScoreWithDefaults(scores[item.id]).status === "correct").length;
+      return `${correct}/${items.length}`;
+    };
+    const commentsForItems = (items: QpsItem[]) =>
+      items
+        .map((item) => {
+          const score = qpsScoreWithDefaults(scores[item.id]);
+          if (score.status !== "missed" && !score.note.trim()) return "";
+          const response = score.status === "missed" ? qpsSelectedText(score) : "";
+          const note = score.note.trim();
+          const detail = [response, note].filter(Boolean).join("; ");
+          return `${primaryQpsDisplay(item.display)}: ${detail}`;
+        })
+        .filter(Boolean)
+        .join(" | ");
+    const renderItems = (items: QpsItem[], className: string) => `
+      <div class="item-grid ${className}">
+        ${items.map((item) => {
+          const score = qpsScoreWithDefaults(scores[item.id]);
+          const statusClass = score.status === "correct"
+            ? "is-correct"
+            : score.status === "missed"
+              ? "is-missed"
+              : "is-unscored";
+          return `<span class="print-item ${statusClass}">${qpsPrintedStimulusHtml(item, score)}</span>`;
+        }).join("")}
+      </div>
+    `;
+    const renderScoreBox = (items: QpsItem[], isLetterSounds = false) => `
+      <div class="score-box">
+        <span>Score</span>
+        ${isLetterSounds ? `<small>/21 con<br>/5 vow</small>` : ""}
+        <strong>${scoreForItems(items)}</strong>
+      </div>
+    `;
+    const renderSection = (section: string) => {
       const sectionItems = qpsItems.filter((item) => item.section === section);
-      return `
-        <tr>
-          <th>${escapeHtml(qpsDisplaySectionName(section))}</th>
-          <td>${total.correct}/${sectionItems.length}</td>
-          <td>${total.missed}</td>
-          <td>${sectionItems.length - total.total}</td>
-        </tr>
-      `;
-    }).join("");
-    const sectionCardsHtml = qpsSections.map((section) => {
-      const sectionItems = qpsItems.filter((item) => item.section === section);
       const total = totals[section] ?? { correct: 0, missed: 0, skipped: 0, total: 0 };
-      const rows = sectionItems.map((item) => {
-        const itemIndex = qpsItems.findIndex((nextItem) => nextItem.id === item.id);
-        const score = qpsScoreWithDefaults(scores[item.id]);
-        const status = score.status === "correct"
-          ? "Correct"
-          : score.status === "missed"
-            ? qpsSelectedText(score)
-            : "Not scored";
+      const setNumber = qpsSetNumber(section);
+      const wordItems = sectionItems.filter((item) => item.type !== "sentence");
+      const sentenceItems = sectionItems.filter((item) => item.type === "sentence");
+      const comments = commentsForItems(sectionItems);
+      const sectionClass = sentenceItems.length ? "has-task-b" : "single-task";
 
+      if (setNumber <= 2) {
         return `
-          <tr class="${score.status}">
-            <td class="item-number">${itemIndex + 1}</td>
-            <td class="printed-stimulus">${qpsPrintedStimulusHtml(item, score)}</td>
-            <td>${escapeHtml(status)}</td>
-            <td>${escapeHtml(score.note)}</td>
-          </tr>
+          <section class="sheet-set ${sectionClass}">
+            <div class="set-number">${setNumber}</div>
+            <div class="set-content">
+              <div class="set-title"><strong>Skill Set ${setNumber}:</strong> ${escapeHtml(qpsDisplaySectionName(section).replace(/^Set \d+ - /, ""))}</div>
+              <div class="task-row no-task-label">
+                <div class="task-items">${renderItems(sectionItems, "is-letters")}</div>
+                ${renderScoreBox(sectionItems, setNumber === 2)}
+              </div>
+              <div class="comments-line"><strong>Comments:</strong> ${escapeHtml(comments)}</div>
+            </div>
+          </section>
         `;
-      }).join("");
+      }
 
       return `
-        <section class="skill-set">
-          <header>
-            <h2>${escapeHtml(qpsDisplaySectionName(section))}</h2>
-            <span>Score: ${total.correct}/${sectionItems.length}</span>
-          </header>
-          <table>
-            <thead>
-              <tr><th>#</th><th>Item / Examiner Marking</th><th>Result</th><th>Comments</th></tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
+        <section class="sheet-set ${sectionClass}">
+          <div class="set-number">${setNumber}</div>
+          <div class="set-content">
+            <div class="set-title">
+              <strong>Skill Set ${setNumber}:</strong> ${escapeHtml(qpsDisplaySectionName(section).replace(/^Set \d+ - /, ""))}
+              <em>${total.correct}/${sectionItems.length} scored correct</em>
+            </div>
+            <div class="task-row">
+              ${sentenceItems.length ? `<div class="task-label">Task A</div>` : ""}
+              <div class="task-items">${renderItems(wordItems, "is-words")}</div>
+              ${renderScoreBox(wordItems)}
+            </div>
+            ${sentenceItems.length ? `
+              <div class="task-row">
+                <div class="task-label">Task B</div>
+                <div class="task-items">${renderItems(sentenceItems, "is-sentences")}</div>
+                ${renderScoreBox(sentenceItems)}
+              </div>
+            ` : ""}
+            <div class="comments-line"><strong>Comments:</strong> ${escapeHtml(comments)}</div>
+          </div>
         </section>
       `;
-    }).join("");
+    };
+    const renderHeader = (continued = false) => `
+      <header class="sheet-header ${continued ? "continued" : ""}">
+        <div class="brand-block">
+          <span class="brand-mark">qps</span>
+          <h1>Quick<br>Phonics<br>Screener</h1>
+        </div>
+        <div class="form-title">
+          <strong>Examiner Scoring Sheet</strong>
+          <span>${escapeHtml(selectedForm.label.toUpperCase())}${continued ? " (continued)" : ""}</span>
+        </div>
+        <div class="student-fields">
+          <p><strong>Student</strong><span>${escapeHtml(scholarName)}</span></p>
+          <p><strong>Teacher</strong><span>${escapeHtml(teacherName)}</span></p>
+          <p><strong>Date</strong><span>${escapeHtml(today)}</span><strong>Grade</strong><span></span></p>
+        </div>
+      </header>
+    `;
+    const firstPageSections = qpsSections.filter((section) => qpsSetNumber(section) <= 6);
+    const secondPageSections = qpsSections.filter((section) => qpsSetNumber(section) >= 7);
+    const firstPageHtml = firstPageSections.map(renderSection).join("");
+    const secondPageHtml = secondPageSections.map(renderSection).join("");
 
     if (!reportWindow) {
       window.print();
@@ -2415,64 +2484,68 @@ export function QpsScreenerGame() {
         <meta charset="utf-8">
         <title>QPS Screener</title>
         <style>
-          @page{margin:10mm}
+          @page{margin:7mm}
           html,body{margin:0;padding:0}
-          body{font-family:Arial,Helvetica,sans-serif;color:#223044}
-          .report{padding:0}
-          .report-header{border-bottom:2px solid #223044;margin:0 0 10px;padding:0 0 10px}
-          h1{margin:0 0 4px;font-size:24px}
-          h2{font-size:15px;margin:0;color:#223044}
-          p{margin:0;color:#56677d;font-size:12px}
-          .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
-          .summary-card{border:1px solid #cdd8e5;border-radius:8px;padding:8px}
-          .summary-card span{display:block;color:#56677d;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
-          .summary-card strong{display:block;font-size:18px;margin-top:3px}
-          .student-line{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:8px;margin-top:8px}
-          .student-line div{border:1px solid #cdd8e5;border-radius:6px;padding:6px;font-size:11px}
-          table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:auto}
-          thead{display:table-header-group}
-          th,td{border:1px solid #cdd8e5;padding:5px;text-align:left;vertical-align:top}
-          th{background:#eef4fa}
-          tr.correct td{background:#f0fbf3}
-          tr.missed td{background:#fff0ec}
-          tr.unscored td{color:#64748b}
-          .skill-set{margin-top:10px;break-inside:avoid;page-break-inside:avoid}
-          .skill-set header{align-items:center;display:flex;justify-content:space-between;border:1px solid #223044;border-bottom:0;border-radius:8px 8px 0 0;padding:7px 8px;background:#f7fafc}
-          .skill-set header span{font-weight:700}
-          .item-number{width:28px}
-          .printed-stimulus{font-family:Arial,Helvetica,sans-serif;font-size:18px;letter-spacing:.04em;line-height:1.9}
-          .print-marked-span{display:inline-grid;grid-template-rows:auto auto;place-items:center;margin:0 1px;color:#912f1a}
-          .print-marked-span em{font-size:11px;font-style:normal;font-weight:700;line-height:1}
-          .print-marked-span b{border-top:2px solid #912f1a;font-weight:700;line-height:1.1}
-          .print-whole-word,.print-no-response{display:inline-grid;gap:1px}
-          .print-whole-word em,.print-no-response b{color:#912f1a;font-size:11px;font-style:normal;font-weight:700}
-          tr,.summary-card{break-inside:avoid;page-break-inside:avoid}
+          body{font-family:"Times New Roman",Times,serif;color:#111;background:#fff}
+          .sheet-page{min-height:calc(100vh - 14mm);page-break-after:always}
+          .sheet-page:last-child{page-break-after:auto}
+          .sheet-header{display:grid;grid-template-columns:205px 1fr 330px;gap:14px;align-items:start;margin:0 0 8px}
+          .sheet-header.continued{grid-template-columns:1fr 360px}
+          .sheet-header.continued .brand-block{display:none}
+          .brand-block{display:grid;grid-template-columns:58px 1fr;gap:8px;align-items:center}
+          .brand-mark{display:grid;place-items:center;width:52px;height:52px;border:1px solid #111;border-radius:50%;font:bold 12px Arial,sans-serif;text-transform:uppercase}
+          .brand-block h1{margin:0;font:700 26px/0.95 Arial,Helvetica,sans-serif}
+          .form-title{padding-top:12px;font-family:Arial,Helvetica,sans-serif}
+          .form-title strong{display:block;font-size:21px}
+          .form-title span{display:block;font-size:29px;letter-spacing:.03em}
+          .sheet-header.continued .form-title span{display:inline;font-size:18px;font-style:italic;margin-left:4px}
+          .student-fields{font:17px Arial,Helvetica,sans-serif}
+          .student-fields p{display:grid;grid-template-columns:70px 1fr;gap:6px;align-items:end;margin:0 0 9px}
+          .student-fields p:last-child{grid-template-columns:54px 1fr 48px 60px}
+          .student-fields span{min-height:18px;border-bottom:1px solid #111}
+          .sheet-set{display:grid;grid-template-columns:52px 1fr;border:1.6px solid #111;border-bottom:0;break-inside:avoid}
+          .sheet-set:last-child{border-bottom:1.6px solid #111}
+          .set-number{display:grid;place-items:center;border-right:1.2px solid #111;font:42px Arial,Helvetica,sans-serif}
+          .set-content{min-width:0}
+          .set-title{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #111;background:#f2f2f2;padding:2px 8px;font:bold 16px Arial,Helvetica,sans-serif}
+          .set-title em{font:11px Arial,Helvetica,sans-serif;color:#444}
+          .task-row{display:grid;grid-template-columns:56px 1fr 74px;border-bottom:1px solid #111;min-height:42px}
+          .task-row.no-task-label{grid-template-columns:1fr 74px}
+          .task-label{display:grid;place-items:center;border-right:1px solid #111;font:bold 13px Arial,Helvetica,sans-serif}
+          .task-items{padding:7px 12px}
+          .item-grid{display:grid;gap:8px 22px;align-items:end}
+          .item-grid.is-letters{grid-template-columns:repeat(13,minmax(22px,1fr));gap:11px 18px}
+          .item-grid.is-words{grid-template-columns:repeat(5,minmax(70px,1fr));gap:8px 24px}
+          .item-grid.is-sentences{grid-template-columns:repeat(2,minmax(210px,1fr));gap:9px 28px}
+          .print-item{display:inline-block;text-align:center;min-height:20px;font-size:17px;line-height:1.35;text-decoration:underline;text-underline-offset:3px}
+          .is-missed{color:#9a2f1b}
+          .is-unscored{color:#777}
+          .score-box{display:grid;grid-template-rows:20px 1fr;align-items:end;border-left:1px solid #111;text-align:right;padding:0 5px 6px;font:18px Arial,Helvetica,sans-serif}
+          .score-box span{align-self:start;text-align:center;border-bottom:1px solid #111;font:13px "Times New Roman",Times,serif}
+          .score-box small{font-size:9px;line-height:1.1;text-align:right;color:#222}
+          .score-box strong{font-weight:400}
+          .comments-line{min-height:25px;padding:3px 8px;font-size:16px;line-height:1.2}
+          .comments-line strong{font-weight:400}
+          .print-marked-span{display:inline-grid;grid-template-rows:auto auto;place-items:center;margin:0 1px;color:#912f1a;text-decoration:none}
+          .print-marked-span em{font:700 12px Arial,Helvetica,sans-serif;line-height:1}
+          .print-marked-span b{border-top:2px solid #912f1a;font-weight:400;line-height:1.05;text-decoration:line-through;text-decoration-thickness:1.4px}
+          .print-whole-word,.print-no-response{display:inline-grid;grid-template-rows:auto auto;gap:0;text-decoration:none}
+          .print-whole-word em,.print-no-response b{color:#912f1a;font:700 12px Arial,Helvetica,sans-serif}
+          .sheet-footer{display:flex;justify-content:space-between;margin:10px 26px 0;font:14px Arial,Helvetica,sans-serif}
         </style>
       </head>
       <body>
-        <main class="report">
-        <header class="report-header">
-          <h1>Quick Phonics Screener</h1>
-          <p>Digitally completed examiner scoring sheet</p>
-          <div class="student-line">
-            <div><strong>Student:</strong> ${escapeHtml(scholarName)}</div>
-            <div><strong>Form:</strong> ${escapeHtml(selectedForm.label)}</div>
-            <div><strong>Date:</strong> ${escapeHtml(new Date().toLocaleDateString())}</div>
-          </div>
-        </header>
-        <section class="summary-grid" aria-label="QPS summary">
-          <div class="summary-card"><span>Score</span><strong>${correctCount}/${qpsItems.length}</strong></div>
-          <div class="summary-card"><span>Percent</span><strong>${percent}%</strong></div>
-          <div class="summary-card"><span>Needs Review</span><strong>${missedCount}</strong></div>
-          <div class="summary-card"><span>Items Scored</span><strong>${scoredItems.length}/${qpsItems.length}</strong></div>
-        </section>
-        <table>
-          <thead>
-            <tr><th>Skill Set</th><th>Score</th><th>Needs Review</th><th>Not Scored</th></tr>
-          </thead>
-          <tbody>${sectionSummaryRows || `<tr><td colspan="4">No QPS items have been scored yet.</td></tr>`}</tbody>
-        </table>
-        ${sectionCardsHtml}
+        <main>
+          <section class="sheet-page">
+            ${renderHeader(false)}
+            ${firstPageHtml}
+            <footer class="sheet-footer"><span>Quick Phonics Screener</span><span>Digital Examiner Sheet</span></footer>
+          </section>
+          <section class="sheet-page">
+            ${renderHeader(true)}
+            ${secondPageHtml}
+            <footer class="sheet-footer"><span>Quick Phonics Screener</span><span>Digital Examiner Sheet</span></footer>
+          </section>
         </main>
       </body>
       </html>
@@ -2738,6 +2811,12 @@ export function QpsScreenerGame() {
                               }}
                               onChange={(event) => updateAnnotationResponse(annotation.id, event.target.value)}
                               onFocus={() => setActiveErrorId(annotation.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  finishExaminerEntry();
+                                }
+                              }}
                               placeholder="said"
                               value={annotation.actualResponse}
                             />
@@ -2825,6 +2904,12 @@ export function QpsScreenerGame() {
                 What scholar said for the whole item
                 <input
                   onChange={(event) => updateWholeWordResponse(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      finishExaminerEntry();
+                    }
+                  }}
                   placeholder="Type the whole response"
                   value={currentScore.wholeWordResponse}
                 />
